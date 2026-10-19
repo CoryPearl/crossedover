@@ -1,0 +1,87 @@
+Subject: winemac: Opt fixed-size game main windows into native fullscreen.
+
+Original CrossedOver change. Disabled by default; application window sizing
+constraints remain in force outside native fullscreen. Dialogs are excluded.
+
+--- a/dlls/winemac.drv/macdrv_cocoa.h
++++ b/dlls/winemac.drv/macdrv_cocoa.h
+@@ -141,6 +141,7 @@
+ extern bool use_confinement_cursor_clipping;
+ extern bool allow_cursor_clipping;
+ extern bool fullscreen_ignore_max_size;
++extern bool native_fullscreen;
+ extern bool cursor_clipping_locks_windows;
+ extern bool use_precise_scrolling;
+ extern int gl_surface_mode;
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -57,6 +57,7 @@
+ bool use_confinement_cursor_clipping = true;
+ bool allow_cursor_clipping = true;
+ bool fullscreen_ignore_max_size = false;
++bool native_fullscreen = false;
+ bool cursor_clipping_locks_windows = true;
+ bool use_precise_scrolling = true;
+ int gl_surface_mode = GL_SURFACE_IN_FRONT_OPAQUE;
+@@ -369,6 +370,9 @@
+ 
+     if (!get_config_key(hkey, appkey, "UseConfinementCursorClipping", buffer, sizeof(buffer)))
+         use_confinement_cursor_clipping = IS_OPTION_TRUE(buffer[0]);
++
++    if (!get_config_key(hkey, appkey, "NativeFullscreen", buffer, sizeof(buffer)))
++        native_fullscreen = IS_OPTION_TRUE(buffer[0]);
+ 
+     if (!get_config_key(hkey, appkey, "FullscreenIgnoreMaxSize", buffer, sizeof(buffer)))
+         fullscreen_ignore_max_size = IS_OPTION_TRUE(buffer[0]);
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -56,7 +56,11 @@
+         style_mask = NSWindowStyleMaskTitled;
+         if (wf->close_button) style_mask |= NSWindowStyleMaskClosable;
+         if (wf->minimize_button) style_mask |= NSWindowStyleMaskMiniaturizable;
+-        if (wf->resizable || wf->maximize_button) style_mask |= NSWindowStyleMaskResizable;
++        /* Opt selected game main windows into AppKit fullscreen, even when
++         * the Windows client only supports a fixed-size desktop window. */
++        if (wf->resizable || wf->maximize_button ||
++            (native_fullscreen && wf->minimize_button && !wf->utility && !wf->prevents_app_activation))
++            style_mask |= NSWindowStyleMaskResizable;
+         if (wf->utility) style_mask |= NSWindowStyleMaskUtilityWindow;
+     }
+     else style_mask = NSWindowStyleMaskBorderless;
+@@ -1109,6 +1113,9 @@
+     - (BOOL) preventResizing
+     {
+         BOOL preventForClipping = cursor_clipping_locks_windows && [[WineApplicationController sharedController] clippingCursor];
++        if (native_fullscreen && !exitingFullScreen &&
++            (enteringFullScreen || ([self styleMask] & NSWindowStyleMaskFullScreen)))
++            return disabled;
+         return ([self styleMask] & NSWindowStyleMaskResizable) && (disabled || !resizable || preventForClipping);
+     }
+ 
+@@ -1158,7 +1165,7 @@
+         NSUInteger style = [self styleMask];
+ 
+         if (behavior & NSWindowCollectionBehaviorParticipatesInCycle &&
+-            style & NSWindowStyleMaskResizable && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
++            style & NSWindowStyleMaskResizable && !(style & NSWindowStyleMaskUtilityWindow) && (!maximized || native_fullscreen) &&
+             !(self.parentWindow || self.latentParentWindow))
+         {
+             behavior |= NSWindowCollectionBehaviorFullScreenPrimary;
+@@ -2528,7 +2535,7 @@
+             ret = [self isKeyWindow] || (!self.disabled && !self.noForeground);
+         else if ([menuItem action] == @selector(undo:)) // CrossOver Hack 10912: Mac Edit menu
+             ret = TRUE;
+-        if ([menuItem action] == @selector(toggleFullScreen:) && (self.disabled || maximized))
++        if ([menuItem action] == @selector(toggleFullScreen:) && (self.disabled || (maximized && !native_fullscreen)))
+             ret = NO;
+ 
+         return ret;
+@@ -2730,7 +2737,7 @@
+ 
+     - (void) toggleFullScreen:(id)sender
+     {
+-        if (!self.disabled && !maximized)
++        if (!self.disabled && (!maximized || native_fullscreen))
+             [super toggleFullScreen:sender];
+     }
+ 

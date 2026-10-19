@@ -35,7 +35,7 @@ The current GUI contains only TrackMania Nations Forever. **Performance** uses t
 
 Source-runtime manifests advertise `supportsMSync`. The app enables `WINEMSYNC=1` only when advertised, and removes inherited ESYNC/FSYNC settings. Every process in the environment must use the same synchronization mode; changing it requires a full environment restart. Older manifests remain readable and use the previous server synchronization mode.
 
-The DXVK configuration is copied into `C:\crossedover\dxvk.conf` so it remains reachable with broad host drive mappings disabled. Reported D3D9 texture memory is limited to 1024 MiB for the old 32-bit demo. Performance displays FPS and frame times in-game to support real comparisons. This is an experimental profile; GPU smoke checks and synthetic benchmarks do not establish game frame rate.
+The DXVK configuration is copied into `C:\crossedover\dxvk.conf` so it remains reachable with broad host drive mappings disabled. Reported D3D9 texture memory is limited to 1024 MiB for the old 32-bit demo. Normal Performance launches disable the DXVK FPS/frame-time overlay (`DXVK_HUD=0`). This is an experimental profile; GPU smoke checks and synthetic benchmarks do not establish game frame rate.
 
 Run `crossedover benchmark` for the fixed 1280×720, 256-draw-call D3D9 comparison workload. It waits for GPU completion and reports mean/p95 frame durations. Run the same game track and settings to evaluate actual playability.
 
@@ -45,7 +45,7 @@ For a synchronization compatibility comparison, close Steam and games, then run 
 
 The source runtime includes 32/64-bit x87 square-root and PC24/PC53 boundary probes, run by CLI smoke checks when the accelerator is selected. Numeric probes do not certify all x87 semantics or TrackMania physics/replay fidelity. The helper implements a binary64-backed subset; full 80-bit state remains outside its qualification.
 
-The Performance HUD also writes its sampled presentation rate to the managed D3D9 log, at most once every five seconds. These are presentation rates; they do not by themselves establish responsive input or race simulation.
+The runtime retains its opt-in HUD diagnostics for developer investigations, but normal launches do not enable the frame-sampling flag. Earlier sampled presentation rates do not by themselves establish responsive input or race simulation.
 
 
 Build 6 adds `runtime/patches/d9vk/0006-opt-in-process-dep.patch`. Its `d3d9.forceProcessDEP` option defaults to false and affects only 32-bit processes. `dxvk.conf` opts TrackMania into permanent non-executable data mappings and a 60 FPS/one-frame latency bound. The non-NX regression probe submits no draws and has a ten-second deadline. See the validation ledger for the reproduced mapped-buffer stall and the remaining full-game stability check.
@@ -55,6 +55,10 @@ Build 6 adds `runtime/patches/d9vk/0006-opt-in-process-dep.patch`. Its `d3d9.for
 
 
 Build 7 adds two opt-in Wine Mac Driver patches: `winemac-optional-cursor-clipping.patch` adds the per-application `AllowCursorClipping` switch; `winemac-native-fullscreen-size.patch` adds `FullscreenIgnoreMaxSize`. Both preserve upstream defaults. CrossedOver configures them only under `AppDefaults\\TmForever.exe\\Mac Driver`, alongside native Command keys, movable windows, and no display capture. The fullscreen policy lifts content maxima during the native transition/session and restores application constraints afterward. The incremental builder now rebuilds the Mac driver even with `--skip-build`, and provenance records Wine patch hashes.
+
+Build 12 applies a CS2 window policy under its per-application Mac Driver key. CS2 retains `AllowCursorClipping=Y` for aiming and uses `CursorClippingLocksWindows=N`, `FullscreenIgnoreMaxSize=Y`, and `NativeFullscreen=Y`. The new `winemac-fixed-window-fullscreen.patch` opts titled, minimizable game windows into AppKit fullscreen even when their Windows style is fixed-size. Disabled windows and utility dialogs retain their restrictions; desktop sizing constraints are restored outside fullscreen. The switch defaults off and TrackMania leaves it off. This requires the rebuilt runtime, not just a registry setting.
+
+The CS2 recipe selects DXMT Metal, passes windowed mode and a frame cap through Steam, and performs backed-up one-time migrations of borderless window settings and FSR upscaling. CS2's shipped `panorama/layout/settings/settings_video.xml` maps FSR Disabled to zero; the clarity migration preserves resolution and other quality settings. Later user choices are preserved by separate migration markers. Global RetinaMode is not changed because its coordinate-space policy is shared by the prefix. Startup/menu and in-game fullscreen have been confirmed; native green-button fullscreen, clarity, and gameplay performance need user validation.
 
 Before launching the demo, the supervisor checks that its process is absent, prepares its own GBX windowed flag and keyboard capture setting, and saves a backup on the first rewrite. Unknown chunks survive unchanged; unsupported settings formats fail safely. No pointer events or screenshots are synthesized to validate the game. User confirmation remains necessary for click alignment, native controls and race responsiveness.
 
@@ -67,3 +71,6 @@ The per-game policy also disables `gameoverlayrenderer` and its 64-bit equivalen
 
 
 With the final OpenAL/runtime configuration, the user subsequently confirmed a smooth short race at 55–60 FPS. The prior 40 FPS result is historical. This remains short-run qualification rather than a strict minimum of 60 or evidence for other Windows games.
+
+
+Build 16 adds `winemac-preserve-game-titlebar.patch`. With the existing per-CS2 `NativeFullscreen` opt-in, Wine retains native decorations for captioned game windows even if their Windows client and visible-window rectangles coincide. This covers client-drawn window frames; shaped, layered, and captionless windows retain their existing policies. Other executables keep upstream behavior. The CS2 window migration advances to v2 (with a separate backup) and its launch recipe requests a bounded 1280×720 window on every launch. Native fullscreen remains available through AppKit; graphics-quality preferences are not reset.

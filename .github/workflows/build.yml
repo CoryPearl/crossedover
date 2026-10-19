@@ -3,6 +3,12 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  website:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check release docs and website
+        run: python3 scripts/check-release.py
   macos:
     runs-on: macos-15
     steps:
@@ -12,9 +18,11 @@ jobs:
           xcode-version: latest-stable
       - name: Test core behavior
         run: swift test
+      - name: Build app and tools
+        run: swift build --jobs 4
       - name: Package local development build
         run: python3 scripts/package.py --debug --skip-build --thin
       - uses: actions/upload-artifact@v4
         with:
-          name: CrossedOver-development
+          name: crossedover-developer-macos
           path: dist/

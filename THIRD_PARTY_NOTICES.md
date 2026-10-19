@@ -19,6 +19,8 @@ Preserve upstream notices and provide corresponding source for redistributed run
 
 The application uses Apple's system frameworks and SF Symbols. No CodeWeavers branding or proprietary assets are included. Steam, CrossOver, Wine, and Apple product names identify their respective third-party projects.
 
-The TrackMania logo is read from the user’s existing Steam artwork cache and displayed in grayscale. No game artwork is redistributed in the app bundle.
+The TrackMania logo is read from the user’s existing Steam artwork cache and displayed in its original colors. No game artwork is redistributed in the app bundle.
 
 The optional cooperative Wine loader handshake is adapted from https://github.com/vakesz/TrackMania-MacOS/blob/main/patches/wine/0008-ntdll-rosetta-cooperative-sidecar.patch for the CodeWeavers Wine 11.0 loader signature. It is inactive without an explicitly selected helper.
+
+The website contains app-interface previews with cached game artwork visible in context. It hosts no game files. Full GRDB and Sparkle license texts are in licenses/ and included with the packaged app.

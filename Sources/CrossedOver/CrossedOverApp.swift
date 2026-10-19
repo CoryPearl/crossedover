@@ -13,10 +13,13 @@ import CrossedOverCore
                 model.runtimes = try await model.runtimeManager.installed()
                 model.environment = try model.store.all(ManagedEnvironment.self, kind: "environment").first
                 if let environment = model.environment {
-                    model.games = try SteamDiscovery().discover(environment: environment, prefix: model.paths.prefix(environment)).filter { $0.appID == "11020" }
+                    model.games = try SteamDiscovery().discover(environment: environment, prefix: model.paths.prefix(environment))
                 }
                 model.operations = try model.store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
                 model.sessions = try model.store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
+                if let fixture = CommandLine.arguments.firstIndex(of: "--preview-games"), fixture + 1 < CommandLine.arguments.count {
+                    model.games = try JSONDecoder().decode([GameInstallation].self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[fixture + 1])))
+                }
                 if let page = CommandLine.arguments.firstIndex(of: "--preview-page"), page + 1 < CommandLine.arguments.count {
                     model.selectedPage = CommandLine.arguments[page + 1]
                 }
@@ -25,9 +28,9 @@ import CrossedOverCore
                     switch CommandLine.arguments[stateIndex + 1] {
                     case "setup": model.environment = nil; model.games = []
                     case "install": model.games = []
-                    case "running":
+                    case "running", "unknown":
                         if let environment = model.environment {
-                            model.currentSession = LaunchSession(appID: "11020", environmentID: environment.id, state: "running")
+                            model.currentSession = LaunchSession(appID: model.games.first?.appID ?? "11020", environmentID: environment.id, state: CommandLine.arguments[stateIndex + 1])
                         }
                     case "busy": model.busy = true; model.progress = "Preparing your game. This may take a moment…"
                     case "notice": model.notice = "Uninstall requested. Confirm in Steam; the library will update when it finishes."
@@ -36,7 +39,15 @@ import CrossedOverCore
                 }
                 let advanced = CommandLine.arguments.contains("--preview-advanced")
                 let tall = CommandLine.arguments.contains("--tall-preview")
-                let renderer = ImageRenderer(content: ContentView(model: model, renderingSnapshot: true, previewAdvanced: advanced).environment(\.colorScheme, .dark).frame(width: compact ? 840 : 1100, height: tall ? 1400 : compact ? 620 : 760))
+                func previewArgument(_ flag: String) -> String? {
+                    guard let index = CommandLine.arguments.firstIndex(of: flag), index + 1 < CommandLine.arguments.count else { return nil }
+                    return CommandLine.arguments[index + 1]
+                }
+                let width = min(2560, max(840, Double(previewArgument("--preview-width") ?? "") ?? (compact ? 840 : 1100)))
+                let height = min(1800, max(620, Double(previewArgument("--preview-height") ?? "") ?? (tall ? 1400 : compact ? 620 : 760)))
+                let renderer = ImageRenderer(content: ContentView(model: model, renderingSnapshot: true, previewAdvanced: advanced,
+                    previewLibraryMode: previewArgument("--preview-layout") ?? "grid", previewSearch: previewArgument("--preview-search"))
+                    .environment(\.colorScheme, .dark).frame(width: width, height: height))
                 renderer.scale = 2
                 guard let image = renderer.cgImage, let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { throw CrossedOverError.message("Could not render the SwiftUI preview.") }
                 try data.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
@@ -49,6 +60,7 @@ import CrossedOverCore
 
 struct CrossedOverApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @FocusedValue(\.librarySearch) private var librarySearch
     private let model: AppModel?
     private let startupError: String?
     init() {
@@ -74,6 +86,9 @@ struct CrossedOverApp: App {
                     .disabled(!delegate.updatesConfigured)
             }
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(after: .textEditing) {
+                Button("Find Game…") { librarySearch?() }.keyboardShortcut("f").disabled(librarySearch == nil)
+            }
             CommandMenu("Steam") {
                 Button("Open Windows Steam") { model?.openSteam() }.keyboardShortcut("s", modifiers: [.command, .shift]).disabled(model == nil || model?.busy == true)
                 Button("Refresh Library") { Task { await model?.refresh() } }.keyboardShortcut("r").disabled(model == nil || model?.busy == true)

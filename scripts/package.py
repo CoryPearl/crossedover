@@ -10,6 +10,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = (ROOT / "VERSION").read_text().strip()
 
 def run(args):
     subprocess.run([str(x) for x in args], cwd=ROOT, check=True)
@@ -46,12 +47,17 @@ def main():
     if not args.skip_build: run(["swift", "build", "-c", configuration, "-j", "4"])
     binary = Path(subprocess.check_output(["swift", "build", "-c", configuration, "--show-bin-path"], cwd=ROOT, text=True).strip())
     dist = ROOT / "dist"; dist.mkdir(exist_ok=True)
-    app = dist / "CrossedOver.app"
+    app = dist / "crossedover.app"
+    legacy_app = dist / "CrossedOver.app"
+    if legacy_app.exists(): shutil.rmtree(legacy_app)
     if app.exists(): shutil.rmtree(app)
     macos = app / "Contents/MacOS"; resources = app / "Contents/Resources"; frameworks = app / "Contents/Frameworks"
     for folder in [macos, resources, frameworks]: folder.mkdir(parents=True, exist_ok=True)
     for name in ["CrossedOver", "CrossedOverSupervisor"]: shutil.copy2(binary / name, macos / name)
     for bundle in binary.glob("*.bundle"): shutil.copytree(bundle, resources / bundle.name, symlinks=True)
+    shutil.copy2(ROOT / "LICENSE", resources / "LICENSE.txt")
+    shutil.copy2(ROOT / "THIRD_PARTY_NOTICES.md", resources / "Third-party notices.md")
+    shutil.copytree(ROOT / "licenses", resources / "Licenses")
     if args.runtime:
         source_runtime = args.runtime.resolve()
         if not (source_runtime / "runtime.json").exists(): raise RuntimeError("Selected runtime has no runtime.json")
@@ -61,10 +67,10 @@ def main():
     sparkle = ROOT / ".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
     shutil.copytree(sparkle, frameworks / "Sparkle.framework", symlinks=True)
     info = {
-        "CFBundleIdentifier": "org.crossedover.CrossedOver", "CFBundleName": "CrossedOver", "CFBundleDisplayName": "CrossedOver",
-        "CFBundleExecutable": "CrossedOver", "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "0.1.0",
-        "CFBundleVersion": "10", "LSMinimumSystemVersion": "15.0", "NSHighResolutionCapable": True,
-        "NSPrincipalClass": "NSApplication", "NSHumanReadableCopyright": "CrossedOver contributors. GPL-3.0-or-later.",
+        "CFBundleIdentifier": "org.crossedover.CrossedOver", "CFBundleName": "crossedover", "CFBundleDisplayName": "crossedover",
+        "CFBundleExecutable": "CrossedOver", "CFBundlePackageType": "APPL", "CFBundleShortVersionString": VERSION,
+        "CFBundleVersion": "19", "LSMinimumSystemVersion": "15.0", "NSHighResolutionCapable": True,
+        "NSPrincipalClass": "NSApplication", "NSHumanReadableCopyright": "crossedover contributors. GPL-3.0-or-later.",
         "LSApplicationCategoryType": "public.app-category.games", "CFBundleIconFile": "CrossedOver"
     }
     iconset = ROOT / ".cache/CrossedOver.iconset"
@@ -97,13 +103,20 @@ def main():
         if target.exists(): shutil.rmtree(target)
         shutil.copytree(bundle, target, symlinks=True)
     if args.dmg:
-        image = dist / "CrossedOver-0.1.0.dmg"
+        image = dist / f"crossedover-{VERSION}.dmg"
+        legacy_image = dist / "CrossedOver-0.1.0.dmg"
+        if legacy_image.exists(): legacy_image.unlink()
         if image.exists(): image.unlink()
         stage = dist / ".dmg-stage"
         if stage.exists(): shutil.rmtree(stage)
         stage.mkdir(); shutil.copytree(app, stage / app.name, symlinks=True)
         (stage / "Applications").symlink_to("/Applications")
-        run(["hdiutil", "create", "-volname", "CrossedOver", "-srcfolder", stage, "-ov", "-format", "UDZO", image])
+        for source, name in [(ROOT / "docs/QUICKSTART.html", "Start Here.html"),
+                             (ROOT / "LICENSE", "LICENSE.txt"),
+                             (ROOT / "THIRD_PARTY_NOTICES.md", "Third-party notices.md")]:
+            if source.exists(): shutil.copy2(source, stage / name)
+        shutil.copytree(ROOT / "licenses", stage / "Licenses")
+        run(["hdiutil", "create", "-volname", "crossedover", "-srcfolder", stage, "-ov", "-format", "UDZO", image])
         shutil.rmtree(stage)
     print("Built", app)
     print("CLI:", cli / "crossedover")

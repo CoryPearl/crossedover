@@ -9,7 +9,7 @@ public final class EnvironmentLock: @unchecked Sendable {
         guard descriptor >= 0 else { throw CrossedOverError.message("Could not open the environment lock.") }
         guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
             close(descriptor); descriptor = -1
-            throw CrossedOverError.message("Another CrossedOver operation is using this environment.")
+            throw CrossedOverError.message("Another crossedover operation is using this environment.")
         }
     }
     deinit { if descriptor >= 0 { flock(descriptor, LOCK_UN); close(descriptor) } }
@@ -42,7 +42,6 @@ public enum WineConfiguration {
             // TrackMania uses DirectDraw for startup windows. Its 3D calls go
             // through native D9VK; avoid initializing a second OpenGL adapter.
             variables["WINE_D3D_CONFIG"] = "renderer=gdi"
-            variables["CROSSEDOVER_FRAME_LOG"] = "1"
             if let helper = runtime.manifest.x87RelativePath {
                 variables["ROSETTA_X87_PATH"] = runtime.root.appendingPathComponent(helper).path
             }
@@ -51,7 +50,7 @@ public enum WineConfiguration {
             variables["DXVK_CONFIG_FILE"] = "C:\\crossedover\\dxvk.conf"
             variables["DXVK_LOG_PATH"] = "C:\\crossedover\\logs"
             variables["DXVK_LOG_LEVEL"] = "info"
-            variables["DXVK_HUD"] = "fps,frametimes"
+            variables["DXVK_HUD"] = "0"
         }
         variables["PATH"] = runtime.wine.deletingLastPathComponent().path + ":/usr/bin:/bin:/usr/sbin:/sbin"
         return variables

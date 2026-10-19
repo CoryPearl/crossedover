@@ -1,0 +1,20 @@
+Subject: winemac: Preserve opted-in game title bars with client-drawn frames.
+
+Original CrossedOver change. Honor WS_CAPTION for NativeFullscreen games even
+when the client draws across the Windows non-client area. Other games, shaped
+windows, layered windows and native borderless styles retain upstream behavior.
+
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -118,7 +118,10 @@
+     struct macdrv_window_features wf = {0};
+ 
+     if (ex_style & WS_EX_NOACTIVATE) wf.prevents_app_activation = TRUE;
+-    if (EqualRect(&data->rects.window, &data->rects.visible)) return wf;
++    /* SDL games can draw their own non-client area while retaining WS_CAPTION.
++     * Keep native controls for opted-in framed game windows in that case. */
++    if (EqualRect(&data->rects.window, &data->rects.visible) &&
++        !(native_fullscreen && (style & WS_CAPTION) == WS_CAPTION && !data->shaped)) return wf;
+ 
+     /* CrossOver Hack #16933 */
+     if (is_main_quicken_window(data->hwnd))

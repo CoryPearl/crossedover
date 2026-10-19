@@ -180,6 +180,15 @@ import Testing
         try JSONEncoder().encode(launch).write(to: file)
         try await Task.detached { try SupervisorEngine.runLaunchWorker(requestFile: file) }.value
         #expect(try String(contentsOf: log, encoding: .utf8) == steam.path + "\n-cef-disable-gpu\n-silent\n-applaunch\n11020\n")
+        let cs2 = try #require(ResourceCatalog.recipes().first { $0.appID == "730" })
+        #expect(cs2.profile == .metal)
+        #expect(cs2.compatibleProfiles == [.metal])
+        #expect(cs2.executableNames == ["cs2.exe"])
+        try JSONEncoder().encode(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchGame, appID: "730")).write(to: file)
+        try await Task.detached { try SupervisorEngine.runLaunchWorker(requestFile: file) }.value
+        let cs2Arguments = try String(contentsOf: log, encoding: .utf8).split(separator: "\n").map(String.init)
+        #expect(cs2Arguments.prefix(5) == [steam.path, "-cef-disable-gpu", "-silent", "-applaunch", "730"])
+        #expect(Array(cs2Arguments.dropFirst(5)) == cs2.launchArguments)
         for (command, uri) in [(SupervisorRequest.Command.uninstallGame, "steam://uninstall/11020"), (.gameProperties, "steam://gameproperties/11020"), (.verifyGame, "steam://validate/11020"), (.openDownloads, "steam://nav/downloads")] {
             try JSONEncoder().encode(SupervisorRequest(root: paths.root, environmentID: environment.id, command: command, appID: "11020")).write(to: file)
             try await Task.detached { try SupervisorEngine.runLaunchWorker(requestFile: file) }.value
@@ -217,6 +226,35 @@ import Testing
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: paths.logs.path).filter { $0.hasPrefix(".launch-") }.isEmpty)
         #expect(FileManager.default.fileExists(atPath: steam.appendingPathComponent("steamapps/appmanifest_11020.acf").path))
+        do {
+            _ = try await SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchGame, appID: "11020"))
+            Issue.record("Window policy must not be rewritten beneath a running game")
+        } catch { #expect(error.localizedDescription.contains("already running")) }
+        #expect(!FileManager.default.fileExists(atPath: paths.prefix(environment).appendingPathComponent("drive_c/crossedover/trackmania-windowing.reg").path))
+    }
+    @Test func managingRunningGameWithoutARecipeIsRejected() async throws {
+        let (paths, _, environment, original) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        let store = try Store(url: paths.root.appendingPathComponent("crossedover.sqlite"))
+        try store.put(environment, kind: "environment", id: environment.id.uuidString)
+        var manifest = original.manifest; manifest.observerRelativePath = "observer.exe"
+        try Data().write(to: original.root.appendingPathComponent("observer.exe"))
+        try JSONEncoder().encode(manifest).write(to: original.root.appendingPathComponent("runtime.json"))
+        try "#!/bin/sh\n/usr/bin/printf '%s\\n' '[{\"pid\":42,\"executable\":\"unlisted.exe\"}]'\n".write(to: original.wine, atomically: true, encoding: .utf8)
+        let steam = paths.prefix(environment).appendingPathComponent("drive_c/Program Files (x86)/Steam")
+        let game = steam.appendingPathComponent("steamapps/common/Unlisted/bin/win64")
+        try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)
+        try Data().write(to: game.appendingPathComponent("unlisted.exe"))
+        try Data().write(to: steam.appendingPathComponent("steam.exe"))
+        let acf = "\"AppState\" { \"appid\" \"424242\" \"name\" \"Unlisted Game\" \"installdir\" \"Unlisted\" \"StateFlags\" \"4\" }"
+        try Data(acf.utf8).write(to: steam.appendingPathComponent("steamapps/appmanifest_424242.acf"))
+        for command in [SupervisorRequest.Command.uninstallGame, .verifyGame] {
+            do {
+                _ = try await SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: command, appID: "424242"))
+                Issue.record("An active game without a recipe must not be managed")
+            } catch { #expect(error.localizedDescription.contains("Close Unlisted Game")) }
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.logs.path).filter { $0.hasPrefix(".launch-") }.isEmpty)
     }
     @Test func stoppingAnAlreadyStoppedEnvironmentIsSuccessful() async throws {
         let (paths, _, environment, runtime) = try fixture()

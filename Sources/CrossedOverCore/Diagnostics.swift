@@ -2,7 +2,7 @@ import Foundation
 
 public enum DiagnosticsService {
     public static func preview(paths: AppPaths, store: Store, host: HostReport?) throws -> String {
-        var sections = ["CrossedOver diagnostic report", "Generated: \(ISO8601DateFormatter().string(from: Date()))", "Application: 0.1.0-dev"]
+        var sections = ["crossedover diagnostic report", "Generated: \(ISO8601DateFormatter().string(from: Date()))", "Application: \(AppVersion.current)"]
         if let host { sections += ["macOS: \(host.osVersion)", "GPU: \(host.gpu)", "Memory: \(host.memoryGB) GiB", "Translation available: \(host.translationAvailable)"] }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let environments = try store.all(ManagedEnvironment.self, kind: "environment")

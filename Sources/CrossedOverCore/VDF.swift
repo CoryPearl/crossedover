@@ -94,16 +94,31 @@ public struct SteamDiscovery: Sendable {
             guard fm.fileExists(atPath: steamapps.path) else { continue }
             for file in try fm.contentsOfDirectory(at: steamapps, includingPropertiesForKeys: nil) where file.lastPathComponent.hasPrefix("appmanifest_") && file.pathExtension == "acf" {
                 let state = try VDF.parse(String(contentsOf: file, encoding: .utf8))["appstate"]?.object
-                guard let appID = state?["appid"]?.string, Self.validAppID(appID),
+                // Steam's shared redistributables are a dependency, not a game.
+                guard let appID = state?["appid"]?.string, Self.validAppID(appID), appID != "228980",
                       let name = state?["name"]?.string, let directory = state?["installdir"]?.string,
                       let flags = Int(state?["stateflags"]?.string ?? ""), flags & 4 != 0 else { continue }
                 let game = try FileSafety.containedURL("steamapps/common/" + directory, in: library)
                 guard fm.fileExists(atPath: game.path) else { continue }
                 var installation = GameInstallation(appID: appID, environmentID: environment.id, name: name, directory: game.path, sizeBytes: Int64(state?["sizeondisk"]?.string ?? "0") ?? 0)
                 for steam in steamRoots {
-                    for suffix in ["_library_600x900.jpg", "_library_hero.jpg", "_header.jpg"] {
-                        guard let artwork = try? FileSafety.containedURL("appcache/librarycache/" + appID + suffix, in: steam) else { continue }
+                    let artworkNames = [appID + "/header.jpg", appID + "_header.jpg", appID + "/library_hero.jpg", appID + "_library_hero.jpg", appID + "/library_600x900.jpg", appID + "_library_600x900.jpg", appID + "/logo.png", appID + "_logo.png"]
+                    for name in artworkNames {
+                        guard let artwork = try? FileSafety.containedURL("appcache/librarycache/" + name, in: steam) else { continue }
                         if fm.fileExists(atPath: artwork.path) { installation.artworkPath = artwork.path; break }
+                    }
+                    // Current Steam versions also put artwork under a content-hash directory.
+                    if installation.artworkPath == nil,
+                       let cache = try? FileSafety.containedURL("appcache/librarycache/" + appID, in: steam),
+                       let children = try? fm.contentsOfDirectory(at: cache, includingPropertiesForKeys: [.isDirectoryKey]) {
+                        for child in children.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }).prefix(128) {
+                            guard (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+                            for name in ["header.jpg", "library_header.jpg", "library_hero.jpg", "library_600x900.jpg", "library_capsule.jpg", "logo.png"] {
+                                guard let artwork = try? FileSafety.containedURL(child.lastPathComponent + "/" + name, in: cache), fm.fileExists(atPath: artwork.path) else { continue }
+                                installation.artworkPath = artwork.path; break
+                            }
+                            if installation.artworkPath != nil { break }
+                        }
                     }
                     if installation.artworkPath != nil { break }
                 }

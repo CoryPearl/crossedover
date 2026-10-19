@@ -173,3 +173,70 @@ Validation on 2026-10-18:
 - Packaged app build 10, verified its deep/strict code signature, and verified the DMG checksum. Opened the packaged app and confirmed its process remained running. No game was launched, uninstalled, or reconfigured for this visual pass.
 
 Preview images and command output are under `.cache/visual-refresh/`. Design constraints and reproduction commands are in [DESIGN.md](DESIGN.md). The game-performance result above remains the latest user-confirmed gameplay evidence.
+
+### Build 11: all installed Windows Steam games
+
+Removed the GUI's app-11020 filters from discovery, persisted fallback data, and preview rendering. The library now displays every completed game installation from managed Windows Steam libraries, sorted by name, with adaptive cards, cached Steam artwork, storage usage, and per-game Play/Manage controls. Incomplete downloads and Steamworks Common Redistributables are excluded. TrackMania keeps its tested demo configuration; other games are labeled with untested compatibility. The empty library retains the optional TrackMania demo installer.
+
+Session presentation and Activity names now follow the requested game's identity. Generic game tracking and pre-management checks inventory installed executable basenames without following symbolic links, with a 50,000-entry limit and Steam fallback when observation is unavailable. This is conservative process matching, not compatibility certification. TrackMania's settings/audio preparation still applies only to app 11020. Runtime binaries and graphics configuration were not changed.
+
+Validation:
+
+- All **36 release tests passed** (`.cache/all-games/tests.log`). New coverage checks multiple games across two managed Steam libraries, modern cached-artwork paths, exclusion of incomplete downloads and shared redistributables, library replacement after uninstall, generic executable detection without traversing links, and rejection of management requests for an active game without a recipe. The first executable-inventory test caught a directory-enumeration bug; it was corrected before the passing full run.
+- Release build and `git diff --check` passed. App-owned renders checked one, two, and three game libraries at 1100 × 760 and 840 × 620, plus tall scrolling-content previews, missing artwork, long names, running and unknown session states, and an empty library. Native menu interaction is not established by static rendering.
+- CS2's real manifest was observed in an incomplete download state. The multi-game previews used explicit in-memory fixture metadata; no real Steam manifest was edited to pretend the download had completed. No game was launched or uninstalled for this change.
+- Packaged build 11, passed deep/strict app signature validation, and verified the DMG checksum. Reopened the packaged native app. No remote was configured or pushed.
+
+Artifacts: `.cache/all-games/`; preview fixtures contain only local library metadata and are ignored by Git.
+
+
+## CS2 native fullscreen and clarity — 2026-10-19
+
+The user confirmed CS2 startup/menu and its own in-game fullscreen work, but the native green button still failed and the image looked soft. Source inspection found that Wine requires a resizable native window for fullscreen and rejects Windows-maximized windows. The new opt-in `NativeFullscreen` patch permits eligible fixed-size game main windows, and bypasses resize locking during native fullscreen while restoring desktop constraints afterward. It is enabled only for CS2, preserving the TrackMania policy.
+
+The live saved graphics configuration reported FSR detail 2. The game's settings layout maps 2 to Quality and 0 to Disabled (reference: https://github.com/SteamDatabase/GameTracking-CS2/blob/master/game/csgo/pak01_dir/panorama/layout/settings/settings_video.xml). A separate one-time clarity migration disables that internal upscaler, backs up the original bytes, and preserves other settings and later user choices. The prefix-wide RetinaMode is unchanged; this is not a claim of physical-panel native resolution.
+
+The rebuilt source runtime has content ID `591dba8b13` and was imported and selected through the normal backed-up migration. 32/64-bit Windows execution and DXMT Direct3D 11 pixel readbacks passed (RGBA 64,128,191,255), as did the OpenAL playback-clock smoke check. All 39 Swift tests and the offline patch-series regression passed. The release app and DMG were rebuilt. Native fullscreen transitions, improved clarity, and CS2 match performance remain unconfirmed until the user checks the new run. No Wine UI was inspected or automated.
+
+
+## Branch application icon — build 13
+
+Replaced the upright arrowheads in the app-icon generator with original outward diagonal arrowheads and a rounded shared stem to match the sidebar branch motif. The generated 512-pixel and 32-pixel assets were visually inspected. Repackaged the existing release binaries and current source runtime without changing game settings or stopping Steam/game processes. This is an icon-only app change; the preceding 39-test result remains the last code validation.
+
+
+## Responsive library, search, and list mode — build 14
+
+Removed the library's 940-point width cap and its oversized single-game layout. Grid columns now adapt between 250 and 320 points; artwork is 112 points tall and normal card footers have a consistent height. The header and library use the available window width. Added live localized title search, clear/no-results states, Command-F focus, Escape clearing, and a persisted grid/list selector. List rows retain game controls and current-session behavior.
+
+The release build passed. App-owned ImageRenderer previews were inspected at compact (840), default (1100), and wide (1920) widths, using explicit fixture metadata for a larger library. The default grid fits three columns and the wide grid six. Matching and nonmatching searches and compact list rows were checked, including a deliberately long title. These static previews do not establish live keyboard interaction or scrolling. No Steam/game configuration or installation was changed.
+
+
+## TrackMania overlay disabled — build 15
+
+Normal Performance launches explicitly set `DXVK_HUD=0` and no longer enable the CrossedOver frame-sampling diagnostic flag. The existing environment sanitization removes inherited values for both. The visible FPS/frame-time display was a managed renderer diagnostic, not a change to TrackMania’s own preferences. The change applies after the Windows Steam/game environment restarts; no running game was interrupted.
+
+
+## CS2 native title-bar retention — build 16
+
+The user reported CS2 had no traffic-light controls, while TrackMania did. The saved CS2 configuration was already windowed and bordered (both fullscreen and nowindowborder zero) but its dimensions were 1512×982, matching the desktop. No custom Steam launch options were present. Wine's Mac driver discards all native decorations when the Windows visible and outer rectangles coincide, even if WS_CAPTION remains set. Added a per-CS2 opt-in exception to preserve captioned native frames in that case; shaped, layered, and truly captionless styles keep their existing policy.
+
+The source runtime was rebuilt as content ID `5fb685fcd2`. A v2 backed-up video migration restores a framed 1280×720 desktop window, including for installations with the v1 marker; older backups remain intact. The recipe now explicitly requests that initial desktop size on every launch. Native fullscreen remains available through the existing fixed-window opt-in. All 39 Swift tests passed, and the revised settings regressions passed separately, including migration from a v1 marker without replacing its backup. The release build and offline patch regression passed. The updated runtime passed the Performance graphics, mapped-copy, x87 precision, and OpenAL smoke checks. The environment was then switched to Metal; both 32- and 64-bit D3D11 pixel-readback checks and the OpenAL playback check passed. The v2 migration was observed to save the previous file and write fullscreen=0, nowindowborder=0, defaultres=1280, defaultresheight=720 before the CS2 relaunch. The native title bar and controls still require user confirmation after relaunch; no Wine window was inspected or automated.
+
+
+## Lowercase product branding — build 17
+
+Adopted the lowercase wordmark `crossedover` in the sidebar, app metadata, settings/activity copy, diagnostic labels, and app/DMG filenames. Internal bundle identifiers, executables, resources, and the existing data location keep their established names. The release build passed and the compact app-owned library preview was visually inspected. This change does not modify game or runtime settings.
+
+
+## Search focus dismissal — build 18
+
+Added a search-field-scoped AppKit click observer, active only while search has focus. Clicks outside the search region clear its FocusState while returning the original event so buttons and menus still respond on the first click. Clicks inside the field or its clear button keep normal editing behavior. The observer is removed when focus ends or the view is dismantled. Search text is preserved. The release build passed; live interaction was not automated.
+
+
+## v1.0.0 release preparation
+
+Unified the app, CLI, diagnostics, package metadata, documentation, and website around v1.0.0 (build 19). The app root extends through the top safe area so the sidebar divider continues behind the hidden title bar in normal windows. This native title-bar behavior remains a visual check; app-owned grid/list previews were generated for the documentation and website.
+
+All 39 Swift tests and the release build passed. Offline website checks passed for release versions, local links, image metadata, and the standalone quickstart. The v1.0.0 DMG passed signature/checksum checks and includes the app, Applications shortcut, offline Start Here guide, GPL license, third-party notices, and GRDB/Sparkle licenses. No account, prefix, game installation, or credentials are packaged. The site deployed through Sites with owner-private access. Browser UI verification was unavailable because the browser service referenced a missing plugin component; no alternate access route was used.
+
+GitHub publication preserves the repository’s private visibility. The v1.0.0 number does not close the signing, notarization, dependency-source, compatibility, or fresh-machine gates listed in RELEASE.md.

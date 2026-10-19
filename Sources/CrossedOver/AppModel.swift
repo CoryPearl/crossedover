@@ -44,6 +44,16 @@ import CrossedOverCore
               let logo = try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: steam.deletingLastPathComponent()) else { return nil }
         return NSImage(contentsOf: logo)
     }
+    @ObservationIgnored private let artworkCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>(); cache.countLimit = 64; return cache
+    }()
+    func artwork(for game: GameInstallation) -> NSImage? {
+        guard let path = game.artworkPath else { return nil }
+        if let cached = artworkCache.object(forKey: path as NSString) { return cached }
+        guard let image = NSImage(contentsOfFile: path) else { return nil }
+        artworkCache.setObject(image, forKey: path as NSString)
+        return image
+    }
     var setupStep: Int { runtimes.isEmpty ? 0 : environment == nil ? 1 : !steamInstalled ? 2 : 3 }
     var supervisor: SupervisorClient {
         let sibling = Bundle.main.executableURL!.deletingLastPathComponent().appendingPathComponent("CrossedOverSupervisor")
@@ -82,12 +92,18 @@ import CrossedOverCore
             environment = try store.all(ManagedEnvironment.self, kind: "environment").first
             if let environment {
                 do {
-                    let discovered = try SteamDiscovery().discover(environment: environment, prefix: paths.prefix(environment)).filter { $0.appID == "11020" }
+                    let prefix = paths.prefix(environment)
+                    let discovered = try await Task.detached(priority: .utility) {
+                        try SteamDiscovery().discover(environment: environment, prefix: prefix)
+                    }.value
                     try store.replaceGames(discovered, environmentID: environment.id); games = discovered
                 } catch {
-                    if games.isEmpty { games = try store.all(GameInstallation.self, kind: "game").filter { $0.appID == "11020" } }
+                    if games.isEmpty {
+                        games = try store.all(GameInstallation.self, kind: "game").filter { $0.environmentID == environment.id }
+                            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                    }
                 }
-            }
+            } else { games = [] }
             operations = try store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
             sessions = try store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
         } catch { self.error = error.localizedDescription }
@@ -120,7 +136,7 @@ import CrossedOverCore
                 }
             }
             guard let runtime = selected else { return }
-            guard runtime.id != "wine-devel-11.18" else { throw CrossedOverError.message("This community runtime has a known black Steam window. Use the source-built CrossedOver runtime from Settings.") }
+            guard runtime.id != "wine-devel-11.18" else { throw CrossedOverError.message("This community runtime has a known black Steam window. Use the source-built crossedover runtime from Settings.") }
             if let existing = self.environment, existing.runtimeID != runtime.id { throw CrossedOverError.message("The environment's runtime is missing. Import its matching runtime before continuing setup.") }
             var environment = self.environment
             if environment == nil {
@@ -135,7 +151,7 @@ import CrossedOverCore
             }
             self.progress = "Opening Steam…"
             _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openSteam))
-            self.notice = "Sign in to Steam to install TrackMania."
+            self.notice = "Sign in to Steam to download your games."
         }
     }
     func openSteam() {
@@ -183,6 +199,9 @@ import CrossedOverCore
         } catch { self.error = error.localizedDescription }
     }
     func recipe(for game: GameInstallation) -> GameRecipe? { recipes.first { $0.appID == game.appID } }
+    func gameName(appID: String) -> String {
+        games.first { $0.appID == appID }?.name ?? recipes.first { $0.appID == appID }?.name ?? "Steam game \(appID)"
+    }
     func requestLaunch(_ game: GameInstallation) {
         guard currentSession == nil else { error = "Finish the current session before launching another game."; return }
         if let recipe = recipe(for: game), let environment, !(recipe.compatibleProfiles ?? [recipe.profile]).contains(environment.profile) {
@@ -219,7 +238,11 @@ import CrossedOverCore
         monitorTask?.cancel(); observationCount = 0
         monitorTask = Task {
             var observedRunning = false
-            let executableNames = recipe(for: game)?.executableNames.map { $0.lowercased() } ?? []
+            let recipe = recipe(for: game)
+            let executableNames = (try? await Task.detached {
+                try GameProcessDetection.executableNames(for: game, recipe: recipe)
+            }.value) ?? []
+            guard !Task.isCancelled else { return }
             while !Task.isCancelled, var session = currentSession {
                 try? await Task.sleep(for: .seconds(3))
                 guard !Task.isCancelled else { return }
@@ -308,7 +331,7 @@ import CrossedOverCore
     }
     func showDiagnostics() { do { diagnostics = try DiagnosticsService.preview(paths: paths, store: store, host: host) } catch { self.error = error.localizedDescription } }
     func exportDiagnostics(_ text: String) {
-        let panel = NSSavePanel(); panel.nameFieldStringValue = "CrossedOver-diagnostics.txt"; panel.allowedContentTypes = [.plainText]
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "crossedover-diagnostics.txt"; panel.allowedContentTypes = [.plainText]
         if panel.runModal() == .OK, let url = panel.url { do { try text.write(to: url, atomically: true, encoding: .utf8) } catch { self.error = error.localizedDescription } }
     }
 }

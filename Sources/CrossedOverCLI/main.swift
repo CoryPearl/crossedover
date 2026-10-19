@@ -119,7 +119,7 @@ import CrossedOverCore
         case "diagnostics": print(try await DiagnosticsService.preview(paths: paths, store: store, host: HostInspector.inspect(at: paths.root)))
         default:
             print("""
-            CrossedOver 0.1.0-dev
+            crossedover \(AppVersion.current)
             Usage: crossedover [--root DIRECTORY] COMMAND
               host                      Inspect this Mac
               runtime-list              List installed runtimes

@@ -87,6 +87,7 @@ public struct GameRecipe: Codable, Sendable, Identifiable {
     public var status: String
     public var notes: String
     public var compatibleProfiles: [GraphicsProfile]?
+    public var launchArguments: [String]? = nil
     public var id: String { appID }
 }
 

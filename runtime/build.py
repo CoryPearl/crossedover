@@ -170,7 +170,15 @@ def main():
     if "bool fullscreen_ignore_max_size = false;" not in (SOURCE / "dlls/winemac.drv/macdrv_main.c").read_text():
         run(["git", "apply", "--check", fullscreen_patch], cwd=SOURCE)
         run(["git", "apply", fullscreen_patch], cwd=SOURCE)
+    fixed_fullscreen_patch = PROJECT / "runtime/patches/winemac-fixed-window-fullscreen.patch"
+    if "bool native_fullscreen = false;" not in (SOURCE / "dlls/winemac.drv/macdrv_main.c").read_text():
+        run(["git", "apply", "--check", fixed_fullscreen_patch], cwd=SOURCE)
+        run(["git", "apply", fixed_fullscreen_patch], cwd=SOURCE)
     dependency_archive = fetch(LOCK["developmentDependencies"])
+    titlebar_patch = PROJECT / "runtime/patches/winemac-preserve-game-titlebar.patch"
+    if "SDL games can draw their own non-client area" not in (SOURCE / "dlls/winemac.drv/window.c").read_text():
+        run(["git", "apply", "--check", titlebar_patch], cwd=SOURCE)
+        run(["git", "apply", titlebar_patch], cwd=SOURCE)
     dependency_extract = PROJECT / ".cache/community-runtime"
     if not (dependency_extract / "Wine Devel.app").exists():
         extract(dependency_archive, dependency_extract)

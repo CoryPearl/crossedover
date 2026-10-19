@@ -15,6 +15,11 @@ struct ContentView: View {
     @Bindable var model: AppModel
     var renderingSnapshot = false
     var previewAdvanced = false
+    var previewLibraryMode: String? = nil
+    var previewSearch: String? = nil
+    @AppStorage("libraryPresentation") private var libraryPresentation = "grid"
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
     @State private var advancedExpanded = false
     @State private var forceStopConfirmation = false
 
@@ -35,6 +40,11 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .foregroundStyle(Palette.ink).background(Palette.canvas).tint(Palette.ink)
+        .ignoresSafeArea(.container, edges: .top)
+        .focusedSceneValue(\.librarySearch, {
+            model.selectedPage = "library"
+            searchFocused = true
+        })
         .alert("Couldn't complete the action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
             Button("View activity") { model.selectedPage = "activity"; model.error = nil }
@@ -54,7 +64,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 9) {
                 Image(systemName: "arrow.triangle.branch").font(.system(size: 19, weight: .medium))
-                Text("CrossedOver").font(.system(size: 14, weight: .semibold)).tracking(-0.25)
+                Text("crossedover").font(.system(size: 14, weight: .semibold)).tracking(-0.25)
             }.padding(.horizontal, 20).padding(.top, 54).padding(.bottom, 36)
             VStack(spacing: 5) {
                 navigation("Library", icon: "square.grid.2x2", page: "library")
@@ -74,7 +84,7 @@ struct ContentView: View {
                     .help("Open the Windows Steam client")
                 Text("Windows client").font(.system(size: 10)).foregroundStyle(Palette.muted)
             }.padding(.horizontal, 20)
-            Text("VERSION 0.1.0").font(.system(size: 9, weight: .medium)).tracking(1.2)
+            Text("VERSION \(AppVersion.current)").font(.system(size: 9, weight: .medium)).tracking(1.2)
                 .foregroundStyle(Palette.muted.opacity(0.7)).padding(.horizontal, 20).padding(.top, 30).padding(.bottom, 24)
         }.frame(width: 196).frame(maxHeight: .infinity).background(Palette.sidebar)
     }
@@ -97,11 +107,11 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 28) {
             pageHeader
             switch model.selectedPage {
-            case "settings": settings
+            case "settings": settings.frame(maxWidth: 940, alignment: .leading)
             case "activity": activity
             default: library
             }
-        }.frame(maxWidth: 940, alignment: .leading).padding(.horizontal, 40).padding(.top, 46).padding(.bottom, 40)
+        }.padding(.horizontal, 32).padding(.top, 46).padding(.bottom, 40)
             .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
@@ -125,12 +135,43 @@ struct ContentView: View {
     }
 
     private var library: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionLabel("GAMES")
-            // The card follows the content width, including at the minimum window size.
-            ViewThatFits(in: .horizontal) {
-                gameCard(wide: true).frame(minWidth: 660)
-                gameCard(wide: false)
+        let games = filteredGames
+        return VStack(alignment: .leading, spacing: 18) {
+            libraryToolbar
+            sectionLabel(model.games.isEmpty ? "GET STARTED" : "INSTALLED GAMES",
+                         trailing: model.games.isEmpty ? nil : libraryCount)
+            if model.games.isEmpty {
+                gameCard(nil).frame(maxWidth: 320)
+                if model.steamInstalled {
+                    Text("Games installed through Windows Steam appear here automatically.")
+                        .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                }
+            } else if games.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass").font(.system(size: 24, weight: .light)).foregroundStyle(Palette.muted)
+                    Text("No games found").font(.system(size: 15, weight: .medium))
+                    Text("No titles match “\(query)”.").font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
+                    Button("Clear search") { searchText = ""; searchFocused = true }.buttonStyle(SecondaryButton())
+                }.padding(.vertical, 64).padding(.horizontal, 24).frame(maxWidth: .infinity)
+            } else if showingList {
+                LazyVStack(spacing: 0) {
+                    ForEach(games) { game in
+                        gameRow(game)
+                        if game.id != games.last?.id { Rule().padding(.horizontal, 16) }
+                    }
+                }.panel()
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 320), spacing: 16, alignment: .top)], alignment: .leading, spacing: 16) {
+                    ForEach(games) { game in gameCard(game) }
+                }
+            }
+            if let tracked = model.currentSession,
+               !model.games.contains(where: { $0.appID == tracked.appID && $0.environmentID == tracked.environmentID }) {
+                HStack(spacing: 16) {
+                    Text("The tracked game is no longer in this library.").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Spacer(minLength: 0)
+                    Button("Dismiss tracking") { model.dismissUnknownSession() }.buttonStyle(TextButton())
+                }.padding(18).panel()
             }
             if !model.steamInstalled, let blocker = model.host?.blockers.first {
                 Label(blocker, systemImage: "info.circle").font(.system(size: 12)).foregroundStyle(Palette.muted).padding(.top, 10)
@@ -138,95 +179,180 @@ struct ContentView: View {
         }
     }
 
-    private var installedGame: GameInstallation? { model.games.first { $0.appID == "11020" } }
+    private var query: String { (previewSearch ?? searchText).trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var showingList: Bool { (previewLibraryMode ?? libraryPresentation) == "list" }
+    private var filteredGames: [GameInstallation] {
+        query.isEmpty ? model.games : model.games.filter { $0.name.localizedStandardContains(query) }
+    }
+    private var libraryCount: String {
+        let count = filteredGames.count
+        return query.isEmpty ? "\(count) \(count == 1 ? "GAME" : "GAMES")" : "\(count) OF \(model.games.count) GAMES"
+    }
 
-    private func gameCard(wide: Bool) -> some View {
-        VStack(spacing: 0) {
-            if wide {
-                HStack(spacing: 0) {
-                    artwork.frame(width: 258, height: 232)
-                    Rectangle().fill(Palette.line).frame(width: 1)
-                    gameDetails.padding(30).frame(maxWidth: .infinity, alignment: .leading)
-                }.fixedSize(horizontal: false, vertical: true)
-            } else {
-                artwork.frame(height: 148)
-                Rule()
-                gameDetails.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+    private var libraryToolbar: some View {
+        HStack(spacing: 16) {
+            HStack(spacing: 9) {
+                Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                if renderingSnapshot {
+                    Text(query.isEmpty ? "Search games" : query).foregroundStyle(query.isEmpty ? Palette.muted : Palette.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    TextField("Search games", text: $searchText).textFieldStyle(.plain)
+                        .focused($searchFocused).accessibilityLabel("Search games")
+                        .onExitCommand { if searchText.isEmpty { searchFocused = false } else { searchText = "" } }
+                }
+                if !query.isEmpty {
+                    Button { searchText = ""; searchFocused = true } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.muted)
+                    }.buttonStyle(.plain).accessibilityLabel("Clear search").help("Clear search")
+                }
+            }.font(.system(size: 12)).padding(.horizontal, 11).frame(height: 34).frame(maxWidth: 340)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(searchFocused ? Palette.muted : Palette.line))
+                .background(SearchFocusDismissal(isFocused: searchFocused) { searchFocused = false })
+            Spacer(minLength: 0)
+            HStack(spacing: 2) {
+                presentationButton("grid", title: "Grid view", symbol: "square.grid.2x2")
+                presentationButton("list", title: "List view", symbol: "list.bullet")
+            }.padding(3).background(Palette.surface, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.line))
+        }
+    }
+
+    private func presentationButton(_ mode: String, title: String, symbol: String) -> some View {
+        let selected = (showingList ? "list" : "grid") == mode
+        return Button { libraryPresentation = mode } label: {
+            Image(systemName: symbol).font(.system(size: 12, weight: .medium)).frame(width: 32, height: 28)
+                .foregroundStyle(selected ? Palette.ink : Palette.muted)
+                .background(selected ? Color.white.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 4))
+                .contentShape(RoundedRectangle(cornerRadius: 4))
+        }.buttonStyle(.plain).help(title).accessibilityLabel(title).accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func gameRow(_ game: GameInstallation) -> some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 16) {
+                artwork(game, compact: true).frame(width: 88, height: 56).clipShape(RoundedRectangle(cornerRadius: 4))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(game.name).font(.system(size: 13, weight: .medium)).lineLimit(1).help(game.name)
+                    Text(gameState(game) + (game.sizeBytes > 0 ? " · " + ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""))
+                        .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) { manageMenu(game, compact: true); gameAction(game) }.fixedSize()
             }
+            if session(for: game)?.state == "unknown" {
+                HStack {
+                    Text("Check Steam for game status.").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Spacer()
+                    Button("Dismiss tracking") { model.dismissUnknownSession() }.buttonStyle(TextButton())
+                }
+            }
+        }.padding(16)
+    }
+
+    private func session(for game: GameInstallation?) -> LaunchSession? {
+        guard let game, let session = model.currentSession,
+              session.appID == game.appID, session.environmentID == game.environmentID else { return nil }
+        return session
+    }
+
+    private func gameCard(_ game: GameInstallation?) -> some View {
+        VStack(spacing: 0) {
+            artwork(game).frame(height: 112)
+            Rule()
+            gameDetails(game).padding(16).frame(maxWidth: .infinity, alignment: .leading)
             Rule()
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Circle().fill(Palette.muted).frame(width: 5, height: 5)
-                        Text(gameState).font(.system(size: 11, weight: .medium))
+                        Text(gameState(game)).font(.system(size: 11, weight: .medium)).lineLimit(1).help(gameState(game))
                     }
-                    if let game = installedGame, model.currentSession == nil {
-                        Text(ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) + " on disk")
-                            .font(.system(size: 10)).foregroundStyle(Palette.muted)
+                    if let game, session(for: game) == nil, game.sizeBytes > 0 {
+                        Text(ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file))
+                            .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1).help("Space used on disk")
                     }
                 }
                 Spacer(minLength: 8)
-                if let game = installedGame { manageMenu(game) }
-                gameAction
-            }.padding(.horizontal, 24).padding(.vertical, 18)
-            if model.currentSession?.state == "unknown" {
+                if let game { manageMenu(game, compact: true) }
+                gameAction(game)
+            }.padding(.horizontal, 16).padding(.vertical, 14)
+            if session(for: game)?.state == "unknown" {
                 Rule()
-                HStack {
-                    Text("Game status could not be confirmed.").font(.system(size: 11)).foregroundStyle(Palette.muted)
-                    Spacer()
+                HStack(spacing: 16) {
+                    Text("Check Steam for game status.").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Spacer(minLength: 0)
                     Button("Dismiss tracking") { model.dismissUnknownSession() }.buttonStyle(TextButton())
                 }.padding(16)
             }
         }.panel()
     }
 
-    private var artwork: some View {
-        ZStack {
-            Color(white: 0.85)
-            if let logo = model.trackManiaLogo {
-                Image(nsImage: logo).resizable().scaledToFit().padding(.horizontal, 26).padding(.vertical, 22)
-                    .accessibilityLabel("TrackMania Nations Forever logo")
-            } else {
+    private func artwork(_ game: GameInstallation?, compact: Bool = false) -> some View {
+        let isDemo = game == nil || game?.appID == "11020"
+        let image = isDemo ? model.trackManiaLogo ?? game.flatMap { model.artwork(for: $0) } : game.flatMap { model.artwork(for: $0) }
+        return ZStack {
+            (isDemo ? Color(white: 0.85) : Palette.sidebar)
+            if let image {
+                Image(nsImage: image).resizable().scaledToFit().padding(.horizontal, compact ? 8 : 22).padding(.vertical, compact ? 8 : 18)
+                    .accessibilityLabel("\(game?.name ?? "TrackMania Nations Forever") artwork")
+            } else if isDemo && !compact {
                 VStack(spacing: 5) {
                     Text("TRACKMANIA").font(.system(size: 25, weight: .heavy, design: .rounded)).tracking(-1)
                     Text("NATIONS FOREVER").font(.system(size: 10, weight: .semibold)).tracking(2)
                 }.foregroundStyle(Color(white: 0.12))
+            } else {
+                Image(systemName: "gamecontroller").font(.system(size: compact ? 20 : 26, weight: .ultraLight))
+                    .foregroundStyle(Palette.muted).accessibilityHidden(true)
             }
         }
     }
 
-    private var gameDetails: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("DEMO").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
-                .padding(.bottom, 16)
-            Text("TrackMania").font(.system(size: 23, weight: .medium)).tracking(-0.5)
-            Text("Nations Forever").font(.system(size: 15)).foregroundStyle(Palette.muted).padding(.top, 3)
-            Text("Racing · Windows").font(.system(size: 12)).foregroundStyle(Palette.muted)
-                .padding(.top, 22).fixedSize(horizontal: false, vertical: true)
+    private func gameDetails(_ game: GameInstallation?) -> some View {
+        let isDemo = game == nil || game?.appID == "11020"
+        let experimental = game.flatMap { model.recipe(for: $0) }?.status == "experimental"
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(isDemo ? "DEMO" : experimental ? "EXPERIMENTAL" : "COMPATIBILITY UNTESTED").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
+                .padding(.bottom, 10)
+            Text(isDemo ? "TrackMania" : game?.name ?? "Windows game")
+                .font(.system(size: 17, weight: .medium)).tracking(-0.3).lineLimit(2)
+                .help(game?.name ?? "TrackMania Nations Forever")
+            if isDemo {
+                Text("Nations Forever").font(.system(size: 11)).foregroundStyle(Palette.muted).padding(.top, 3)
+            }
+        }.frame(height: 66, alignment: .topLeading)
+    }
+
+    private func gameState(_ game: GameInstallation?) -> String {
+        if let session = session(for: game) {
+            switch session.state {
+            case "requested": return "Opening…"
+            case "unknown": return "Status unknown"
+            default: return session.state.capitalized
+            }
         }
+        return game != nil ? "Installed" : model.steamInstalled ? "Ready to install" : "Steam setup required"
     }
 
-    private var gameState: String {
-        if let session = model.currentSession { return session.state == "requested" ? "Opening…" : session.state.capitalized }
-        return installedGame != nil ? "Installed" : model.steamInstalled ? "Ready to install" : "Steam setup required"
-    }
-
-    @ViewBuilder private var gameAction: some View {
-        if !model.steamInstalled {
+    @ViewBuilder private func gameAction(_ game: GameInstallation?) -> some View {
+        if let game {
+            let tracked = session(for: game)
+            Button { model.requestLaunch(game) } label: {
+                Label(tracked == nil ? "Play" : tracked?.state == "running" ? "In game" : "Sent", systemImage: "play.fill")
+                    .lineLimit(1).fixedSize().frame(minWidth: 48)
+            }.buttonStyle(PrimaryButton()).disabled(model.busy || model.currentSession != nil)
+                .accessibilityLabel("Play \(game.name)")
+        } else if !model.steamInstalled {
             Button(model.setupStep > 0 ? "Continue setup" : "Set up Steam") { model.setup() }
                 .buttonStyle(PrimaryButton()).disabled(model.busy || model.host?.supported != true)
-        } else if let game = installedGame {
-            Button { model.requestLaunch(game) } label: {
-                Label(model.currentSession == nil ? "Play" : "In game", systemImage: "play.fill").frame(minWidth: 68)
-            }.buttonStyle(PrimaryButton()).disabled(model.busy || model.currentSession != nil).keyboardShortcut(.defaultAction)
-        } else if let recipe = model.recipes.first {
-            Button("Install game") { model.install(recipe) }.buttonStyle(PrimaryButton()).disabled(model.busy)
+        } else if let recipe = model.recipes.first(where: { $0.appID == "11020" }) {
+            Button("Install demo") { model.install(recipe) }.buttonStyle(PrimaryButton()).disabled(model.busy)
         }
     }
 
-    private func manageMenu(_ game: GameInstallation) -> some View {
+    private func manageMenu(_ game: GameInstallation, compact: Bool = false) -> some View {
         Group {
-            if renderingSnapshot { menuLabel("Manage", icon: "ellipsis") }
+            if renderingSnapshot { managementLabel(compact: compact) }
             else {
                 Menu {
                     Button("Game properties…") { model.manage(game, command: .gameProperties) }
@@ -234,10 +360,19 @@ struct ContentView: View {
                     Button("Verify game files…") { model.manage(game, command: .verifyGame) }.disabled(model.currentSession != nil)
                     Divider()
                     Button("Uninstall…", role: .destructive) { model.manage(game, command: .uninstallGame) }.disabled(model.currentSession != nil)
-                } label: { menuLabel("Manage", icon: "ellipsis") }
+                } label: { managementLabel(compact: compact) }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                    .accessibilityLabel("Manage \(game.name)").help("Manage \(game.name)")
             }
         }.disabled(model.busy)
+    }
+
+    @ViewBuilder private func managementLabel(compact: Bool) -> some View {
+        if compact {
+            Image(systemName: "ellipsis").font(.system(size: 13, weight: .medium)).frame(width: 32, height: 34)
+                .background(Color.white.opacity(0.02), in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.line))
+        } else { menuLabel("Manage", icon: "ellipsis") }
     }
 
     private var settings: some View {
@@ -291,7 +426,7 @@ struct ContentView: View {
                 }.buttonStyle(.plain).accessibilityValue(advancedExpanded || previewAdvanced ? "Expanded" : "Collapsed")
                 if advancedExpanded || previewAdvanced { Rule(); advanced.padding(22) }
             }.panel()
-            Text("CrossedOver 0.1.0 · Development build").font(.system(size: 10)).foregroundStyle(Palette.muted)
+            Text("crossedover \(AppVersion.current)").font(.system(size: 10)).foregroundStyle(Palette.muted)
         }
     }
 
@@ -355,7 +490,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionLabel("RECENT ACTIONS", trailing: "LATEST 20")
                 VStack(spacing: 0) {
-                    if model.operations.isEmpty { emptyRow("No activity yet", detail: "Actions will appear here as you use CrossedOver.") }
+                    if model.operations.isEmpty { emptyRow("No activity yet", detail: "Actions will appear here as you use crossedover.") }
                     ForEach(Array(model.operations.prefix(20).enumerated()), id: \.element.id) { index, operation in
                         if index > 0 { Rule().padding(.horizontal, 22) }
                         HStack(alignment: .top, spacing: 14) {
@@ -383,7 +518,7 @@ struct ContentView: View {
                         ForEach(Array(model.sessions.prefix(15).enumerated()), id: \.element.id) { index, session in
                             if index > 0 { Rule().padding(.horizontal, 22) }
                             HStack {
-                                Text("TrackMania").font(.system(size: 12))
+                                Text(model.gameName(appID: session.appID)).font(.system(size: 12)).lineLimit(2)
                                 Spacer()
                                 Text(session.state.capitalized)
                                 Text(session.startedAt, style: .date).frame(width: 85, alignment: .trailing)
@@ -464,6 +599,56 @@ struct ContentView: View {
             Text(title).font(.system(size: 13, weight: .medium))
             Text(detail).font(.system(size: 11)).foregroundStyle(Palette.muted)
         }.padding(26).frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct LibrarySearchKey: FocusedValueKey {
+    typealias Value = @MainActor () -> Void
+}
+
+/// Observe clicks without consuming them, so buttons and menus still work on
+/// the first click. The search field and its clear button share this region.
+private struct SearchFocusDismissal: NSViewRepresentable {
+    var isFocused: Bool
+    var dismiss: () -> Void
+
+    func makeNSView(context: Context) -> ClickRegion { ClickRegion() }
+    func updateNSView(_ view: ClickRegion, context: Context) {
+        view.update(isFocused: isFocused, dismiss: dismiss)
+    }
+    static func dismantleNSView(_ view: ClickRegion, coordinator: ()) { view.stopMonitoring() }
+
+    final class ClickRegion: NSView {
+        private var monitor: Any?
+        private var dismiss: (() -> Void)?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        func update(isFocused: Bool, dismiss: @escaping () -> Void) {
+            self.dismiss = dismiss
+            guard isFocused else { stopMonitoring(); return }
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+                guard let self, let window = self.window, event.window === window else { return event }
+                if !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) {
+                    self.dismiss?()
+                }
+                return event
+            }
+        }
+
+        func stopMonitoring() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+            dismiss = nil
+        }
+    }
+}
+
+extension FocusedValues {
+    var librarySearch: (@MainActor () -> Void)? {
+        get { self[LibrarySearchKey.self] }
+        set { self[LibrarySearchKey.self] = newValue }
     }
 }
 

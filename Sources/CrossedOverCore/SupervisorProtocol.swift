@@ -70,55 +70,43 @@ public enum SupervisorEngine {
         }
         if [.uninstallGame, .verifyGame].contains(request.command) {
             guard let game = try SteamDiscovery().discover(environment: environment, prefix: prefix).first(where: { $0.appID == request.appID }) else { throw CrossedOverError.message("This game is no longer installed. Refresh your library.") }
-            guard let recipe = try ResourceCatalog.recipes().first(where: { $0.appID == game.appID }),
-                  let observer = runtime.manifest.observerRelativePath else { throw CrossedOverError.message("Close Steam and all games before managing this installation.") }
+            let recipe = try ResourceCatalog.recipes().first(where: { $0.appID == game.appID })
+            let executables = try GameProcessDetection.executableNames(for: game, recipe: recipe)
+            guard !executables.isEmpty, let observer = runtime.manifest.observerRelativePath else { throw CrossedOverError.message("Could not confirm this game is closed. Use Windows Steam to manage its files.") }
             let source = try FileSafety.containedURL(observer, in: runtime.root)
             let destination = try FileSafety.containedURL("drive_c/crossedover/process-observer.exe", in: prefix)
             try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             if !FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.copyItem(at: source, to: destination) }
             let observation = try await ProcessRunner.run(runtime.wine, arguments: [destination.path], environment: variables, timeout: 15)
             guard observation.status == 0, let processes = decodeObservation(observation.output) else { throw CrossedOverError.message("Could not confirm the game is closed. Close it and retry.") }
-            let executables = recipe.executableNames.map { $0.lowercased() }
             guard !processes.contains(where: { executables.contains($0.executable.lowercased()) }) else { throw CrossedOverError.message("Close \(game.name) before uninstalling or verifying its files.") }
         }
-        if request.command == .launchGame, request.appID == "11020" {
+        if request.command == .launchGame, let appID = request.appID, let registry = GameWindowingPolicy.registry(for: appID) {
             // Never rewrite settings beneath an already running game.
-            guard let observer = runtime.manifest.observerRelativePath else { throw CrossedOverError.message("Update the runtime before launching TrackMania.") }
+            let recipe = try ResourceCatalog.recipes().first { $0.appID == appID }
+            let name = recipe?.name ?? "This game"
+            guard let observer = runtime.manifest.observerRelativePath else { throw CrossedOverError.message("Update the runtime before launching \(name).") }
             let source = try FileSafety.containedURL(observer, in: runtime.root)
             let destination = try FileSafety.containedURL("drive_c/crossedover/process-observer.exe", in: prefix)
             try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             if !FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.copyItem(at: source, to: destination) }
             let observation = try await ProcessRunner.run(runtime.wine, arguments: [destination.path], environment: variables, timeout: 15)
-            guard observation.status == 0, let processes = decodeObservation(observation.output) else { throw CrossedOverError.message("Could not check whether TrackMania is already running.") }
-            guard !processes.contains(where: { $0.executable.lowercased() == "tmforever.exe" }) else { throw CrossedOverError.message("TrackMania is already running.") }
-            try TrackManiaSettings.prepare(prefix: prefix, performance: environment.profile == .performance)
-            if let game = try SteamDiscovery().discover(environment: environment, prefix: prefix).first(where: { $0.appID == "11020" }) {
-                try TrackManiaAudio.prepare(runtime: runtime, game: game, prefix: prefix)
+            guard observation.status == 0, let processes = decodeObservation(observation.output) else { throw CrossedOverError.message("Could not check whether \(name) is already running.") }
+            let executables = recipe?.executableNames.map { $0.lowercased() } ?? []
+            guard !executables.isEmpty, !processes.contains(where: { executables.contains($0.executable.lowercased()) }) else { throw CrossedOverError.message("\(name) is already running or cannot be tracked.") }
+            if appID == "11020" {
+                try TrackManiaSettings.prepare(prefix: prefix, performance: environment.profile == .performance)
+                if let game = try SteamDiscovery().discover(environment: environment, prefix: prefix).first(where: { $0.appID == appID }) {
+                    try TrackManiaAudio.prepare(runtime: runtime, game: game, prefix: prefix)
+                }
             }
-            let policy = prefix.appendingPathComponent("drive_c/crossedover/trackmania-windowing.reg")
-            let registry = """
-            Windows Registry Editor Version 5.00
-
-            [HKEY_CURRENT_USER\\Software\\Wine\\AppDefaults\\TmForever.exe\\Mac Driver]
-            "AllowCursorClipping"="N"
-            "FullscreenIgnoreMaxSize"="Y"
-            "CursorClippingLocksWindows"="N"
-            "AllowImmovableWindows"="N"
-            "CaptureDisplaysForFullscreen"="N"
-            "WindowsFloatWhenInactive"="none"
-            "LeftCommandIsCtrl"="N"
-            "RightCommandIsCtrl"="N"
-            "LeftOptionIsAlt"="Y"
-
-            [HKEY_CURRENT_USER\\Software\\Wine\\AppDefaults\\TmForever.exe\\DllOverrides]
-            "gameoverlayrenderer"=""
-            "gameoverlayrenderer64"=""
-
-            """
+            if appID == "730" { try CS2WindowSettings.prepare(prefix: prefix) }
+            let filename = appID == "11020" ? "trackmania-windowing.reg" : "cs2-windowing.reg"
+            let policy = prefix.appendingPathComponent("drive_c/crossedover/" + filename)
             var registryData = Data([0xff, 0xfe]); registryData.append(registry.data(using: .utf16LittleEndian)!)
             try registryData.write(to: policy, options: .atomic)
-            let configured = try await ProcessRunner.run(runtime.wine, arguments: ["regedit", "/S", "C:\\crossedover\\trackmania-windowing.reg"], environment: variables, timeout: 15)
-            guard configured.status == 0 else { throw CrossedOverError.message("Could not prepare TrackMania's window controls.") }
+            let configured = try await ProcessRunner.run(runtime.wine, arguments: ["regedit", "/S", "C:\\crossedover\\" + filename], environment: variables, timeout: 15)
+            guard configured.status == 0 else { throw CrossedOverError.message("Could not prepare \(name)'s window controls.") }
         }
         // A detached worker drains output into a bounded log for the whole session.
         let file = paths.logs.appendingPathComponent(".launch-" + UUID().uuidString + ".json")
@@ -165,6 +153,9 @@ public enum SupervisorEngine {
         if request.command == .launchGame {
             guard let appID = request.appID, SteamDiscovery.validAppID(appID) else { throw CrossedOverError.message("Invalid game identifier.") }
             arguments += ["-silent", "-applaunch", appID]
+            if let recipe = try ResourceCatalog.recipes().first(where: { $0.appID == appID }) {
+                arguments += recipe.launchArguments ?? []
+            }
         }
         if request.command == .installGame {
             guard let appID = request.appID, SteamDiscovery.validAppID(appID) else { throw CrossedOverError.message("Invalid game identifier.") }
