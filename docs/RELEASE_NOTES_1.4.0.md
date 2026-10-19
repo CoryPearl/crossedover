@@ -10,8 +10,10 @@
 - Minecraft uses a separate WineGDK runtime and data directory. Its Stop action
   leaves Steam and Epic sessions independent; uninstall preserves Minecraft worlds.
 - Epic partner launches use the repaired prerequisites and queued client handoff.
-  Brawlhalla's window opened in the user test; its native window controls still
-  need work.
+  Brawlhalla opens from crossedover. A new scoped runtime patch adds native
+  controls to shaped/layered main windows and keeps desktop title bars onscreen.
+  The owned 32/64-bit tests pass, and the owner confirmed the real game's
+  red/yellow/green buttons, minimize and fullscreen work.
 
 Microsoft sign-in is confirmed. Minecraft's package download remains blocked;
 installation, gameplay, audio/input, saves, fullscreen and repeat launches are

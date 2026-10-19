@@ -1,0 +1,101 @@
+Subject: winemac: Preserve forced controls around shaped/layered main windows.
+
+Original crossedover change, scoped by the existing default-off per-game
+ForceWindowControls option. Keep the caption inside the desktop work area;
+AppKit fullscreen transitions retain their normal frame. Regions/alpha still
+apply only to game content. The explicit owned-fixture diagnostic reads only
+the receiving window when its test title and environment flag both match.
+
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -119,12 +119,13 @@
+ 
+     if (ex_style & WS_EX_NOACTIVATE) wf.prevents_app_activation = TRUE;
+     /* Explicit per-game opt-in for clients that remove their Windows frame.
+-     * Keep helpers, dialogs, transparent and shaped surfaces unchanged. The
+-     * Cocoa frame surrounds the existing content; Windows client coordinates
+-     * and the game executable are unchanged. */
+-    if (force_window_controls && !data->shaped &&
+-        !(style & (WS_CHILD | WS_DISABLED)) &&
+-        !(ex_style & (WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE)) &&
++     * A region or WS_EX_LAYERED can also describe an opaque game surface.
++     * Keep its content mask/alpha, but put controls outside that content.
++     * Helpers, owned dialogs and inactive tools retain their own styles;
++     * disabled main windows keep a title bar with disabled buttons. */
++    if (force_window_controls &&
++        !(style & WS_CHILD) &&
++        !(ex_style & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)) &&
+         (!NtUserGetWindowRelative(data->hwnd, GW_OWNER) || (ex_style & WS_EX_APPWINDOW)) &&
+         data->rects.visible.right - data->rects.visible.left >= 320 &&
+         data->rects.visible.bottom - data->rects.visible.top >= 200)
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -1938,6 +1938,24 @@
+ 
+     - (void) setFrameAndWineFrame:(NSRect)frame
+     {
++        /* Keep forced desktop controls visible, including when a captionless
++         * client initially requests the entire screen as its content area. */
++        if (force_window_controls && ([self styleMask] & NSWindowStyleMaskTitled) &&
++            !([self styleMask] & NSWindowStyleMaskFullScreen) && !enteringFullScreen && !exitingFullScreen)
++        {
++            NSScreen *target = [self screen];
++            if (!target)
++            {
++                CGFloat area = 0;
++                for (NSScreen *candidate in [NSScreen screens])
++                {
++                    NSRect intersection = NSIntersectionRect(frame, [candidate frame]);
++                    CGFloat candidateArea = NSWidth(intersection) * NSHeight(intersection);
++                    if (candidateArea > area) { target = candidate; area = candidateArea; }
++                }
++            }
++            if (target) frame = [self constrainFrameRect:frame toScreen:target];
++        }
+         [self setFrame:frame display:YES];
+ 
+         wineFrame = frame;
+@@ -2484,6 +2502,17 @@
+         // it.
+         NSArray* screens = [NSScreen screens];
+         NSRect contentRect = [self contentRectForFrameRect:frameRect];
++        if (force_window_controls && ([self styleMask] & NSWindowStyleMaskTitled) &&
++            !([self styleMask] & NSWindowStyleMaskFullScreen) && !enteringFullScreen && !exitingFullScreen &&
++            screen && frame_intersects_screens(frameRect, screens))
++        {
++            NSRect visible = [screen visibleFrame];
++            frameRect.size.width = fmin(NSWidth(frameRect), NSWidth(visible));
++            frameRect.size.height = fmin(NSHeight(frameRect), NSHeight(visible));
++            frameRect.origin.x = fmax(NSMinX(visible), fmin(NSMinX(frameRect), NSMaxX(visible) - NSWidth(frameRect)));
++            frameRect.origin.y = fmax(NSMinY(visible), fmin(NSMinY(frameRect), NSMaxY(visible) - NSHeight(frameRect)));
++            return frameRect;
++        }
+         if (!screen_covered_by_rect(contentRect, screens) &&
+             frame_intersects_screens(frameRect, screens))
+             frameRect = [super constrainFrameRect:frameRect toScreen:screen];
+@@ -3581,6 +3610,25 @@
+         titleString = @"crossedover Steam";
+     OnMainThreadAsync(^{
+         [window setTitle:titleString];
++        /* Explicit owned-fixture diagnostic. Never inspects another window. */
++        if (getenv("CROSSEDOVER_WINDOW_CONTROLS_PROBE") &&
++            [titleString hasPrefix:@"Owned crossedover controls:"])
++        {
++            NSButton *close = [window standardWindowButton:NSWindowCloseButton];
++            NSButton *mini = [window standardWindowButton:NSWindowMiniaturizeButton];
++            NSButton *zoom = [window standardWindowButton:NSWindowZoomButton];
++            NSRect frame = [window frame];
++            NSScreen *screen = [window screen] ?: [NSScreen mainScreen];
++            NSRect visible = [screen visibleFrame];
++            fprintf(stderr, "CROSSEDOVER_CONTROLS case=%s titled=%d close=%d mini=%d zoom=%d fullscreen=%d onscreen=%d\n",
++                [[titleString substringFromIndex:[@"Owned crossedover controls:" length]] UTF8String],
++                !!([window styleMask] & NSWindowStyleMaskTitled),
++                close && ![close isHidden] && [close isEnabled],
++                mini && ![mini isHidden] && [mini isEnabled],
++                zoom && ![zoom isHidden] && [zoom isEnabled],
++                !!([window collectionBehavior] & NSWindowCollectionBehaviorFullScreenPrimary),
++                NSMaxY(frame) <= NSMaxY(visible) + 1 && NSMaxY(frame) >= NSMinY(visible) + 24);
++        }
+         if ([window isOrderedIn] && ![window isExcludedFromWindowsMenu])
+             [NSApp changeWindowsItem:window title:titleString filename:NO];
+     });

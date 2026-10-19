@@ -1,5 +1,44 @@
 # Validation record
 
+## Brawlhalla native window controls — October 19, 2026
+
+The owner confirms Brawlhalla opens reliably, but still has no traffic-light
+buttons. An owned Win32 fixture reproduced two gaps in the old driver: layered
+and region-shaped windows received no native frame, and a desktop-sized popup
+had buttons above the display work area. This is fixture evidence, not a trace
+or inspection of Brawlhalla's actual window styles.
+
+The new default-off, per-game `ForceWindowControls` follow-up keeps controls
+around eligible shaped/layered main windows without removing their content
+mask or alpha. Disabled main windows retain a title bar with disabled buttons;
+small helpers, tools, inactive windows and owned dialogs keep their old styles.
+Outside native fullscreen, forced frames fit the screen work area. AppKit
+fullscreen and its transitions bypass this desktop constraint.
+
+- The actual AppKit close/minimize/zoom buttons, fullscreen eligibility and
+  onscreen caption checks passed for **32-bit and 64-bit** owned fixtures.
+  Negative helper/inactive/disabled cases also passed. The opt-in diagnostic
+  reads only its receiving owned fixture window, with both an explicit test
+  environment flag and fixture title; no game windows were inspected.
+- The tracked patch reproduces the compiled source exactly and passes forward
+  and reverse application checks. The source runtime rebuilt successfully as
+  `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-x87-openal1.25.2-ae61c2d959`.
+- The owned Epic regression passed queued partner launches/cancellation,
+  management and uninstall discovery, plus D3D11 Metal and scoped D3D9 readback.
+  The v1.4.0/build 26 preview with this runtime passed strict deep signing checks.
+- The actual environment passed its stopped-environment guard and selected
+  the new runtime with Performance preserved. No automatic backup was created.
+  A fresh Epic launch was requested. The owner then confirmed **“Buttons
+  visible and working”**, in response to the check covering the red/yellow/green
+  controls, minimize and fullscreen. Pointer alignment was not separately
+  checked during this confirmation.
+
+Evidence: `.cache/window-controls/`, `.cache/window-controls-14a89067-c227-46a7-9bc0-3ffc6fcf83f6/`
+(baseline), `.cache/window-controls-89738c0f-24cc-476e-b248-ce26d84f228a/`
+(64-bit), and `.cache/window-controls-a43922b2-9041-4983-83e9-ebe84df00784/`
+(32-bit). Disposable fixture runtime/prefix copies were removed; user games and
+accounts were preserved. No release or push occurred.
+
 ## v1.4.0 version and installed Minecraft library entry — October 19, 2026
 
 Development metadata now uses **1.4.0/build 26**, the Minecraft release. Existing

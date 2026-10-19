@@ -187,6 +187,12 @@ def main():
     if "bool force_window_controls = false;" not in (SOURCE / "dlls/winemac.drv/macdrv_main.c").read_text():
         run(["git", "apply", "--check", controls_patch], cwd=SOURCE)
         run(["git", "apply", controls_patch], cwd=SOURCE)
+    visible_controls_patch = PROJECT / "runtime/patches/winemac-visible-window-controls.patch"
+    applied = subprocess.run(["git", "apply", "--reverse", "--check", visible_controls_patch],
+                             cwd=SOURCE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if applied.returncode != 0:
+        run(["git", "apply", "--check", visible_controls_patch], cwd=SOURCE)
+        run(["git", "apply", visible_controls_patch], cwd=SOURCE)
     dependency_extract = PROJECT / ".cache/community-runtime"
     if not (dependency_extract / "Wine Devel.app").exists():
         extract(dependency_archive, dependency_extract)
