@@ -1,12 +1,38 @@
-# crossedover
+<p align="center">
+  <a href="https://corypearl.github.io/crossedover/">
+    <img src="docs/assets/app-icon.png" width="96" height="96" alt="crossedover — splitting arrows app icon">
+  </a>
+</p>
 
-Windows apps and games, at home on your Mac.
+<h1 align="center">crossedover</h1>
 
-**crossedover v1.3.0** runs Windows software through Wine, with separate **Games** and **Apps** libraries. Steam games remain our focus, with Windows **Epic Games** alongside them. Ubisoft Connect handoffs, including Brawlhalla installations, are discovered too. Install through either launcher and find your games in one library, or add a local **.exe** for other games and tools. More launcher and platform support is coming soon.
+<p align="center">Windows apps and games, at home on your Mac.</p>
 
-![The crossedover library](website/assets/library.png)
+<p align="center">
+  <a href="https://corypearl.github.io/crossedover/"><strong>Website ↗</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/CoryPearl/crossedover/releases">Downloads</a>
+  &nbsp;·&nbsp;
+  <a href="QUICKSTART.md">Quickstart</a>
+  &nbsp;·&nbsp;
+  <a href="TECHNICAL_README.md">Technical README</a>
+</p>
 
-**[Download v1.3.0](https://github.com/CoryPearl/crossedover/releases/tag/v1.3.0)** · **[Quickstart](QUICKSTART.md)** · **[Website](https://corypearl.github.io/crossedover/)**
+<p align="center"><sub>v1.3.0 &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
+
+<br>
+
+<p align="center">
+  <img src="website/assets/library.png" width="1100" alt="crossedover’s monochrome game library with search, game cards, and a Game Launchers menu">
+  <br>
+  <sub>A little less launcher. A little more library. Interface preview · v1.3.0.</sub>
+</p>
+
+Run Windows software on your Mac through Wine. **Games** for what you play. **Apps** for everything else. Steam games are our focus, with Epic Games and Ubisoft Connect handoffs alongside them. More launcher and platform support is coming soon.
+
+| Your games, together | Bring an .exe | Stay in control |
+| --- | --- | --- |
+| Steam and Epic installs in one searchable library. Open your clients from **Game Launchers**. | Add Windows games, tools, installers, and mod managers as cards. Steam is optional. | See launch status, stop Windows windows, browse files, and manage your installations. |
 
 ## Get started
 
