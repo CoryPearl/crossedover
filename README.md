@@ -6,7 +6,7 @@ crossedover brings a native Mac library, Windows Steam, and a Wine-based runtime
 
 ![The crossedover library](website/assets/library.png)
 
-**[Download v1.0.0](https://github.com/CoryPearl/crossedover/releases/tag/v1.0.0)** · **[Quickstart](QUICKSTART.md)** · **[Website](https://crossedover.corypearl561.chatgpt.site)**
+**[Download v1.0.0](https://github.com/CoryPearl/crossedover/releases/tag/v1.0.0)** · **[Quickstart](QUICKSTART.md)** · **[Website](https://corypearl.github.io/crossedover/)**
 
 ## Get playing
 

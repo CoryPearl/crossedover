@@ -1,4 +1,4 @@
-"""Prepare the static Sites deployment; no dependencies required."""
+"""Prepare the static GitHub Pages deployment; no dependencies required."""
 from pathlib import Path
 import shutil
 
@@ -13,3 +13,6 @@ for name in ["index.html", "styles.css", "quickstart.html", "assets"]:
         shutil.copytree(source, output / name)
     else:
         shutil.copy2(source, output / name)
+
+# Also support ordinary static serving without Jekyll processing.
+(output / ".nojekyll").touch()
