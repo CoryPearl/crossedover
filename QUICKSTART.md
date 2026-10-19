@@ -2,7 +2,7 @@
 
 ## Before you start
 
-You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, an internet connection for setup. Steam and Epic accounts are needed only for games from those stores. Allow **8 GiB free for setup, plus space for apps and games**.
+You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, an internet connection for setup. Steam and Epic accounts are needed only for games from those stores. Allow **8 GiB free for setup, plus space for apps and games**. Recommended: **16 GB+ unified memory**, or **24–32 GB+** for heavier games. [Hardware guidelines](#hardware-guidelines).
 
 Compatibility is experimental. TrackMania Nations Forever is the first tested demo, CS2 is experimental, and compatibility with other games and apps varies. A version number does not certify every game or sustained performance.
 
@@ -131,3 +131,17 @@ The launcher uses Metal for Direct3D 11, with Performance rendering for Direct3D
 **Settings → Other platforms → Open Xbox Cloud** opens Microsoft's official site in your default browser. It streams only supported cloud titles; account, subscription, region, network, and controller requirements vary. This does not download games into crossedover or imply Minecraft Bedrock is available in the cloud.
 
 Experimental [Bedrock for Mac](https://github.com/1JRobertson/bedrock-mac) work uses a separate WineGDK/DXMT runtime and Microsoft account helper. It establishes a possible future Bedrock-specific route, not support in crossedover or the Windows Xbox app. See [the technical assessment](docs/XBOX_AND_BEDROCK.md). Minecraft Java already has a separate native Mac version. No Microsoft credentials or games are included or collected by crossedover.
+
+
+## Hardware guidelines
+
+| Required to start | Recommended guidance |
+| --- | --- |
+| Apple silicon Mac (M1 or newer), with a Metal GPU | M4-class performance; larger GPUs may help heavier 3D games |
+| macOS 15 or 26; working Rosetta / Intel translation | macOS 26 is the current test environment; macOS 27 is experimental and 28+ is blocked |
+| Enough memory for macOS, the launcher, and your game; no separate RAM gate | **16 GB+ unified memory**, or **24–32 GB+** for demanding games, large mods, or multitasking |
+| **8 GiB free for setup**, plus all app/game files and updates | SSD storage; leave **20–30 GiB spare after installs**, with more for large patches |
+| Internet for setup, store downloads, sign-in, and activation | Stable broadband for larger downloads; offline play depends on the title |
+| A game/app supported by the runtime | Start at **720p or 1080p**, low/medium detail; check performance during gameplay |
+
+An 8 GB Mac has not been validated for gaming. Recommendations are not measured minimums or a promise of 60 FPS. Current testing uses an **M4 / 16 GB Mac on macOS 26.6.2**; the short TrackMania result does not predict other games or Macs. Large updates may temporarily need space comparable to the game itself. [Full hardware and storage guide](docs/HARDWARE.md).

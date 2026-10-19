@@ -7,3 +7,5 @@
 
 .download-stats{margin-top:18px;font-size:13px;color:var(--ink,#ededed)}
 .download-stats span{display:block;margin-top:5px;font-size:10px;line-height:1.5;color:var(--muted,#999)}
+
+.hardware-table{width:100%;border-collapse:collapse;table-layout:fixed;margin:26px 0;font-size:14px;line-height:1.7;color:#555850}.hardware-table caption{text-align:left;font-size:12px;color:var(--muted);margin-bottom:12px}.hardware-table th,.hardware-table td{text-align:left;vertical-align:top;padding:16px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.hardware-table th{color:var(--ink);font-size:13px;font-weight:600;background:var(--soft)}.hardware-table th:first-child,.hardware-table td:first-child{padding-left:0}.hardware-table th:first-child{padding-left:16px}.hardware-table td:last-child{padding-right:0}@media(max-width:560px){.hardware-table{font-size:12px;line-height:1.65}.hardware-table th,.hardware-table td{padding:12px 8px}.hardware-table th:first-child{padding-left:8px}}

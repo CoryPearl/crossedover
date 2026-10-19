@@ -112,6 +112,7 @@ def main():
         stage.mkdir(); shutil.copytree(app, stage / app.name, symlinks=True)
         (stage / "Applications").symlink_to("/Applications")
         for source, name in [(ROOT / "docs/QUICKSTART.html", "Start Here.html"),
+                             (ROOT / "docs/HARDWARE.md", "Hardware guidelines.md"),
                              (ROOT / "LICENSE", "LICENSE.txt"),
                              (ROOT / "THIRD_PARTY_NOTICES.md", "Third-party notices.md")]:
             if source.exists(): shutil.copy2(source, stage / name)

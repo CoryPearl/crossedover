@@ -11,6 +11,7 @@ Windows Epic Games joins Steam and local Windows apps in one library, with smoot
 - Epic partner records plus Ubisoft install discovery fix missing cards for games Epic delegates to Ubisoft, including Brawlhalla. Play opens the installed Ubisoft game link after initial account linking in Epic; file management and mods remain accessible. The user confirmed Brawlhalla works from Epic’s Library; crossedover’s card launch and native window controls are still being checked.
 - GitHub Pages shows aggregate release DMG download counts, refreshed during server-side builds. No visitor tracking or browser credentials.
 - Settings adds an Xbox Cloud browser shortcut. Local Windows Xbox app, PC Game Pass downloads, and Minecraft Bedrock are not supported by the included runtime; the guide explains the separate experimental Bedrock route.
+- Required and recommended hardware guidelines in the README, quickstart, website, and DMG, with memory/storage planning and measured-test limits.
 - Updated quickstart, offline guide, and GitHub Pages site. More launcher and platform support is coming soon.
 
 Compatibility varies by game, DRM, anti-cheat, and required Windows features. Epic sign-in was confirmed by the user; real Epic game validation is still in progress. The owned handoff/graphics fixture is not a real store-game compatibility test. No accounts or games are bundled.
