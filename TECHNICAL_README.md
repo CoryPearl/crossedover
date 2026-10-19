@@ -251,7 +251,7 @@ The supervisor limits request size to 64 KiB, resolves current metadata and the 
 
 For a launch, the parent writes a managed `.launch-<uuid>.json` file and starts a detached copy of its executable with `--launch-worker`. The worker validates and removes that request file, resolves the environment again, acquires the operation lock, and starts Wine with structured arguments. The CLI uses the same engine and can re-execute itself as the worker.
 
-The parent returns an acknowledgement without waiting for a whole game session. The worker drains runtime output independently of the native window. The lock protects preparation and process startup, not the entire duration of a game.
+The parent returns an acknowledgement without waiting for a whole game session. The worker drains runtime output independently of the native window. The lock protects preparation and process startup, not the entire duration of a game. Each managed request captures a prefix-local launch generation under that lock. A worker checks the generation immediately before starting Wine. Force Stop changes the generation while holding the lock, so a queued worker cannot reopen Windows after the stop. Old requests without this field are accepted only before the first generation change. See [LaunchGeneration.swift](Sources/CrossedOverCore/LaunchGeneration.swift).
 
 Launcher/app worker logs retain a tail of at most 1 MiB. Shorter setup and management commands use [ProcessRunner](Sources/CrossedOverCore/ProcessRunner.swift), which supports captured output, cancellation, and timeouts. Terminating one timed-out command does not prove every Windows child has stopped. Closing crossedover's native window also does not automatically quit its Windows clients.
 
@@ -419,7 +419,9 @@ Importing a runtime and selecting it are separate actions. Migration requires a 
 
 An unsuccessful migration preserves files and blocks normal launches until repair or an explicit manual restore. It does not create a full backup automatically. Repair runs Wineboot and restores the managed setup invariants using the selected runtime. Neither repair nor migration promises to repair a game's own corrupted files or account state.
 
-Normal Stop requests Steam shutdown. It is not a universal quit command for every Windows client. Force Stop uses the selected runtime and prefix's wineserver; it does not issue a global kill of every Wine installation on the Mac, but it can discard unsaved work in this shared environment.
+**Close Windows Steam** requests Steam shutdown. The bottom **Stop & close Windows** action cancels and awaits the native operation, cancels game observation, then requests Force Stop. The bottom bar appears from the initial Play click, persists through requested/running/unknown tracking, and also covers imported executable runs. Its indeterminate spinner does not estimate a completion percentage. A running process does not prove a usable game window.
+
+Force Stop waits up to ten seconds for an in-flight preparation/worker lock, invalidates queued workers, sends `wineserver -k`, and confirms shutdown with `wineserver -w`. Only after confirmation does it mark active sessions and app runs for this environment stopped. If shutdown fails, the UI retains the session and resumes observation so the user can retry. Late observer replies cannot restore cancelled tracking. The client permits a longer, 60-second timeout for this action. It uses the selected runtime and prefix, rather than a global Wine kill; all games, apps, and launchers in this shared environment close, and unsaved work can be lost. Native Mac launchers are outside this action.
 
 ## 14. Security, accounts, and diagnostics
 

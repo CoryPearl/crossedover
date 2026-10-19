@@ -20,6 +20,8 @@ Use **Game Launchers** to open Steam, Epic Games, or an installed Ubisoft Connec
 
 Compatibility varies. TrackMania Nations Forever is our first tested game; CS2 is experimental. Importing an executable does not guarantee it will work. Drivers, anti-cheat, extra frameworks, and some apps need functionality this runtime does not provide.
 
+The bottom launch bar shows opening and running status. **Stop & close Windows** cancels the launch and closes all managed Windows windows; unsaved progress may be lost.
+
 Use **⋯** to manage cards and browse files. Steam keeps its uninstall and verification controls. Epic cards open **Epic Library → ⋯ → Manage** for verification and uninstall; confirm there. Both stores have file access, launch tracking, and mod folders. Imported cards can be renamed, moved between libraries, or removed. Removing an imported card keeps its files. [Mods and file access](QUICKSTART.md#mods) use normal Windows locations.
 
 Full environment backups are **manual only**. **Settings → Uninstall crossedover** removes the app, managed Windows apps, games, saves, and data after Windows software is closed. Empty Trash afterward. Dragging only the Mac app to Trash leaves its separate data folder behind.

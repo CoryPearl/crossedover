@@ -34,10 +34,15 @@ import CrossedOverCore
                     switch CommandLine.arguments[stateIndex + 1] {
                     case "setup": model.environment = nil; model.games = []
                     case "install": model.games = []
-                    case "running", "unknown":
+                    case "opening", "running", "unknown":
                         if let environment = model.environment {
-                            model.currentSession = LaunchSession(appID: model.games.first?.sessionAppID ?? "11020", environmentID: environment.id, state: CommandLine.arguments[stateIndex + 1])
+                            let state = CommandLine.arguments[stateIndex + 1]
+                            model.currentSession = LaunchSession(appID: model.games.first?.sessionAppID ?? "11020", environmentID: environment.id, state: state == "opening" ? "requested" : state)
                         }
+                    case "preparing":
+                        model.openingGame = model.games.first
+                        model.busy = true; model.progress = "Preparing graphics and contacting the launcher…"
+                    case "stopping": model.stoppingWindows = true
                     case "busy": model.busy = true; model.progress = "Preparing your game. This may take a moment…"
                     case "notice": model.notice = "Uninstall requested. Confirm in Steam; the library will update when it finishes."
                     default: break

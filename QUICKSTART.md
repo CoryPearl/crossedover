@@ -67,6 +67,8 @@ Completed Steam installs appear automatically in **Games**. Press **⌘R** to re
 
 Press **Play** to launch. If a known game's graphics profile needs to change, close your current game and accept the Steam restart.
 
+A bottom status bar shows when a game is preparing, waiting, or running. Its spinner shows activity, not a percentage. Choose **Stop & close Windows** to cancel the launch and close all crossedover Windows games, apps, and launchers. This can discard unsaved progress and interrupt downloads; it leaves your native Mac launchers alone.
+
 Use **⋯** for properties, game files, verification, or uninstall. Steam handles the uninstall confirmation. **Settings → Windows Steam → Open download folder** opens the installed games folder in Finder. The separate **Steam Downloads** button opens download progress and updates in Steam.
 
 Graphics profiles are explained in Settings:

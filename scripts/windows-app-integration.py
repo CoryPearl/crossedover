@@ -77,8 +77,33 @@ try:
         assert result == {'bits': bits, 'sidecarRead': True, 'registryWrite': True, 'windowCreated': True}, result
         assert len(records('windowsApp')) == len(results) + 1
         results.append(dict(result, persistedCard=True, runningObserved=True, sourceRemoved=True, duplicateRejected=True))
+    # Exercise the bottom bar's stop command against real Wine in this owned
+    # prefix, including a worker's late exit and a normal launch after stopping.
+    stopped_request = dict(request, runID=str(uuid.uuid4()))
+    def send(request):
+        reply = subprocess.run([str(SUPERVISOR)], input=json.dumps(request), text=True,
+                               capture_output=True, timeout=60, check=True)
+        assert json.loads(reply.stdout)['success']
+    def wait_for_run(request, terminal=False):
+        deadline = time.monotonic() + 40
+        while time.monotonic() < deadline:
+            run = next((item for item in records('windowsRun') if item['id'].lower() == request['runID'].lower()), None)
+            if run and (run['state'] not in ('requested', 'running') if terminal else run['state'] == 'running'):
+                return run
+            time.sleep(.1)
+        raise AssertionError('Timed out waiting for owned Windows run')
+    send(stopped_request)
+    wait_for_run(stopped_request)
+    send({'version': 1, 'root': ROOT.as_uri() + '/', 'environmentID': environment['id'], 'command': 'forceStop'})
+    assert wait_for_run(stopped_request, terminal=True)['state'] == 'stopped'
+    time.sleep(.5)  # Allow the killed worker's final reply to arrive.
+    assert wait_for_run(stopped_request, terminal=True)['state'] == 'stopped'
+    restarted_request = dict(request, runID=str(uuid.uuid4()))
+    send(restarted_request)
+    assert wait_for_run(restarted_request, terminal=True)['state'] == 'exited'
     assert not list((ROOT / 'Backups').iterdir())
-    output = {'runtime': manifest['id'], 'steamRequired': False, 'checks': results, 'automaticBackups': False}
+    output = {'runtime': manifest['id'], 'steamRequired': False, 'checks': results, 'automaticBackups': False,
+              'stopConfirmed': True, 'lateWorkerPreservedStop': True, 'relaunchAfterStop': True}
     (PROJECT / '.cache/release-preview/windows-app-results.json').write_text(json.dumps(output, indent=2))
     print(json.dumps(output, indent=2))
 finally:

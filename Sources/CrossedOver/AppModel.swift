@@ -22,6 +22,9 @@ import CrossedOverCore
     var operations: [OperationRecord] = []
     var sessions: [LaunchSession] = []
     var currentSession: LaunchSession?
+    var openingGame: GameInstallation?
+    var openingApp: WindowsApp?
+    var stoppingWindows = false
     var busy = false
     var progress = ""
     var error: String?
@@ -32,6 +35,7 @@ import CrossedOverCore
     private var work: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var monitorTask: Task<Void, Never>?
+    private var stopTask: Task<Void, Never>?
     private var observationCount = 0
     private var refreshing = false
     private var steamPath: URL?
@@ -50,6 +54,25 @@ import CrossedOverCore
     var epicInstalled: Bool { environment != nil && epicPath != nil }
     var steamInstalled: Bool { environment != nil && steamPath != nil }
     var ubisoftInstalled: Bool { environment != nil && ubisoftPath != nil }
+    var launchStatus: (title: String, detail: String, waiting: Bool)? {
+        if stoppingWindows { return ("Closing Windows…", "Stopping launches, games, and launchers.", true) }
+        if let openingGame { return ("Opening \(openingGame.name)…", progress, true) }
+        if let openingApp { return ("Opening \(openingApp.name)…", "Starting the Windows program.", true) }
+        if let currentSession {
+            let name = gameName(appID: currentSession.appID)
+            switch currentSession.state {
+            case "running": return ("\(name) is running", "Stop closes all crossedover Windows windows.", false)
+            case "unknown": return ("Check \(name)’s launcher", "The launch was sent; game status is unavailable.", false)
+            default: return ("Opening \(name)…", "Waiting for the game. Check its launcher for sign-in or setup prompts.", true)
+            }
+        }
+        if let run = windowsRuns.first(where: { $0.environmentID == environment?.id && $0.isActive }),
+           let app = windowsApps.first(where: { $0.id == run.appID }) {
+            return (run.state == "requested" ? "Opening \(app.name)…" : "\(app.name) is running",
+                    run.state == "requested" ? "Waiting for the Windows program." : "Stop closes all crossedover Windows windows.", run.state == "requested")
+        }
+        return nil
+    }
     @ObservationIgnored var previewArtwork: [String: CGImage] = [:]
     func artworkPath(for game: GameInstallation?) -> String? {
         if game == nil || (game?.store == .steam && game?.appID == "11020") { return logoPath ?? game?.artworkPath }
@@ -147,20 +170,24 @@ import CrossedOverCore
             if ubisoftPath != snapshot.9 { ubisoftPath = snapshot.9 }
         } catch { self.error = error.localizedDescription }
     }
-    func perform(_ title: String, action: @escaping @MainActor () async throws -> Void) {
-        guard !busy else { return }
+    func perform(_ title: String, allowsStopping: Bool = false, action: @escaping @MainActor () async throws -> Void) {
+        guard !busy, !stoppingWindows || allowsStopping else { return }
         busy = true; progress = title; error = nil; notice = nil
         work = Task {
             var record = OperationRecord(kind: title, state: "running", detail: title)
             do {
                 let initial = record, store = store
                 try await Task.detached(priority: .utility) { try store.put(initial, kind: "operation", id: initial.id.uuidString) }.value
-                try await action(); try Task.checkCancellation(); record.state = "completed"; record.detail = "Completed"
+                try Task.checkCancellation(); try await action(); try Task.checkCancellation(); record.state = "completed"; record.detail = "Completed"
             } catch is CancellationError { record.state = "cancelled"; record.detail = "Cancelled. You can retry this operation." }
-            catch { record.state = "failed"; record.detail = Redaction.apply(error.localizedDescription); self.error = error.localizedDescription }
+            catch {
+                if Task.isCancelled { record.state = "cancelled"; record.detail = "Cancelled. You can retry this operation." }
+                else { record.state = "failed"; record.detail = Redaction.apply(error.localizedDescription); self.error = error.localizedDescription }
+            }
             record.updatedAt = Date()
             let finished = record, store = store
             try? await Task.detached(priority: .utility) { try store.put(finished, kind: "operation", id: finished.id.uuidString) }.value
+            openingGame = nil; openingApp = nil
             busy = false; progress = ""; await refresh()
         }
     }
@@ -284,8 +311,10 @@ import CrossedOverCore
     }
     func latestRun(for app: WindowsApp) -> WindowsAppRun? { windowsRuns.first { $0.appID == app.id } }
     func runWindowsApp(_ app: WindowsApp) {
-        guard latestRun(for: app)?.isActive != true else { return }
+        guard !busy, !stoppingWindows, latestRun(for: app)?.isActive != true else { return }
+        openingApp = app
         perform("Open \(app.name)") {
+            defer { self.openingApp = nil }
             let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: app.environmentID,
                 command: .launchWindowsApp, windowsAppID: app.id, runID: UUID()))
             self.notice = reply.message
@@ -405,9 +434,12 @@ import CrossedOverCore
         } else { launch(game, restart: false) }
     }
     func launch(_ game: GameInstallation, restart: Bool) {
+        guard !busy, !stoppingWindows, currentSession == nil else { return }
         pendingGame = nil
         guard let environment, let runtime else { return }
+        openingGame = game
         perform("Launch \(game.name)") {
+            defer { self.openingGame = nil }
             var updated = environment
             if restart, let recipe = self.recipe(for: game) {
                 self.progress = "Closing Steam before switching graphics…"
@@ -421,7 +453,10 @@ import CrossedOverCore
                 guard stopped else { throw CrossedOverError.message("Close Steam, Epic, and Windows apps before changing graphics. Force quit is available in Settings → Advanced.") }
                 updated = try await self.environmentManager.setProfile(recipe.profile, environment: environment, runtime: runtime)
             }
+            try Task.checkCancellation()
+            self.progress = "Preparing graphics and contacting \(game.managementStore.title)…"
             _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: updated.id, command: game.store == .epic ? .launchEpicGame : game.store == .ubisoft ? .launchUbisoftGame : .launchGame, appID: game.appID))
+            try Task.checkCancellation()
             let session = LaunchSession(id: UUID(), appID: game.sessionAppID, environmentID: updated.id, startedAt: Date(), state: "requested")
             try self.store.put(session, kind: "session", id: session.id.uuidString); self.currentSession = session
             self.monitor(game: game, environment: updated)
@@ -441,6 +476,7 @@ import CrossedOverCore
                 guard !Task.isCancelled else { return }
                 do {
                     let reply = try await supervisor.send(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .observe))
+                    guard !Task.isCancelled, currentSession?.id == session.id else { return }
                     guard let processes = reply.processes, !executableNames.isEmpty else {
                         session.state = "unknown"; session.detail = "Launch requested; this runtime or game has no validated process observer. Check the game's Windows launcher."
                         currentSession = session; try store.put(session, kind: "session", id: session.id.uuidString); return
@@ -460,6 +496,7 @@ import CrossedOverCore
                         try await Task.detached(priority: .utility) { try store.put(saved, kind: "session", id: saved.id.uuidString) }.value
                     }
                 } catch {
+                    guard !Task.isCancelled, currentSession?.id == session.id else { return }
                     observationCount += 1
                     if observationCount >= 3 {
                         session.state = "unknown"; session.detail = "Process observation was interrupted. Check the game's Windows launcher."
@@ -477,14 +514,38 @@ import CrossedOverCore
         monitorTask?.cancel(); currentSession = nil
     }
     func stop(force: Bool) {
+        if force { stopLaunchAndCloseWindows(); return }
         guard let environment else { return }
-        perform(force ? "Force stop environment" : "Close Windows Steam") {
-            _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: force ? .forceStop : .shutdown))
-            if force {
-                if var session = self.currentSession { session.state = "stopped"; session.endedAt = Date(); try self.store.put(session, kind: "session", id: session.id.uuidString) }
-                self.currentSession = nil; self.monitorTask?.cancel()
+        perform("Close Windows Steam") {
+            _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .shutdown))
+            self.notice = "Steam shutdown requested. Wait for its windows to close."
+        }
+    }
+    func stopLaunchAndCloseWindows() {
+        guard !stoppingWindows, let environment else { return }
+        stoppingWindows = true; pendingGame = nil
+        let observation = monitorTask
+        observation?.cancel()
+        let previous = work
+        previous?.cancel()
+        stopTask = Task {
+            // Let the cancelled operation finish before starting another one.
+            // The supervisor also fences detached workers that have not run yet.
+            await previous?.value
+            await observation?.value
+            self.perform("Stop and close Windows", allowsStopping: true) {
+                defer { self.stoppingWindows = false; self.openingGame = nil; self.openingApp = nil }
+                do {
+                    _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .forceStop))
+                    self.currentSession = nil
+                    self.notice = "Windows games, apps, and launchers are closed."
+                } catch {
+                    if let session = self.currentSession, let game = self.games.first(where: { $0.sessionAppID == session.appID }) {
+                        self.monitor(game: game, environment: environment)
+                    }
+                    throw error
+                }
             }
-            self.notice = force ? "Stop requested for this Windows environment." : "Steam shutdown requested. Wait for its windows to close."
         }
     }
     func backup() {

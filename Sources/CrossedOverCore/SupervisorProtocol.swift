@@ -10,6 +10,7 @@ public struct SupervisorRequest: Codable, Sendable {
     public var runID: UUID?
     // Recomputed by execute; caller input cannot select a different program.
     public var primeEpic: Bool? = nil
+    var launchGeneration: String? = nil
     public enum Command: String, Codable, Sendable {
         case openUbisoft, launchUbisoftGame, ubisoftProperties, verifyUbisoftGame, uninstallUbisoftGame
         case openEpic, launchEpicGame, epicProperties, verifyEpicGame, uninstallEpicGame, epicDownloads
@@ -58,13 +59,34 @@ public enum SupervisorEngine {
         var launchRequest = request
         launchRequest.primeEpic = false
         var partnerLaunch = false
-        let lock = try EnvironmentLock(prefix: prefix); defer { withExtendedLifetime(lock) {} }
+        let lock: EnvironmentLock
         if request.command == .forceStop {
+            // Launch setup and a cold Epic primer briefly hold this lock.
+            // Stopping must wait for their handoff rather than fail immediately.
+            var acquired: EnvironmentLock?
+            for _ in 0..<200 {
+                if let candidate = try? EnvironmentLock(prefix: prefix) { acquired = candidate; break }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            guard let acquired else { throw CrossedOverError.message("Windows is still preparing a launch. Try Stop again in a moment.") }
+            lock = acquired
+        } else { lock = try EnvironmentLock(prefix: prefix) }
+        defer { withExtendedLifetime(lock) {} }
+        if request.command == .forceStop {
+            try LaunchGeneration.invalidate(prefix: prefix)
             _ = try await ProcessRunner.run(runtime.wineserver, arguments: ["-k"], environment: variables, timeout: 15)
             // -k returns nonzero when the server has already exited. A stopped
             // environment is a successful outcome, including repeated requests.
             let result = try await ProcessRunner.run(runtime.wineserver, arguments: ["-w"], environment: variables, timeout: 15)
             guard result.status == 0 else { throw CrossedOverError.message("Could not confirm environment shutdown: \(Redaction.apply(result.output).suffix(800))") }
+            for var session in try store.all(LaunchSession.self, kind: "session") where session.environmentID == environment.id && session.endedAt == nil && ["requested", "running", "unknown"].contains(session.state) {
+                session.state = "stopped"; session.endedAt = Date(); session.detail = "Stopped by the user with all Windows windows."
+                try store.put(session, kind: "session", id: session.id.uuidString)
+            }
+            for var run in try store.all(WindowsAppRun.self, kind: "windowsRun") where run.environmentID == environment.id && run.isActive {
+                run.state = "stopped"; run.endedAt = Date(); run.detail = "Stopped by the user with all Windows windows."
+                try store.updateActiveWindowsRun(run)
+            }
             return SupervisorReply(success: true, message: "This Windows environment is stopped.")
         }
         if request.command == .observe {
@@ -160,6 +182,7 @@ public enum SupervisorEngine {
             guard configured.status == 0 else { throw CrossedOverError.message("Could not prepare \(name)'s window controls.") }
         }
         // A detached worker drains output into a bounded log for the whole session.
+        launchRequest.launchGeneration = try LaunchGeneration.current(prefix: prefix)
         let file = paths.logs.appendingPathComponent(".launch-" + UUID().uuidString + ".json")
         try JSONEncoder().encode(launchRequest).write(to: file, options: .atomic)
         // Bundle.main can identify the outer GUI app when this tool lives in
@@ -223,13 +246,14 @@ public enum SupervisorEngine {
             throw CrossedOverError.message("Missing or already handled Windows app launch.")
         }
         run.workerPID = ProcessInfo.processInfo.processIdentifier
-        try store.put(run, kind: "windowsRun", id: id.uuidString)
+        guard try store.updateActiveWindowsRun(run) else { throw CrossedOverError.message("This Windows app launch was cancelled.") }
         var acquired: EnvironmentLock?
         for _ in 0..<100 {
             if let lock = try? EnvironmentLock(prefix: prefix) { acquired = lock; break }
             Thread.sleep(forTimeInterval: 0.05)
         }
         guard acquired != nil else { throw CrossedOverError.message("The environment remained locked during launch.") }
+        try LaunchGeneration.check(request.launchGeneration, prefix: prefix)
         let executable = try WindowsApps.executable(for: app, prefix: prefix)
         let pipe = Pipe(), process = Process()
         process.executableURL = runtime.wine; process.arguments = [executable.path]
@@ -242,7 +266,7 @@ public enum SupervisorEngine {
         process.standardInput = FileHandle.nullDevice; process.standardOutput = pipe; process.standardError = pipe
         try withExtendedLifetime(acquired) { try process.run() }; acquired = nil
         run.state = "running"; run.detail = "Windows process started."
-        try store.put(run, kind: "windowsRun", id: id.uuidString)
+        try store.updateActiveWindowsRun(run)
         try pipe.fileHandleForWriting.close()
         defer { try? pipe.fileHandleForReading.close() }
         let log = paths.logs.appendingPathComponent("windows-app-" + app.id.uuidString + ".log")
@@ -260,7 +284,7 @@ public enum SupervisorEngine {
         run.exitCode = process.terminationStatus; run.endedAt = Date()
         run.state = process.terminationStatus == 0 ? "exited" : "failed"
         run.detail = process.terminationStatus == 0 ? "Windows process exited." : "Windows app exited with code \(process.terminationStatus). Open its launch log for details."
-        try store.put(run, kind: "windowsRun", id: id.uuidString)
+        try store.updateActiveWindowsRun(run)
     }
     public static func runLaunchWorker(requestFile: URL) throws {
         var validatedRequest: SupervisorRequest?
@@ -277,7 +301,7 @@ public enum SupervisorEngine {
                let store = try? Store(url: request.root.appendingPathComponent("crossedover.sqlite")),
                var run = try? store.all(WindowsAppRun.self, kind: "windowsRun").first(where: { $0.id == id && $0.appID == request.windowsAppID && $0.environmentID == request.environmentID && $0.isActive }) {
                 run.state = "failed"; run.endedAt = Date(); run.detail = Redaction.apply(error.localizedDescription)
-                try? store.put(run, kind: "windowsRun", id: run.id.uuidString)
+                try? store.updateActiveWindowsRun(run)
             }
             throw error
         }
@@ -375,6 +399,7 @@ public enum SupervisorEngine {
             Thread.sleep(forTimeInterval: 0.05)
         }
         guard acquired != nil else { throw CrossedOverError.message("The environment remained locked during launch.") }
+        try LaunchGeneration.check(request.launchGeneration, prefix: prefix)
         var primer: Process?
         if primeEpic {
             // Cold URI startup hides Epic's UI before sign-in/linking can finish
@@ -417,7 +442,7 @@ public struct SupervisorClient: Sendable {
     public var executable: URL
     public init(executable: URL) { self.executable = executable }
     public func send(_ request: SupervisorRequest) async throws -> SupervisorReply {
-        let result = try await ProcessRunner.run(executable, input: JSONEncoder().encode(request), timeout: 30)
+        let result = try await ProcessRunner.run(executable, input: JSONEncoder().encode(request), timeout: request.command == .forceStop ? 60 : 30)
         guard let data = result.output.data(using: .utf8), let reply = try? JSONDecoder().decode(SupervisorReply.self, from: data) else { throw CrossedOverError.message("The runtime supervisor returned an invalid reply.") }
         guard result.status == 0, reply.success else { throw CrossedOverError.message(reply.message) }
         return reply

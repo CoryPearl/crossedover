@@ -31,6 +31,17 @@ public final class Store: Sendable {
     public func remove(kind: String, id: String) throws {
         try database.write { db in try db.execute(sql: "DELETE FROM records WHERE kind=? AND id=?", arguments: [kind, id]) }
     }
+    /// Worker replies can arrive after Stop. Check and write in one transaction
+    /// so a delayed reply cannot resurrect a terminal run.
+    @discardableResult func updateActiveWindowsRun(_ run: WindowsAppRun) throws -> Bool {
+        try database.write { db in
+            guard let data = try Data.fetchOne(db, sql: "SELECT payload FROM records WHERE kind='windowsRun' AND id=?", arguments: [run.id.uuidString]) else { return false }
+            let saved = try JSONDecoder().decode(WindowsAppRun.self, from: data)
+            guard saved.isActive, saved.appID == run.appID, saved.environmentID == run.environmentID else { return false }
+            try db.execute(sql: "UPDATE records SET payload=? WHERE kind='windowsRun' AND id=?", arguments: [try JSONEncoder().encode(run), run.id.uuidString])
+            return true
+        }
+    }
     public func replaceGames(_ games: [GameInstallation], environmentID: UUID) throws {
         let encoder = JSONEncoder()
         let entries = try games.map { ($0.id, try encoder.encode($0)) }

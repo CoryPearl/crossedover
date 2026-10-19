@@ -325,6 +325,69 @@ import Testing
         let reply = try await SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .forceStop))
         #expect(reply.success)
     }
+    @Test func stopInvalidatesQueuedWorkersAndKeepsOtherEnvironmentSessions() async throws {
+        let (paths, _, environment, runtime) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        let prefix = paths.prefix(environment)
+        let store = try Store(url: paths.root.appendingPathComponent("crossedover.sqlite"))
+        try store.put(environment, kind: "environment", id: environment.id.uuidString)
+        let session = LaunchSession(appID: "11020", environmentID: environment.id, state: "requested")
+        let other = LaunchSession(appID: "730", environmentID: UUID(), state: "running")
+        for saved in [session, other] { try store.put(saved, kind: "session", id: saved.id.uuidString) }
+        let app = WindowsApp(environmentID: environment.id, name: "Queued app", category: .games, executablePath: "drive_c/queued.exe")
+        let run = WindowsAppRun(app: app)
+        try store.put(app, kind: "windowsApp", id: app.id.uuidString)
+        try store.put(run, kind: "windowsRun", id: run.id.uuidString)
+        try Data().write(to: prefix.appendingPathComponent("drive_c/queued.exe"))
+        let steam = prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/steam.exe")
+        try FileManager.default.createDirectory(at: steam.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: steam)
+        // If either stale worker reaches Wine, this marker exposes the bug.
+        let marker = prefix.appendingPathComponent("unexpected-launch")
+        try "#!/bin/sh\n/usr/bin/touch '\(marker.path)'\n".write(to: runtime.wine, atomically: true, encoding: .utf8)
+        var queued = SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchGame, appID: "11020")
+        queued.launchGeneration = try LaunchGeneration.current(prefix: prefix)
+        let oldGeneration = queued.launchGeneration
+        _ = try await SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .forceStop))
+        #expect(try LaunchGeneration.current(prefix: prefix) != oldGeneration)
+        #expect(try store.all(WindowsAppRun.self, kind: "windowsRun").first(where: { $0.id == run.id })?.state == "stopped")
+        var lateReply = run; lateReply.state = "running"
+        #expect(try !store.updateActiveWindowsRun(lateReply))
+        #expect(try store.all(WindowsAppRun.self, kind: "windowsRun").first(where: { $0.id == run.id })?.state == "stopped")
+        for command in [SupervisorRequest.Command.launchGame, .launchWindowsApp] {
+            queued.command = command; queued.windowsAppID = app.id; queued.runID = run.id
+            // Keep a requested record to exercise a delayed app worker too.
+            if command == .launchWindowsApp { try store.put(run, kind: "windowsRun", id: run.id.uuidString) }
+            let file = paths.logs.appendingPathComponent(".launch-stale.json")
+            try JSONEncoder().encode(queued).write(to: file)
+            do { try SupervisorEngine.runLaunchWorker(requestFile: file); Issue.record("A stopped launch must not restart Wine") }
+            catch { #expect(error.localizedDescription.contains("cancelled")) }
+        }
+        #expect(!FileManager.default.fileExists(atPath: marker.path))
+        let sessions = try store.all(LaunchSession.self, kind: "session")
+        #expect(sessions.first(where: { $0.id == session.id })?.state == "stopped")
+        #expect(sessions.first(where: { $0.id == other.id })?.state == "running")
+        try LaunchGeneration.check(LaunchGeneration.current(prefix: prefix), prefix: prefix)
+        var fresh = SupervisorRequest(root: paths.root, environmentID: environment.id, command: .openSteam)
+        fresh.launchGeneration = try LaunchGeneration.current(prefix: prefix)
+        let file = paths.logs.appendingPathComponent(".launch-fresh.json")
+        try JSONEncoder().encode(fresh).write(to: file)
+        try SupervisorEngine.runLaunchWorker(requestFile: file)
+        #expect(FileManager.default.fileExists(atPath: marker.path))
+    }
+    @Test func stopWaitsForAnInFlightLaunchLock() async throws {
+        let (paths, _, environment, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        let store = try Store(url: paths.root.appendingPathComponent("crossedover.sqlite"))
+        try store.put(environment, kind: "environment", id: environment.id.uuidString)
+        var held: EnvironmentLock? = try EnvironmentLock(prefix: paths.prefix(environment))
+        let stopping = Task {
+            try await SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .forceStop))
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        withExtendedLifetime(held) {}; held = nil
+        #expect(try await stopping.value.success)
+    }
     @Test func prefixCreationWaitsForDeferredRegistryWrites() async throws {
         let paths = AppPaths(root: FileManager.default.temporaryDirectory.appendingPathComponent("CrossedOver-deferred-" + UUID().uuidString))
         try paths.prepare(); defer { try? FileManager.default.removeItem(at: paths.root) }

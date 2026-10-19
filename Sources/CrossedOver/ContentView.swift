@@ -47,7 +47,8 @@ struct ContentView: View {
                 } else {
                     ScrollView { page.frame(maxWidth: .infinity, alignment: .topLeading) }
                 }
-                if model.busy || model.notice != nil { status }
+                if let launch = model.launchStatus { launchStatus(launch) }
+                else if model.busy || model.notice != nil { status }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -851,6 +852,28 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private func launchStatus(_ launch: (title: String, detail: String, waiting: Bool)) -> some View {
+        VStack(spacing: 0) {
+            Rule()
+            HStack(spacing: 14) {
+                if launch.waiting {
+                    if renderingSnapshot { Image(systemName: "arrow.triangle.2.circlepath").frame(width: 16) }
+                    else { ProgressView().controlSize(.small).frame(width: 16) }
+                } else {
+                    Image(systemName: "gamecontroller").frame(width: 16).foregroundStyle(Palette.muted)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(launch.title).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    Text(launch.detail).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(2)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)
+                Button("Stop & close Windows") { model.stopLaunchAndCloseWindows() }
+                    .buttonStyle(SecondaryButton()).disabled(model.stoppingWindows)
+                    .help("Stops this launch and closes all crossedover Windows games, apps, and launchers. Unsaved progress may be lost.")
+            }.padding(.horizontal, 26).padding(.vertical, 14)
+        }.background(Palette.surface)
     }
 
     private var status: some View {
