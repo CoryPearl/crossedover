@@ -113,27 +113,29 @@ struct ContentView: View {
             navigation("Activity", icon: "clock.arrow.circlepath", page: "activity").padding(.horizontal, 12)
             Rule().padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 20)
             VStack(alignment: .leading, spacing: 10) {
-                Button { model.openSteam() } label: {
-                    HStack {
-                        Text(model.steamInstalled ? "Open Steam" : "Set up Steam")
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .medium))
-                    }.frame(maxWidth: .infinity)
-                }.buttonStyle(SecondaryButton()).disabled(model.busy || (!model.steamInstalled && model.host?.supported != true))
-                    .help("Open the Windows Steam client")
-                Button { model.openEpic() } label: {
-                    HStack {
-                        Text(model.epicInstalled ? "Open Epic" : "Set up Epic")
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .medium))
-                    }.frame(maxWidth: .infinity)
-                }.buttonStyle(SecondaryButton()).disabled(model.busy || (!model.epicInstalled && model.host?.supported != true))
-                    .help("Open the Windows Epic Games Launcher")
+                if renderingSnapshot { launcherMenuLabel }
+                else {
+                    Menu { GameLauncherActions(model: model) } label: { launcherMenuLabel }
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                        .disabled(model.busy)
+                        .help("Open a Windows game launcher, or set up Steam or Epic Games")
+                }
                 Text("Windows launchers").font(.system(size: 10)).foregroundStyle(Palette.muted)
             }.padding(.horizontal, 20)
             Text("VERSION \(AppVersion.current)").font(.system(size: 9, weight: .medium)).tracking(1.2)
                 .foregroundStyle(Palette.muted.opacity(0.7)).padding(.horizontal, 20).padding(.top, 30).padding(.bottom, 24)
         }.frame(width: 196).frame(maxHeight: .infinity).background(Palette.sidebar)
+    }
+
+    private var launcherMenuLabel: some View {
+        HStack(spacing: 8) {
+            Text("Game Launchers")
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+        }.font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.ink.opacity(0.85))
+            .padding(.horizontal, 12).frame(height: 34)
+            .background(Color.white.opacity(0.02), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.line))
     }
 
     private func navigation(_ title: String, icon: String, page: String) -> some View {
@@ -921,6 +923,24 @@ struct ContentView: View {
             Text(title).font(.system(size: 13, weight: .medium))
             Text(detail).font(.system(size: 11)).foregroundStyle(Palette.muted)
         }.padding(26).frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Shared by the sidebar and macOS menu bar so launcher availability stays consistent.
+struct GameLauncherActions: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        Button(model.steamInstalled ? "Open Steam" : "Set up Steam…") { model.openSteam() }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .disabled(model.busy || (!model.steamInstalled && model.host?.supported != true))
+        Button(model.epicInstalled ? "Open Epic Games" : "Set up Epic Games…") { model.openEpic() }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            .disabled(model.busy || (!model.epicInstalled && model.host?.supported != true))
+        Divider()
+        Button(model.ubisoftInstalled ? "Open Ubisoft Connect" : "Ubisoft Connect (not installed)") { model.openUbisoft() }
+            .disabled(model.busy || !model.ubisoftInstalled)
+            .help("Supported Epic games install Ubisoft Connect during their initial setup in Epic.")
     }
 }
 

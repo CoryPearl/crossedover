@@ -96,12 +96,10 @@ struct CrossedOverApp: App {
             CommandGroup(after: .textEditing) {
                 Button("Search Library…") { librarySearch?() }.keyboardShortcut("f").disabled(librarySearch == nil)
             }
-            CommandMenu("Epic") {
-                Button("Open Windows Epic") { model?.openEpic() }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(model == nil || model?.busy == true)
+            CommandMenu("Game Launchers") {
+                if let model { GameLauncherActions(model: model) }
+                Divider()
                 Button("Epic Downloads") { model?.openEpicDownloads() }.disabled(model?.busy == true || model?.epicInstalled != true)
-            }
-            CommandMenu("Steam") {
-                Button("Open Windows Steam") { model?.openSteam() }.keyboardShortcut("s", modifiers: [.command, .shift]).disabled(model == nil || model?.busy == true)
                 Button("Refresh Library") { Task { await model?.refresh() } }.keyboardShortcut("r").disabled(model == nil || model?.busy == true)
                 Divider()
                 Button("Close Windows Steam") { model?.stop(force: false) }.disabled(model?.busy == true || model?.environment == nil)

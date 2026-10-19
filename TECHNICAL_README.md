@@ -373,7 +373,7 @@ The optional named Steam loader and branding flag label Steam's Mac host as cros
 
 The interface uses SwiftUI, with AppKit where native behavior matters. `AppModel` is `@MainActor` and observable, while discovery, large file work, and image decoding are moved off the interface's execution path.
 
-Games combines discovered store installations and imported game cards. Apps shows imported tool/app cards. Search, store filters, and grid/list modes operate on local library data. Store setup/open buttons are separate from each game's Play action.
+Games combines discovered store installations and imported game cards. Apps shows imported tool/app cards. Search, store filters, and grid/list modes operate on local library data. The sidebar's Game Launchers menu groups Steam, Epic Games, and installed Ubisoft Connect, separately from each game's Play action. The macOS menu bar reuses the same actions and availability checks. Steam and Epic offer setup when missing; Ubisoft Connect requires an existing installation. Launcher executable discovery runs in the background refresh snapshot, so opening the menu does not scan the filesystem.
 
 Responsiveness work has several independent parts:
 

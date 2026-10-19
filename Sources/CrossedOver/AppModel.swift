@@ -36,6 +36,7 @@ import CrossedOverCore
     private var refreshing = false
     private var steamPath: URL?
     private var epicPath: URL?
+    private var ubisoftPath: URL?
     private var logoPath: String?
     var runtime: InstalledRuntime? {
         if let environment { return runtimes.first { $0.id == environment.runtimeID } }
@@ -48,6 +49,7 @@ import CrossedOverCore
     }
     var epicInstalled: Bool { environment != nil && epicPath != nil }
     var steamInstalled: Bool { environment != nil && steamPath != nil }
+    var ubisoftInstalled: Bool { environment != nil && ubisoftPath != nil }
     @ObservationIgnored var previewArtwork: [String: CGImage] = [:]
     func artworkPath(for game: GameInstallation?) -> String? {
         if game == nil || (game?.store == .steam && game?.appID == "11020") { return logoPath ?? game?.artworkPath }
@@ -61,6 +63,7 @@ import CrossedOverCore
     func updateSteamLocation() {
         steamPath = environment.flatMap { try? SteamService.steamExecutable(prefix: paths.prefix($0)) }
         epicPath = environment.flatMap { try? EpicService.executable(prefix: paths.prefix($0)) }
+        ubisoftPath = environment.flatMap { try? UbisoftDiscovery.executable(prefix: paths.prefix($0)) }
         logoPath = steamPath.flatMap { try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: $0.deletingLastPathComponent()).path }
     }
     var setupStep: Int { runtimes.isEmpty ? 0 : environment == nil ? 1 : !steamInstalled ? 2 : 3 }
@@ -127,7 +130,8 @@ import CrossedOverCore
                     try store.put(runs[index], kind: "windowsRun", id: runs[index].id.uuidString)
                 }
                 let epic = environment.flatMap { try? EpicService.executable(prefix: paths.prefix($0)) }
-                return (environment, games, operations, sessions, steam, logo, apps, runs, epic)
+                let ubisoft = environment.flatMap { try? UbisoftDiscovery.executable(prefix: paths.prefix($0)) }
+                return (environment, games, operations, sessions, steam, logo, apps, runs, epic, ubisoft)
             }.value
             guard !Task.isCancelled else { return }
             if runtimes != installed { runtimes = installed }
@@ -140,6 +144,7 @@ import CrossedOverCore
             if windowsApps != snapshot.6 { windowsApps = snapshot.6 }
             if windowsRuns != snapshot.7 { windowsRuns = snapshot.7 }
             if epicPath != snapshot.8 { epicPath = snapshot.8 }
+            if ubisoftPath != snapshot.9 { ubisoftPath = snapshot.9 }
         } catch { self.error = error.localizedDescription }
     }
     func perform(_ title: String, action: @escaping @MainActor () async throws -> Void) {
@@ -208,6 +213,16 @@ import CrossedOverCore
             }
             self.progress = "Opening Epic Games…"
             let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openEpic))
+            self.notice = reply.message
+        }
+    }
+    func openUbisoft() {
+        guard let environment, ubisoftInstalled else {
+            error = "Ubisoft Connect is not installed. Open a supported Ubisoft game in Epic to complete its launcher setup."
+            return
+        }
+        perform("Open Ubisoft Connect") {
+            let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openUbisoft))
             self.notice = reply.message
         }
     }

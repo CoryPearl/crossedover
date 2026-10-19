@@ -39,7 +39,7 @@ Apps share one Windows environment and its graphics profile with Steam games. Cl
 
 ## Set up Steam
 
-1. Click **Set up Steam**. The app prepares its included runtime and downloads Windows Steam directly from Valve. Allow a few minutes.
+1. Choose **Game Launchers → Set up Steam**. The app prepares its included runtime and downloads Windows Steam directly from Valve. Allow a few minutes.
 2. Sign in **inside Steam's window**, completing Steam Guard if requested.
 3. Install a Windows game through that Steam client.
 
@@ -47,13 +47,13 @@ Your native Mac Steam installation stays separate. No Steam account, game files,
 
 ## Epic Games
 
-1. Choose **Set up Epic**. crossedover downloads Epic’s official Windows MSI installer and installs it in the managed Windows environment; Steam is not required.
+1. Choose **Game Launchers → Set up Epic Games**. crossedover downloads Epic’s official Windows MSI installer and installs it in the managed Windows environment; Steam is not required.
 2. Sign in **inside Epic’s own window**, including any two-factor prompt. crossedover does not ask for your Epic password.
 3. Install a Windows game through that Epic client. Use its default C: drive location, or another folder inside the same Windows C: drive.
 4. Completed installs appear automatically in **Games**, with an **Epic Games** label. Press **⌘R** to refresh, or use the **All games / Steam / Epic Games / Added .exe** filter.
 5. Press **Play** on the game’s card. Launches go through Windows Epic so it can handle account authorization and DRM; crossedover tracks the game process.
 
-**Open Steam** and **Open Epic** are separate sidebar buttons. Each uses crossedover’s Windows client; your native Mac launchers stay separate. Both clients and their downloads live under crossedover’s existing data folder. The in-app uninstaller removes both clients and all their managed games.
+**Game Launchers** in the sidebar groups **Open Steam**, **Open Epic Games**, and **Open Ubisoft Connect**. Steam and Epic offer setup when missing; Ubisoft Connect is enabled after a supported Epic game installs it. These open crossedover’s Windows clients; your native Mac launchers stay separate. These clients and their downloads live under crossedover’s existing data folder. The in-app uninstaller removes these clients and all their managed games.
 
 Use an Epic card’s **⋯** menu for **Game properties**, **Show game files**, **Mods & files**, and **Manage in Epic**. **Verify files in Epic** and **Uninstall in Epic** open Epic Library: find the game, choose **⋯ → Manage → Verify / Uninstall**, then confirm in Epic. These buttons open the supported management flow; they do not silently verify or delete files. The card disappears after Epic finishes uninstalling and the library refreshes.
 
