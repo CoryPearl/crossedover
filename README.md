@@ -52,7 +52,7 @@ Use **⋯** to manage cards and browse files. Steam keeps its uninstall and veri
 
 Full environment backups are **manual only**. **Settings → Uninstall crossedover** removes the app, managed Windows apps, games, saves, and data after Windows software is closed. Empty Trash afterward. Dragging only the Mac app to Trash leaves its separate data folder behind.
 
-Epic’s launcher uses Metal for DirectX 10–11; DirectX 9 games use Performance rendering when available. Steam and imported apps keep their selected graphics profile. See the [Epic quickstart](QUICKSTART.md#epic-games) for setup and management.
+**Settings → Graphics renderer** offers DirectX 9–11, DirectX 10–11, DirectX 9, and an OpenGL fallback, with guidance for each. The combined mode appears when both backends are installed. Epic’s launcher manages DXMT for DirectX 10–11 and DXVK for DirectX 9 when available. Steam and imported apps keep their selected graphics profile. See the [Epic quickstart](QUICKSTART.md#epic-games) for setup and management.
 
 The Windows Xbox app and Minecraft Bedrock are **not supported by the included runtime**. Settings can open Xbox Cloud Gaming for supported streaming titles; this does not install Xbox games. [Xbox and Bedrock status](QUICKSTART.md#xbox-and-minecraft-bedrock).
 

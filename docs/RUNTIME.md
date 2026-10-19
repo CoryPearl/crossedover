@@ -29,9 +29,9 @@ Use a dedicated `--root` for smoke testing. Run both `share/crossedover/smoke-32
 
 This runtime uses Rosetta. Apple documents general-purpose translation through macOS 27 and a restricted gaming subset afterward. macOS 28+ is not supported by this prototype. Replacing Rosetta is a separate compatibility-engine project, not a Swift compilation flag.
 
-## TrackMania profiles
+## Graphics renderers
 
-The current GUI contains only TrackMania Nations Forever. **Performance** uses the source-built D9VK D3D9 DLLs and official MoltenVK 1.4.2 library. The DLLs are installed in the prefix's matching 32/64-bit system directories; `d3d9=n` selects them explicitly. Legacy selects Wine's builtin implementation with `d3d9=b`, including after a Performance profile has been installed. DXMT remains available to developer tools but is not a TrackMania graphics choice.
+The GUI offers **DirectX 9–11**, **DirectX 10–11**, **DirectX 9**, and **OpenGL fallback**. Saved/CLI IDs remain `combined`, `metal`, `performance`, and `legacy`. Existing choices keep their behavior. DirectX 9 uses the source-built D9VK D3D9 DLLs and official MoltenVK library; `d3d9=n` selects the installed architecture-matched DLLs. OpenGL fallback selects Wine’s builtin implementation with `d3d9=b`. DirectX 10–11 enables the DXMT builtin overlay. Combined mode enables both paths and is offered only if the runtime advertises both components. It adds no new runtime binary or DirectX 12 implementation. The dedicated DirectX 9 mode retains the optional x87 helper; combined mode does not enable it. Known recipes may still request a dedicated mode for their tuning.
 
 Source-runtime manifests advertise `supportsMSync`. The app enables `WINEMSYNC=1` only when advertised, and removes inherited ESYNC/FSYNC settings. Every process in the environment must use the same synchronization mode; changing it requires a full environment restart. Older manifests remain readable and use the previous server synchronization mode.
 

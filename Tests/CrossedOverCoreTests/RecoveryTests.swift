@@ -103,6 +103,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: paths.root) }
         let manager = EnvironmentManager(paths: paths, store: store)
         await #expect(throws: (any Error).self) { try await manager.setProfile(.metal, environment: environment, runtime: runtime) }
+        await #expect(throws: (any Error).self) { try await manager.setProfile(.combined, environment: environment, runtime: runtime) }
         #expect(try store.all(ManagedEnvironment.self, kind: "environment").first?.profile == .legacy)
     }
     @Test func performanceProfileInstallsBothArchitecturesAndCanReturnToLegacy() async throws {
@@ -145,6 +146,36 @@ import Testing
         #expect(try store.all(ManagedEnvironment.self, kind: "environment").first?.profile == .legacy)
         try FileManager.default.removeItem(at: runtime.root.appendingPathComponent("dxvk/i386-windows/d3d9.dll"))
         #expect(throws: (any Error).self) { try RuntimeManager.validate(manifest, root: runtime.root, verifyHashes: false) }
+    }
+    @Test func combinedGraphicsRequiresBothBackendsAndKeepsLegacyChoicesReadable() throws {
+        let (paths, _, environment, original) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        var manifest = original.manifest
+        #expect(!manifest.supports(.combined))
+        manifest.profiles = [.combined]
+        #expect(!manifest.supports(.combined))
+        #expect(throws: (any Error).self) { try RuntimeManager.validate(manifest, root: original.root, verifyHashes: false) }
+        manifest.profiles = [.legacy, .performance]
+        #expect(!manifest.supports(.combined))
+        manifest.profiles = [.legacy, .metal]
+        #expect(!manifest.supports(.combined))
+        manifest.profiles = [.legacy, .performance, .metal]
+        manifest.x87RelativePath = "tools/x87"
+        #expect(manifest.graphicsProfiles == [.combined, .metal, .performance, .legacy])
+        let runtime = InstalledRuntime(manifest: manifest, root: original.root)
+        let variables = WineConfiguration.environment(runtime: runtime, prefix: paths.prefix(environment), profile: .combined)
+        #expect(variables["WINEDLLPATH"] == runtime.root.appendingPathComponent("dxmt").path)
+        #expect(variables["CROSSEDOVER_DLL_OVERLAY"] == "1")
+        #expect(variables["WINEDLLOVERRIDES"]?.contains("dxgi,d3d11,d3d10core=b;d3d9=n;") == true)
+        #expect(variables["DYLD_FALLBACK_LIBRARY_PATH"]?.hasPrefix(runtime.root.appendingPathComponent("dxvk").path) == true)
+        #expect(variables["DXVK_CONFIG_FILE"] == "C:\\crossedover\\dxvk.conf")
+        #expect(variables["DXVK_HUD"] == "0")
+        #expect(variables["ROSETTA_X87_PATH"] == nil)
+        #expect(variables["WINE_D3D_CONFIG"] == "renderer=gl")
+        for value in ["legacy", "performance", "metal"] {
+            #expect(try JSONDecoder().decode(GraphicsProfile.self, from: Data("\"\(value)\"".utf8)).rawValue == value)
+        }
+        #expect(try JSONDecoder().decode(GraphicsProfile.self, from: JSONEncoder().encode(GraphicsProfile.combined)) == .combined)
     }
     @Test func synchronizationFallbackIsSharedAndSurvivesBackup() async throws {
         let (paths, store, environment, original) = try fixture()
@@ -241,7 +272,7 @@ import Testing
         #expect(try String(contentsOf: log, encoding: .utf8) == steam.path + "\n-cef-disable-gpu\n-silent\n-applaunch\n11020\n")
         let cs2 = try #require(ResourceCatalog.recipes().first { $0.appID == "730" })
         #expect(cs2.profile == .metal)
-        #expect(cs2.compatibleProfiles == [.metal])
+        #expect(cs2.compatibleProfiles == [.metal, .combined])
         #expect(cs2.executableNames == ["cs2.exe"])
         try JSONEncoder().encode(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchGame, appID: "730")).write(to: file)
         try await Task.detached { try SupervisorEngine.runLaunchWorker(requestFile: file) }.value

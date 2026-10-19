@@ -427,7 +427,7 @@ import CrossedOverCore
     func requestLaunch(_ game: GameInstallation) {
         guard currentSession == nil else { error = "Finish the current session before launching another game."; return }
         if let recipe = recipe(for: game), let environment, !(recipe.compatibleProfiles ?? [recipe.profile]).contains(environment.profile) {
-            guard runtime?.manifest.profiles.contains(recipe.profile) == true else {
+            guard runtime?.manifest.supports(recipe.profile) == true else {
                 error = "\(game.name) targets the \(recipe.profile.title) profile. Import the updated bundled runtime from Settings before trying this profile."; return
             }
             pendingGame = game

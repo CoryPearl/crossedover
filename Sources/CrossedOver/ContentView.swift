@@ -577,8 +577,8 @@ struct ContentView: View {
                 Button("Show game files") { model.showGameFiles(game) }.buttonStyle(SecondaryButton())
             }
             Rule()
-            Text("Graphics: " + (game.store != .steam ? "Metal + Performance D3D9" : model.environment?.profile.title ?? "Not configured")).font(.system(size: 12, weight: .medium))
-            Text(game.store == .ubisoft || game.epicPartnerGameID != nil ? "Ubisoft Connect handles this installation, including games Epic delegates to Ubisoft. Its launcher uses Metal and Direct3D 9 games use Performance rendering. Compatibility is experimental." : "Compatibility is untested for this title. Epic uses Metal for DirectX 10–11 and Performance for DirectX 9 when available. Steam and added apps keep their selected graphics profile.")
+            Text("Graphics: " + (game.store != .steam ? "DirectX 9–11 (launcher managed)" : model.environment?.profile.title ?? "Not configured")).font(.system(size: 12, weight: .medium))
+            Text(game.store == .ubisoft || game.epicPartnerGameID != nil ? "Ubisoft Connect manages this installation, including games Epic delegates to Ubisoft. The launcher manages DXMT for DirectX 10–11 and DXVK for DirectX 9 when available. Compatibility varies by software." : "Epic manages DXMT for DirectX 10–11 and DXVK for DirectX 9 when available. Steam and added apps keep their selected graphics renderer. Compatibility varies by software.")
                 .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
             Text("For updates, verification, and uninstall, use this game's management controls inside \(game.managementStore.title). The launcher owns download progress and confirmation dialogs.")
                 .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
@@ -633,12 +633,12 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionLabel("WINDOWS ENVIRONMENT")
                 VStack(alignment: .leading, spacing: 0) {
-                settingRow("Steam & apps graphics", detail: "Quit Steam, Epic, and Windows apps before changing graphics.") {
+                settingRow("Graphics renderer", detail: "Used by Steam and added Windows software. Quit all Windows software before changing it.") {
                     Group {
                         if renderingSnapshot { menuLabel(model.environment?.profile.title ?? "Not set up") }
                         else {
                             Menu {
-                                ForEach(model.runtime?.manifest.profiles ?? []) { profile in
+                                ForEach(model.runtime?.manifest.graphicsProfiles ?? []) { profile in
                                     Button(profile.title) { model.changeProfile(profile) }
                                 }
                             } label: { menuLabel(model.environment?.profile.title ?? "Not set up") }
@@ -648,12 +648,17 @@ struct ContentView: View {
                 }
                 Rule().padding(.horizontal, 22)
                 VStack(alignment: .leading, spacing: 14) {
-                    ForEach(GraphicsProfile.allCases) { profile in
+                    ForEach([GraphicsProfile.combined, .metal, .performance, .legacy]) { profile in
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(profile.title) · \(profile.subtitle)").font(.system(size: 11, weight: .medium))
                             Text(profile.explanation).font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                            if let runtime = model.runtime, !runtime.manifest.supports(profile) {
+                                Text("Not available in this runtime").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                            }
                         }
                     }
+                    Text("Epic and Ubisoft manage their own renderer combination. DirectX 12 is not supported by these modes. Change resolution, visual quality, and frame limits inside each app.")
+                        .font(.system(size: 10)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                 }.padding(22)
                 }.panel()
             }
@@ -695,8 +700,8 @@ struct ContentView: View {
                     }
                     if model.epicInstalled {
                         Rule().padding(.horizontal, 22)
-                        settingRow("Graphics", detail: "Metal handles DirectX 10–11; Performance handles DirectX 9 when available. Compatibility varies by game.") {
-                            Text("Metal").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        settingRow("Graphics", detail: "DXMT handles DirectX 10–11; DXVK handles DirectX 9 when available. The launcher manages this combination.") {
+                            Text("Managed").font(.system(size: 11)).foregroundStyle(Palette.muted)
                         }
                         Rule().padding(.horizontal, 22)
                         settingRow("Downloaded games", detail: "Default install folder. Each game's menu opens its actual files.") {

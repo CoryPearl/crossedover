@@ -43,6 +43,10 @@ def main():
             check("stop-before-metal", "force-stop")
             check("metal-profile", "profile", "metal")
             check("metal-execution-and-gpu", "smoke", "--graphics")
+        if {"performance", "metal"}.issubset(manifest["profiles"]):
+            check("stop-before-combined", "force-stop")
+            check("combined-profile", "profile", "combined")
+            check("combined-execution-and-gpu", "smoke", "--graphics")
         observation = json.loads(check("process-observer", "observe"))
         if not isinstance(observation.get("processes"), list): raise RuntimeError("Runtime did not return process observations")
         check("stop-before-backup", "force-stop")

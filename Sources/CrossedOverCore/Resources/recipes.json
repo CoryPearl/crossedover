@@ -20,7 +20,7 @@
     "executableNames": ["cs2.exe"],
     "status": "experimental",
     "notes": "Startup and the menu are confirmed on M4 with the Direct3D 11 Metal backend. Native fullscreen and gameplay performance are under validation.",
-    "compatibleProfiles": ["metal"],
+    "compatibleProfiles": ["metal", "combined"],
     "launchArguments": ["-windowed", "-w", "1280", "-h", "720", "+fps_max", "60"]
   }
 ]

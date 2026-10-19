@@ -183,7 +183,7 @@ Import checks manifest-listed hashes. Regular runtime listing and launch validat
 
 `EnvironmentManager.create()` refuses to create a second environment. It saves a `creating` record before starting Wine, creates `drive_c`, and runs `wineboot -u -r`. It then waits for Wine's deferred registry writes, installs supported graphics extensions, removes the broad Z: mapping, and replaces user-folder links that escape the prefix with local directories.
 
-A new environment initially selects Performance when the runtime advertises it, otherwise Legacy. Later profile changes remain explicit.
+A new environment initially selects DirectX 9 (`performance`) when the runtime advertises it, otherwise OpenGL fallback (`legacy`). Later profile changes remain explicit.
 
 Successful setup records `ready`. Failed setup leaves `needsRepair` metadata and preserves the directory so the user can repair it instead of losing partially created data. These containment measures reduce accidental filesystem exposure; they do not sandbox Windows software.
 
@@ -325,9 +325,10 @@ Installers must be handled explicitly: run the installer, finish its own Windows
 
 | Profile | Implementation | Intended role |
 | --- | --- | --- |
-| Legacy | Wine builtin Direct3D / OpenGL | Compatibility fallback for supported older DirectX 9 software |
-| Performance | Native D9VK Direct3D 9 → Vulkan → MoltenVK → Metal | Current TrackMania path and compatible DirectX 9 titles |
-| Metal | DXMT builtin overlay → Metal | Supported DirectX 10/11 titles and the experimental CS2 recipe |
+| DirectX 9–11 (`combined`) | D9VK for Direct3D 9 + DXMT for Direct3D 10–11 | Mixed libraries and components requiring different DirectX versions |
+| DirectX 10–11 (`metal`, formerly Metal) | DXMT builtin overlay → Metal; builtin D3D9 fallback | Software requiring DirectX 10 or 11 |
+| DirectX 9 (`performance`, formerly Performance) | Native D9VK → Vulkan → MoltenVK → Metal | Software requiring DirectX 9 |
+| OpenGL fallback (`legacy`, formerly Legacy) | Wine builtin Direct3D / OpenGL | Compatibility fallback for older DirectX software |
 
 The Performance implementation is based on the pinned D9VK source listed in `runtime/source-lock.json`; the interface describes its DXVK-family path in simpler terms. These profiles are not interchangeable implementations of every DirectX version. crossedover provides no DirectX 12 graphics profile or validated general Direct3D 12 route.
 
@@ -335,7 +336,7 @@ In Wine terminology a **native DLL** is a Windows DLL used instead of Wine's bui
 
 `WineConfiguration.environment()` clears relevant inherited Wine/graphics variables, then constructs prefix-specific paths and DLL policy. `WINEDLLOVERRIDES` chooses builtin or native modules; Metal uses `WINEDLLPATH` and the opt-in builtin overlay. Environment setup places supported architecture-specific DLLs and configuration files inside the prefix.
 
-Steam and imported apps use the saved profile. Profile changes require a stopped environment. Recipes can request a different profile, but crossedover does not automatically cycle through backends until a game happens to work.
+Steam and imported apps use the saved profile. Profile changes require a stopped environment. Existing saved enum values keep their meaning and remain selected after an update. `RuntimeManifest.graphicsProfiles` derives combined-mode availability only when the manifest advertises both the Performance and Metal components; it does not add a new runtime binary. Runtime validation rejects a combined-only manifest. Combined launches enable the DXMT overlay and native D3D9 together, using the existing D9VK configuration. They retain Wine’s OpenGL renderer for older fallback components rather than inheriting the dedicated D3D9 mode’s GDI-only tuning. They do not enable the optional x87 helper, which remains specific to the dedicated Performance mode. CLI `profile combined` selects it, and `smoke --graphics` then checks both D3D9 and D3D11 in both architectures. Unsupported modes cannot change environment metadata. Recipes can request a different profile, but crossedover does not automatically cycle through backends until a game happens to work.
 
 ### Epic and Ubisoft use a scoped combination
 

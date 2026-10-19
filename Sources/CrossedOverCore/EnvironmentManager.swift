@@ -35,16 +35,18 @@ public enum WineConfiguration {
         let serverSync = FileManager.default.fileExists(atPath: prefix.appendingPathComponent(serverSyncMarker).path)
         variables["WINEMSYNC"] = runtime.manifest.supportsMSync == true && !serverSync ? "1" : "0"
         variables.removeValue(forKey: "CROSSEDOVER_DLL_OVERLAY")
-        if profile == .metal {
+        if profile == .metal || profile == .combined {
             variables["WINEDLLPATH"] = runtime.root.appendingPathComponent("dxmt").path
             variables["CROSSEDOVER_DLL_OVERLAY"] = "1"
         }
-        if profile == .performance {
-            // TrackMania uses DirectDraw for startup windows. Its 3D calls go
-            // through native D9VK; avoid initializing a second OpenGL adapter.
-            variables["WINE_D3D_CONFIG"] = "renderer=gdi"
-            if let helper = runtime.manifest.x87RelativePath {
-                variables["ROSETTA_X87_PATH"] = runtime.root.appendingPathComponent(helper).path
+        if profile == .performance || profile == .combined {
+            if profile == .performance {
+                // Preserve the tuned dedicated D3D9 path. Combined mode keeps
+                // OpenGL for older DirectDraw/Direct3D fallback components.
+                variables["WINE_D3D_CONFIG"] = "renderer=gdi"
+                if let helper = runtime.manifest.x87RelativePath {
+                    variables["ROSETTA_X87_PATH"] = runtime.root.appendingPathComponent(helper).path
+                }
             }
             variables["DYLD_FALLBACK_LIBRARY_PATH"] = runtime.root.appendingPathComponent("dxvk").path + ":" + runtime.root.appendingPathComponent("lib").path + ":/usr/lib"
             variables["WINEDLLOVERRIDES"] = "winemetal,dxgi,d3d11,d3d10core=b;d3d9=n;mscoree,mshtml="
@@ -141,7 +143,7 @@ public actor EnvironmentManager {
         } catch { throw CrossedOverError.message("Close Steam, games, and Windows apps before modifying the environment.") }
     }
     public func setProfile(_ profile: GraphicsProfile, environment: ManagedEnvironment, runtime: InstalledRuntime) async throws -> ManagedEnvironment {
-        guard runtime.manifest.profiles.contains(profile) else { throw CrossedOverError.message("This runtime does not include \(profile.title). Import a runtime that advertises this capability.") }
+        guard runtime.manifest.supports(profile) else { throw CrossedOverError.message("This runtime does not include \(profile.title). Import a runtime that advertises this capability.") }
         let lock = try EnvironmentLock(prefix: paths.prefix(environment)); defer { withExtendedLifetime(lock) {} }
         try await requireStopped(environment, runtime: runtime)
         try Self.installExtensions(runtime: runtime, prefix: paths.prefix(environment))
@@ -181,7 +183,7 @@ public actor EnvironmentManager {
         try await requireStopped(environment, runtime: current)
         // Full environment backups are opt-in through backup(), never an upgrade side effect.
         var updated = environment; updated.runtimeID = replacement.id
-        if !replacement.manifest.profiles.contains(updated.profile) { updated.profile = .legacy }
+        if !replacement.manifest.supports(updated.profile) { updated.profile = .legacy }
         var interrupted = environment; interrupted.state = "needsRepair"
         try store.put(interrupted, kind: "environment", id: interrupted.id.uuidString)
         do {

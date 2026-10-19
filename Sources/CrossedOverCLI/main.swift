@@ -92,10 +92,13 @@ import CrossedOverCore
             defer { withExtendedLifetime(lock) {} }
             var names = command == "benchmark" ? ["d3d9-benchmark-32.exe"] : ["smoke-32.exe", "smoke-64.exe"]
             if command == "smoke", arguments.contains("--graphics") {
-                names += environment.profile == .metal
-                    ? ["d3d11-smoke-32.exe", "d3d11-smoke-64.exe"]
-                    : ["d3d9-smoke-32.exe", "d3d9-smoke-64.exe", "d3d9-textures-32.exe", "d3d9-textures-64.exe"]
-                if environment.profile == .performance,
+                if environment.profile != .metal {
+                    names += ["d3d9-smoke-32.exe", "d3d9-smoke-64.exe", "d3d9-textures-32.exe", "d3d9-textures-64.exe"]
+                }
+                if environment.profile == .metal || environment.profile == .combined {
+                    names += ["d3d11-smoke-32.exe", "d3d11-smoke-64.exe"]
+                }
+                if environment.profile == .performance || environment.profile == .combined,
                    FileManager.default.fileExists(atPath: runtime.root.appendingPathComponent("share/crossedover/d3d9-mapped-copy-32.exe").path) {
                     names += ["d3d9-mapped-copy-32.exe"]
                 }
@@ -129,7 +132,7 @@ import CrossedOverCore
             guard arguments.count == 2 else { throw CrossedOverError.message("restore requires a managed backup directory.") }
             try await printJSON(environments.restore(URL(fileURLWithPath: arguments[1]), current: current(), runtimeManager: runtimes))
         case "profile":
-            guard arguments.count == 2, let profile = GraphicsProfile(rawValue: arguments[1]) else { throw CrossedOverError.message("profile requires legacy, performance or metal.") }
+            guard arguments.count == 2, let profile = GraphicsProfile(rawValue: arguments[1]) else { throw CrossedOverError.message("profile requires legacy, performance, metal or combined.") }
             let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
             try await printJSON(environments.setProfile(profile, environment: environment, runtime: runtime))
         case "sync":
@@ -182,7 +185,7 @@ import CrossedOverCore
               observe                   Observe processes if the runtime supplies a helper
               stop                      Ask Windows Steam to shut down
               force-stop                Stop only the managed Wine environment
-              profile legacy|performance|metal  Change graphics after stopping the environment
+              profile legacy|performance|metal|combined  Change graphics after stopping the environment
               sync automatic|server     Change synchronization after stopping the environment
               backup                    Back up a stopped environment
               restore BACKUP_DIRECTORY  Restore prefix and runtime selection together

@@ -97,6 +97,9 @@ public actor RuntimeManager {
             let executable = try FileSafety.containedURL(path, in: root)
             guard FileManager.default.isExecutableFile(atPath: executable.path) else { throw CrossedOverError.message("Runtime executable missing: \(path)") }
         }
+        if manifest.profiles.contains(.combined), !manifest.supports(.combined) {
+            throw CrossedOverError.message("Combined graphics requires both DirectX 9 and DirectX 10–11 components.")
+        }
         if let observer = manifest.observerRelativePath { _ = try FileSafety.containedURL(observer, in: root) }
         if manifest.profiles.contains(.metal) {
             for path in ["dxmt/x86_64-windows/d3d11.dll", "dxmt/x86_64-windows/dxgi.dll", "dxmt/x86_64-windows/winemetal.dll", "dxmt/i386-windows/winemetal.dll", "lib/wine/x86_64-unix/winemetal.so"] {

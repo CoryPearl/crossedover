@@ -6,23 +6,30 @@ public enum CrossedOverError: LocalizedError, Sendable {
 }
 
 public enum GraphicsProfile: String, Codable, CaseIterable, Sendable, Identifiable {
-    case legacy, performance, metal
+    case legacy, performance, metal, combined
     public var id: String { rawValue }
     public var title: String {
-        switch self { case .legacy: "Legacy"; case .performance: "Performance"; case .metal: "Metal" }
+        switch self {
+        case .legacy: "OpenGL fallback"
+        case .performance: "DirectX 9"
+        case .metal: "DirectX 10–11"
+        case .combined: "DirectX 9–11"
+        }
     }
     public var explanation: String {
         switch self {
-        case .legacy: "Uses OpenGL for older DirectX 9 games. Try this compatibility fallback if Performance has rendering problems."
-        case .performance: "Translates DirectX 9 through DXVK and Metal. Recommended for TrackMania Nations Forever and other compatible older games."
-        case .metal: "Translates DirectX 10 and 11 directly to Metal with DXMT. Used by CS2; support and performance vary by app or game."
+        case .legacy: "Uses Wine’s OpenGL renderer for older DirectX software. Try this if a Metal renderer has visual errors or fails to start. Performance and feature support are more limited."
+        case .performance: "Uses DXVK and Metal for DirectX 9 apps and games. Choose this when software requires DirectX 9 and does not need DirectX 10 or 11."
+        case .metal: "Uses DXMT to translate DirectX 10 and 11 to Metal. Choose this for software that requires either version; DirectX 9 uses the OpenGL fallback."
+        case .combined: "Uses DXVK for DirectX 9 and DXMT for DirectX 10–11, both through Metal. Useful for mixed libraries or software with components that use different DirectX versions. Try a dedicated mode if compatibility differs."
         }
     }
     public var subtitle: String {
         switch self {
-        case .legacy: "Direct3D 9 · OpenGL"
-        case .performance: "Direct3D 9 · DXVK / Metal"
-        case .metal: "Direct3D 10–11 · DXMT"
+        case .legacy: "WineD3D · OpenGL"
+        case .performance: "DXVK · Metal"
+        case .metal: "DXMT · Metal"
+        case .combined: "DXVK + DXMT · Metal"
         }
     }
 }
@@ -45,6 +52,15 @@ public struct RuntimeManifest: Codable, Sendable, Equatable {
     public var fileHashes: [String: String]
     public var supportsMSync: Bool?
     public var x87RelativePath: String?
+    /// Combined mode composes two existing backends; it does not require a new
+    /// binary or change the on-disk runtime manifest's advertised components.
+    public func supports(_ profile: GraphicsProfile) -> Bool {
+        if profile == .combined { return profiles.contains(.performance) && profiles.contains(.metal) }
+        return profiles.contains(profile)
+    }
+    public var graphicsProfiles: [GraphicsProfile] {
+        [.combined, .metal, .performance, .legacy].filter(supports)
+    }
     public init(id: String, name: String, version: String, wineRelativePath: String, wineserverRelativePath: String,
                 profiles: [GraphicsProfile] = [.legacy], sourceURL: String, sourceSHA256: String,
                 experimental: Bool = true, fileHashes: [String: String] = [:], observerRelativePath: String? = nil, supportsMSync: Bool = false, x87RelativePath: String? = nil, steamLoaderRelativePath: String? = nil) {

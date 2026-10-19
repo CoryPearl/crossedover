@@ -59,7 +59,7 @@ Use an Epic card’s **⋯** menu for **Game properties**, **Show game files**, 
 
 **Settings → Windows Epic Games → Open download folder** opens the default `C:\Program Files\Epic Games` folder in Finder. Per-game **Show game files** opens the actual install folder if you chose a different C: location. The **Epic downloads → Open Epic** button opens Epic; use its Downloads control for progress, pause/resume, and updates.
 
-Epic’s current Windows launcher needs DirectX 11 and uses **Metal**. Its game processes use Metal for DirectX 10–11 and **Performance** for DirectX 9 when available. Steam and directly added apps retain their chosen graphics profile. The launcher can self-update. Compatibility, DRM, anti-cheat, and extra dependencies vary by game; inclusion in the library is not a compatibility guarantee.
+Epic’s current Windows launcher needs DirectX 11 and uses **DXMT / Metal**. Its game processes use DXMT for DirectX 10–11 and **DXVK / Metal** for DirectX 9 when available. Steam and directly added apps retain their chosen graphics profile. The launcher can self-update. Compatibility, DRM, anti-cheat, and extra dependencies vary by game; inclusion in the library is not a compatibility guarantee.
 
 ## Play and manage
 
@@ -73,11 +73,14 @@ Use **⋯** for properties, game files, verification, or uninstall. Steam handle
 
 Graphics profiles are explained in Settings:
 
-- **Legacy:** OpenGL for older DirectX 9 games; a compatibility fallback.
-- **Performance:** DXVK and Metal for DirectX 9; recommended for TrackMania Nations Forever.
-- **Metal:** DXMT for DirectX 10–11; used by CS2. Compatibility varies by game.
+- **DirectX 9–11:** combines DXVK for DirectX 9 with DXMT for DirectX 10–11, both through Metal. Useful for mixed libraries and apps with components using different versions.
+- **DirectX 10–11:** DXMT and Metal for software requiring DirectX 10 or 11; DirectX 9 falls back to OpenGL.
+- **DirectX 9:** DXVK and Metal for software requiring DirectX 9 without needing the DirectX 10–11 path.
+- **OpenGL fallback:** WineD3D for older DirectX software. Try it when Metal rendering has visual errors or fails to start; performance and feature support are more limited.
 
-Quit Steam, Epic, games, and Windows apps before changing profiles. TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
+Only modes supported by the selected runtime can be chosen. **DirectX 9–11** requires both included backends. Your existing renderer stays selected after updating (the old Legacy, Performance, and Metal choices are now named OpenGL fallback, DirectX 9, and DirectX 10–11). Quit all Windows software before changing **Settings → Graphics renderer**. Epic and Ubisoft retain their launcher-managed combination. These modes do not add DirectX 12 support. Choose resolution, detail, and frame limits inside the app or game; known compatibility presets may still apply.
+
+Known game presets may request a dedicated renderer. Quit Windows software before accepting a renderer restart. Native window controls and gameplay performance remain title-dependent.
 
 ## Mods
 
@@ -124,7 +127,7 @@ v1.3.1 adds Windows Epic Games alongside Steam and the local .exe cards introduc
 
 Some Epic titles, including Brawlhalla, hand installation and launch to Ubisoft Connect. These installations have Ubisoft registry records rather than Epic `.item` manifests. crossedover combines Epic’s partner records with Ubisoft’s completed install registration. These games appear as **Epic Games** cards; Play asks Epic to launch them, preserving Epic’s own authorization and Ubisoft handoff. Complete the initial account linking in Epic’s own Library first. Independent Ubisoft installs appear under **Ubisoft Connect**. Sign in/link accounts in the launcher's own window when requested. Play routes through the launcher that owns the installation. Files and mods open in Finder. Verification and uninstall continue in Ubisoft's own Library controls. Other Ubisoft titles remain untested.
 
-The launcher uses Metal for Direct3D 11, with Performance rendering for Direct3D 9 games such as Brawlhalla. This does not change Steam's saved profile. An observed process is not proof of a visible or playable game. If a title opens no window, check its own launcher for sign-in/linking prompts and report the title; compatibility varies.
+The launcher uses DXMT / Metal for DirectX 10–11, with DXVK / Metal for DirectX 9 when available. This does not change Steam's saved profile. An observed process is not proof of a visible or playable game. If a title opens no window, check its own launcher for sign-in/linking prompts and report the title; compatibility varies.
 
 ## Xbox and Minecraft Bedrock
 

@@ -8,6 +8,7 @@ A local validation candidate for Brawlhalla launch and native window controls. P
 - A **Game Launchers** menu groups Steam, Epic Games, and installed Ubisoft Connect.
 - The bottom launch bar shows preparation, waiting, and running states. **Stop & close Windows** cancels the operation, blocks stale queued launches, and closes all Windows games/apps/launchers in the managed environment. Unsaved progress may be lost.
 - Game cards show their store without Demo, Experimental, or Untested badges.
+- Universal graphics labels and descriptions, plus a combined **DirectX 9–11** renderer when both DXVK and DXMT components are available. Existing choices keep their behavior; no game-specific names are needed to choose a renderer.
 - Backup creation sits beside Clear backups. Documentation includes hardware guidelines, an in-depth Technical README, updated website previews, and a branded README.
 
 The user environment’s runtime was migrated to the included candidate while stopped, preserving its Performance profile. Real card launch, cold/warm Epic behavior, and the red/yellow/green game-window controls still need confirmation. Owned fixtures test routing and graphics, not store authentication or gameplay.
