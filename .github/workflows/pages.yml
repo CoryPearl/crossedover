@@ -9,6 +9,10 @@ on:
       - 'scripts/check-release.py'
       - 'VERSION'
   workflow_dispatch:
+  release:
+    types: [published]
+  schedule:
+    - cron: '23 */6 * * *'
 
 permissions:
   contents: read
@@ -30,7 +34,15 @@ jobs:
       - name: Check release docs and website
         run: python3 scripts/check-release.py
       - name: Build static website
-        run: python3 website/build.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m unittest discover -s website -p 'test_*.py'
+          if python3 website/download_stats.py --output "$RUNNER_TEMP/downloads.json"; then
+            python3 website/build.py --download-stats "$RUNNER_TEMP/downloads.json"
+          else
+            python3 website/build.py
+          fi
       - name: Upload website only
         uses: actions/upload-pages-artifact@v4
         with:

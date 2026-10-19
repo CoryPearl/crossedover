@@ -1,0 +1,61 @@
+Subject: winemac: Opt selected game main windows into native window controls.
+
+Original crossedover change. Disabled by default. Enabled only for Brawlhalla.
+Cocoa surrounds the existing game content; helpers and dialogs retain their
+normal styles. No game files or account state are modified.
+
+--- a/dlls/winemac.drv/macdrv_cocoa.h
++++ b/dlls/winemac.drv/macdrv_cocoa.h
+@@ -142,6 +142,7 @@
+ extern bool allow_cursor_clipping;
+ extern bool fullscreen_ignore_max_size;
+ extern bool native_fullscreen;
++extern bool force_window_controls;
+ extern bool cursor_clipping_locks_windows;
+ extern bool use_precise_scrolling;
+ extern int gl_surface_mode;
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -58,6 +58,7 @@
+ bool allow_cursor_clipping = true;
+ bool fullscreen_ignore_max_size = false;
+ bool native_fullscreen = false;
++bool force_window_controls = false;
+ bool cursor_clipping_locks_windows = true;
+ bool use_precise_scrolling = true;
+ int gl_surface_mode = GL_SURFACE_IN_FRONT_OPAQUE;
+@@ -373,6 +374,9 @@
+ 
+     if (!get_config_key(hkey, appkey, "NativeFullscreen", buffer, sizeof(buffer)))
+         native_fullscreen = IS_OPTION_TRUE(buffer[0]);
++
++    if (!get_config_key(hkey, appkey, "ForceWindowControls", buffer, sizeof(buffer)))
++        force_window_controls = IS_OPTION_TRUE(buffer[0]);
+ 
+     if (!get_config_key(hkey, appkey, "FullscreenIgnoreMaxSize", buffer, sizeof(buffer)))
+         fullscreen_ignore_max_size = IS_OPTION_TRUE(buffer[0]);
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -118,6 +118,22 @@
+     struct macdrv_window_features wf = {0};
+ 
+     if (ex_style & WS_EX_NOACTIVATE) wf.prevents_app_activation = TRUE;
++    /* Explicit per-game opt-in for clients that remove their Windows frame.
++     * Keep helpers, dialogs, transparent and shaped surfaces unchanged. The
++     * Cocoa frame surrounds the existing content; Windows client coordinates
++     * and the game executable are unchanged. */
++    if (force_window_controls && !data->shaped &&
++        !(style & (WS_CHILD | WS_DISABLED)) &&
++        !(ex_style & (WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE)) &&
++        (!NtUserGetWindowRelative(data->hwnd, GW_OWNER) || (ex_style & WS_EX_APPWINDOW)) &&
++        data->rects.visible.right - data->rects.visible.left >= 320 &&
++        data->rects.visible.bottom - data->rects.visible.top >= 200)
++    {
++        wf.title_bar = wf.close_button = wf.minimize_button = TRUE;
++        wf.maximize_button = wf.resizable = wf.shadow = TRUE;
++        return wf;
++    }
++
+     /* SDL games can draw their own non-client area while retaining WS_CAPTION.
+      * Keep native controls for opted-in framed game windows in that case. */
+     if (EqualRect(&data->rects.window, &data->rects.visible) &&

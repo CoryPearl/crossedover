@@ -8,7 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check release docs and website
-        run: python3 scripts/check-release.py
+        run: |
+          python3 scripts/check-release.py
+          python3 -m unittest discover -s website -p 'test_*.py'
   macos:
     runs-on: macos-15
     steps:

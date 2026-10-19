@@ -79,6 +79,12 @@ public struct ManagedEnvironment: Codable, Sendable, Identifiable, Equatable {
     }
 }
 
+public enum GameStore: String, Codable, CaseIterable, Sendable, Identifiable {
+    case steam, epic, ubisoft
+    public var id: String { rawValue }
+    public var title: String { switch self { case .steam: "Steam"; case .epic: "Epic Games"; case .ubisoft: "Ubisoft Connect" } }
+}
+
 public struct GameInstallation: Codable, Sendable, Identifiable, Equatable {
     public var appID: String
     public var environmentID: UUID
@@ -86,7 +92,16 @@ public struct GameInstallation: Codable, Sendable, Identifiable, Equatable {
     public var directory: String
     public var sizeBytes: Int64
     public var artworkPath: String? = nil
-    public var id: String { "\(environmentID.uuidString):\(appID)" }
+    // Optional on disk so existing Steam records decode without a migration.
+    public var source: GameStore? = nil
+    public var epicNamespace: String? = nil
+    public var epicCatalogItemID: String? = nil
+    public var epicPartnerGameID: String? = nil
+    public var launchExecutable: String? = nil
+    public var store: GameStore { source ?? .steam }
+    public var managementStore: GameStore { epicPartnerGameID == nil ? store : .ubisoft }
+    public var sessionAppID: String { store == .steam ? appID : store.rawValue + ":" + appID }
+    public var id: String { "\(environmentID.uuidString):\(sessionAppID)" }
 }
 
 public struct GameRecipe: Codable, Sendable, Identifiable {

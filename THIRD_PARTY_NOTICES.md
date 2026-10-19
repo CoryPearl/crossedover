@@ -24,3 +24,7 @@ The TrackMania logo is read from the user’s existing Steam artwork cache and d
 The optional cooperative Wine loader handshake is adapted from https://github.com/vakesz/TrackMania-MacOS/blob/main/patches/wine/0008-ntdll-rosetta-cooperative-sidecar.patch for the CodeWeavers Wine 11.0 loader signature. It is inactive without an explicitly selected helper.
 
 The website contains app-interface previews with cached game artwork visible in context. It hosts no game files. Full GRDB and Sparkle license texts are in licenses/ and included with the packaged app.
+
+Epic Games Launcher is downloaded directly from Epic for each setup; it and its games are not included in the app or disk image. Epic Games names identify their respective owner. crossedover is independent of Epic Games. Epic installation metadata and artwork remain local to the user’s Windows environment.
+
+Ubisoft Connect and Brawlhalla names identify their respective owners. Connect is installed by its official launcher flow where required; it, accounts, and game payloads are not bundled. Local Windows metadata is used only for installation discovery. The Xbox Cloud link opens Microsoft’s official service in a browser. No Microsoft/Mojang/Xbox or experimental Bedrock runtime components are bundled, and no affiliation is implied.

@@ -13,7 +13,7 @@ public enum DiagnosticsService {
         sections += ["Recent Windows app launches", String(decoding: try encoder.encode(Array(appRuns)), as: UTF8.self)]
         let operations = try store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }.prefix(15)
         sections += ["Recent operations", String(decoding: try encoder.encode(Array(operations)), as: UTF8.self)]
-        sections += ["Steam authentication files, account configuration, cookies and raw Wine logs are excluded.", "No information is uploaded automatically."]
+        sections += ["Steam and Epic authentication files, account configuration, cookies, and raw runtime logs are excluded.", "No information is uploaded automatically."]
         return Redaction.apply(sections.joined(separator: "\n\n"))
     }
 }

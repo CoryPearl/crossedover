@@ -10,6 +10,10 @@ Open http://localhost:8765. The site uses plain HTML, CSS, and local images, wit
 
 Changes to this folder on `main` automatically deploy through [the Pages workflow](../.github/workflows/pages.yml). It checks the release links, runs `python3 website/build.py`, and uploads only the generated `website/dist` folder. You can also run the workflow manually from GitHub Actions. The app source, runtime, caches, and local data are excluded from the published website.
 
-GitHub Pages serves the website publicly. The app repository remains private, so v1.1.0 release downloads require repository access. The site makes that requirement explicit. Former Sites hosting is no longer used by this build or workflow.
+GitHub Pages serves the website publicly. The app repository remains private, so v1.3.0 release downloads require repository access. The site makes that requirement explicit. Former Sites hosting is no longer used by this build or workflow.
 
 Images are app-owned interface previews with no account details. They are not gameplay benchmarks. The branch mark is original vector artwork.
+
+The Games preview shows the user’s installed library without account details. Apps previews use example cards; no games or apps are included. Interface previews are not gameplay benchmarks.
+
+The download count is the sum of uploaded `.dmg` asset `download_count` values on published GitHub releases (including published prereleases). Repeat downloads count; it is not unique users or installs. The Pages build reads the private API through its read-only Actions token, emits only aggregate values, and renders static HTML plus `downloads.json`. No browser API token, analytics script, cookie, or visitor tracking is used. It refreshes on publication and roughly every six hours; scheduling can be delayed. An API failure displays “Download count unavailable” instead of a false zero. Local builds stay offline unless you explicitly run `python3 website/download_stats.py --output PATH` and pass that file to `website/build.py --download-stats PATH`.

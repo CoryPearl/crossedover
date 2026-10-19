@@ -48,7 +48,7 @@ public enum Redaction {
     public static func apply(_ input: String, home: String = FileManager.default.homeDirectoryForCurrentUser.path) -> String {
         var text = input.replacingOccurrences(of: home, with: "~")
         // Auth-bearing lines are removed in full; do not try to guess token boundaries.
-        let pattern = "(?im)^.*(?:password|passwd|authorization|access[_-]?token|refresh[_-]?token|cookie|steamlogin|loginusers|shared_secret|identity_secret|sessionid|accountname|steamid).*$"
+        let pattern = "(?im)^.*(?:password|passwd|authorization|access[_-]?token|refresh[_-]?token|exchange[_-]?code|epicuid|ubi[_-]?ticket|cookie|steamlogin|loginusers|shared_secret|identity_secret|sessionid|accountname|steamid).*$"
         if let regex = try? NSRegularExpression(pattern: pattern) {
             text = regex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "[sensitive line removed]")
         }

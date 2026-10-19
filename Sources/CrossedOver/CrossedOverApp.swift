@@ -13,7 +13,7 @@ import CrossedOverCore
                 model.runtimes = try await model.runtimeManager.installed()
                 model.environment = try model.store.all(ManagedEnvironment.self, kind: "environment").first
                 if let environment = model.environment {
-                    model.games = try SteamDiscovery().discover(environment: environment, prefix: model.paths.prefix(environment))
+                    model.games = GameLibrary.discover(environment: environment, prefix: model.paths.prefix(environment))
                 }
                 model.windowsApps = try model.store.all(WindowsApp.self, kind: "windowsApp")
                 model.windowsRuns = try model.store.all(WindowsAppRun.self, kind: "windowsRun").sorted { $0.startedAt > $1.startedAt }
@@ -36,7 +36,7 @@ import CrossedOverCore
                     case "install": model.games = []
                     case "running", "unknown":
                         if let environment = model.environment {
-                            model.currentSession = LaunchSession(appID: model.games.first?.appID ?? "11020", environmentID: environment.id, state: CommandLine.arguments[stateIndex + 1])
+                            model.currentSession = LaunchSession(appID: model.games.first?.sessionAppID ?? "11020", environmentID: environment.id, state: CommandLine.arguments[stateIndex + 1])
                         }
                     case "busy": model.busy = true; model.progress = "Preparing your game. This may take a moment…"
                     case "notice": model.notice = "Uninstall requested. Confirm in Steam; the library will update when it finishes."
@@ -51,6 +51,7 @@ import CrossedOverCore
                 }
                 let width = min(2560, max(840, Double(previewArgument("--preview-width") ?? "") ?? (compact ? 840 : 1100)))
                 let height = min(1800, max(620, Double(previewArgument("--preview-height") ?? "") ?? (tall ? 1400 : compact ? 620 : 760)))
+                await model.preparePreviewArtwork()
                 let renderer = ImageRenderer(content: ContentView(model: model, renderingSnapshot: true, previewAdvanced: advanced,
                     previewLibraryMode: previewArgument("--preview-layout") ?? "grid", previewSearch: previewArgument("--preview-search"))
                     .environment(\.colorScheme, .dark).frame(width: width, height: height))
@@ -94,6 +95,10 @@ struct CrossedOverApp: App {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .textEditing) {
                 Button("Search Library…") { librarySearch?() }.keyboardShortcut("f").disabled(librarySearch == nil)
+            }
+            CommandMenu("Epic") {
+                Button("Open Windows Epic") { model?.openEpic() }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(model == nil || model?.busy == true)
+                Button("Epic Downloads") { model?.openEpicDownloads() }.disabled(model?.busy == true || model?.epicInstalled != true)
             }
             CommandMenu("Steam") {
                 Button("Open Windows Steam") { model?.openSteam() }.keyboardShortcut("s", modifiers: [.command, .shift]).disabled(model == nil || model?.busy == true)

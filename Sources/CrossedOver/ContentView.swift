@@ -19,6 +19,7 @@ struct ContentView: View {
     var previewSearch: String? = nil
     @AppStorage("libraryPresentation") private var libraryPresentation = "grid"
     @State private var searchText = ""
+    @AppStorage("gameStoreFilter") private var gameStoreFilter = "all"
     @FocusState private var searchFocused: Bool
     @State private var advancedExpanded = false
     @State private var forceStopConfirmation = false
@@ -28,6 +29,7 @@ struct ContentView: View {
     @State private var pendingRuntime: InstalledRuntime?
     @State private var pendingIncludedRuntime = false
     @State private var moddingGame: GameInstallation?
+    @State private var propertiesGame: GameInstallation?
     @State private var executableDraft: WindowsAppDraft?
     @State private var removingApp: WindowsApp?
 
@@ -40,6 +42,8 @@ struct ContentView: View {
                     Color.clear.overlay(alignment: .topLeading) {
                         page.fixedSize(horizontal: false, vertical: true)
                     }.clipped()
+                } else if ["settings", "activity"].contains(model.selectedPage) {
+                    NativePageScroll { page.frame(maxWidth: .infinity, alignment: .topLeading) }
                 } else {
                     ScrollView { page.frame(maxWidth: .infinity, alignment: .topLeading) }
                 }
@@ -60,7 +64,7 @@ struct ContentView: View {
         .confirmationDialog("Restart Steam to change graphics?", isPresented: Binding(get: { model.pendingGame != nil }, set: { if !$0 { model.pendingGame = nil } }), titleVisibility: .visible) {
             if let game = model.pendingGame { Button("Restart and play") { model.launch(game, restart: true) } }
             Button("Cancel", role: .cancel) { model.pendingGame = nil }
-        } message: { Text("Close any running game first. Steam downloads may pause during the restart.") }
+        } message: { Text("Close Epic and any running games or Windows apps first. Steam downloads may pause during the restart.") }
         .confirmationDialog("Force quit the Windows environment?", isPresented: $forceStopConfirmation, titleVisibility: .visible) {
             Button("Force quit", role: .destructive) { model.stop(force: true) }
             Button("Cancel", role: .cancel) {}
@@ -72,7 +76,7 @@ struct ContentView: View {
         .confirmationDialog("Uninstall crossedover and all its data?", isPresented: $uninstallConfirmation, titleVisibility: .visible) {
             Button("Uninstall app and data", role: .destructive) { model.uninstallApplication() }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("Quit Steam, games, and Windows apps first. This moves crossedover, its Windows Steam client, every managed game and Windows app, local saves, runtimes, and backups to Trash, then quits. Empty Trash to reclaim space. Your separate Mac Steam library stays in place.") }
+        } message: { Text("Quit Steam, Epic, games, and Windows apps first. This moves crossedover, its Windows Steam and Epic clients, every managed game and Windows app, local saves, runtimes, and backups to Trash, then quits. Empty Trash to reclaim space. Your separate Mac Steam library stays in place.") }
         .confirmationDialog("Create a full manual backup?", isPresented: $manualBackupConfirmation, titleVisibility: .visible) {
             Button("Create backup") { model.backup() }
             Button("Cancel", role: .cancel) {}
@@ -81,7 +85,7 @@ struct ContentView: View {
             if let runtime = pendingRuntime { Button("Change runtime") { pendingRuntime = nil; model.useRuntime(runtime) } }
             if pendingIncludedRuntime { Button("Use included runtime") { pendingIncludedRuntime = false; model.useIncludedRuntime() } }
             Button("Cancel", role: .cancel) { pendingRuntime = nil; pendingIncludedRuntime = false }
-        } message: { Text("Quit Steam, games, and Windows apps first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Advanced before continuing.") }
+        } message: { Text("Quit Steam, Epic, games, and Windows apps first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Advanced before continuing.") }
         .confirmationDialog("Remove this card from your library?", isPresented: Binding(get: { removingApp != nil }, set: { if !$0 { removingApp = nil } }), titleVisibility: .visible) {
             if let app = removingApp { Button("Remove card", role: .destructive) { model.removeWindowsApp(app); removingApp = nil } }
             Button("Cancel", role: .cancel) { removingApp = nil }
@@ -89,6 +93,7 @@ struct ContentView: View {
         .sheet(item: $executableDraft) { draft in
             WindowsAppEditor(model: model, draft: draft) { executableDraft = nil }
         }
+        .sheet(item: $propertiesGame) { game in gameProperties(game) }
         .sheet(item: $moddingGame) { game in modding(game) }
         .sheet(isPresented: Binding(get: { model.diagnostics != nil }, set: { if !$0 { model.diagnostics = nil } })) { diagnostics }
     }
@@ -116,7 +121,15 @@ struct ContentView: View {
                     }.frame(maxWidth: .infinity)
                 }.buttonStyle(SecondaryButton()).disabled(model.busy || (!model.steamInstalled && model.host?.supported != true))
                     .help("Open the Windows Steam client")
-                Text("Windows client").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                Button { model.openEpic() } label: {
+                    HStack {
+                        Text(model.epicInstalled ? "Open Epic" : "Set up Epic")
+                        Spacer(minLength: 8)
+                        Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .medium))
+                    }.frame(maxWidth: .infinity)
+                }.buttonStyle(SecondaryButton()).disabled(model.busy || (!model.epicInstalled && model.host?.supported != true))
+                    .help("Open the Windows Epic Games Launcher")
+                Text("Windows launchers").font(.system(size: 10)).foregroundStyle(Palette.muted)
             }.padding(.horizontal, 20)
             Text("VERSION \(AppVersion.current)").font(.system(size: 9, weight: .medium)).tracking(1.2)
                 .foregroundStyle(Palette.muted.opacity(0.7)).padding(.horizontal, 20).padding(.top, 30).padding(.bottom, 24)
@@ -159,7 +172,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(model.selectedPage == "settings" ? "Settings" : model.selectedPage == "activity" ? "Activity" : appsPage ? "Apps" : "Games")
                         .font(.system(size: 25, weight: .medium)).tracking(-0.6).accessibilityAddTraits(.isHeader)
-                    Text(model.selectedPage == "settings" ? "Windows, Steam, and app preferences." : model.selectedPage == "activity" ? "Recent actions and sessions." : appsPage ? "Your Windows apps, on Mac." : "Steam favorites and Windows games, together.")
+                    Text(model.selectedPage == "settings" ? "Windows, launchers, and app preferences." : model.selectedPage == "activity" ? "Recent actions and sessions." : appsPage ? "Your Windows apps, on Mac." : "Steam, Epic, and Windows games, together.")
                         .font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
                 Spacer()
@@ -177,11 +190,17 @@ struct ContentView: View {
 
     private var appsPage: Bool { model.selectedPage == "apps" }
     private var importedApps: [WindowsApp] { model.windowsApps.filter { $0.category == (appsPage ? .apps : .games) } }
-    private var filteredApps: [WindowsApp] { query.isEmpty ? importedApps : importedApps.filter { $0.name.localizedStandardContains(query) } }
+    private var filteredApps: [WindowsApp] {
+        guard appsPage || ["all", "added"].contains(gameStoreFilter) else { return [] }
+        return query.isEmpty ? importedApps : importedApps.filter { $0.name.localizedStandardContains(query) }
+    }
     private var query: String { (previewSearch ?? searchText).trimmingCharacters(in: .whitespacesAndNewlines) }
     private var showingList: Bool { (previewLibraryMode ?? libraryPresentation) == "list" }
     private var filteredGames: [GameInstallation] {
-        appsPage ? [] : query.isEmpty ? model.games : model.games.filter { $0.name.localizedStandardContains(query) }
+        guard !appsPage else { return [] }
+        return model.games.filter { game in
+            (gameStoreFilter == "all" || gameStoreFilter == game.store.rawValue) && (query.isEmpty || game.name.localizedStandardContains(query))
+        }
     }
     private var totalCount: Int { importedApps.count + (appsPage ? 0 : model.games.count) }
     private var libraryCount: String {
@@ -203,16 +222,27 @@ struct ContentView: View {
                         Button("Add Windows app…") { beginImport() }.buttonStyle(PrimaryButton()).disabled(model.busy)
                     }.padding(28).frame(maxWidth: 420, alignment: .leading).panel()
                 } else {
-                    gameCard(nil).frame(maxWidth: 320)
-                    Text("Steam installs appear automatically. Use Add .exe for games from elsewhere.")
-                        .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("A home for your Windows games.").font(.system(size: 18, weight: .medium))
+                        Text("Install through Windows Steam or Epic. Completed downloads appear here automatically. Add .exe for games from elsewhere.")
+                            .font(.system(size: 12)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 8) {
+                            Button(model.steamInstalled ? "Open Steam" : "Set up Steam") { model.openSteam() }.buttonStyle(SecondaryButton())
+                            Button(model.epicInstalled ? "Open Epic" : "Set up Epic") { model.openEpic() }.buttonStyle(SecondaryButton())
+                        }.disabled(model.busy)
+                        if model.steamInstalled, let demo = model.recipes.first(where: { $0.appID == "11020" }) {
+                            Button("Install TrackMania demo") { model.install(demo) }.buttonStyle(TextButton()).disabled(model.busy)
+                        }
+                    }.padding(28).frame(maxWidth: 510, alignment: .leading).panel()
                 }
             } else if games.isEmpty && apps.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "magnifyingglass").font(.system(size: 24, weight: .light)).foregroundStyle(Palette.muted)
                     Text(appsPage ? "No apps found" : "No games found").font(.system(size: 15, weight: .medium))
-                    Text("No titles match “\(query)”.").font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
-                    Button("Clear search") { searchText = ""; searchFocused = true }.buttonStyle(SecondaryButton())
+                    Text(query.isEmpty ? "Install games through the selected launcher, or choose All games." : "No titles match “\(query)”.")
+                        .font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
+                    if !query.isEmpty { Button("Clear search") { searchText = ""; searchFocused = true }.buttonStyle(SecondaryButton()) }
+                    else if gameStoreFilter == "epic" { Button(model.epicInstalled ? "Open Epic" : "Set up Epic") { model.openEpic() }.buttonStyle(SecondaryButton()).disabled(model.busy) }
                 }.padding(.vertical, 64).padding(.horizontal, 24).frame(maxWidth: .infinity)
             } else if showingList {
                 LazyVStack(spacing: 0) {
@@ -226,7 +256,7 @@ struct ContentView: View {
                 }
             }
             if !appsPage, let tracked = model.currentSession,
-               !model.games.contains(where: { $0.appID == tracked.appID && $0.environmentID == tracked.environmentID }) {
+               !model.games.contains(where: { $0.sessionAppID == tracked.appID && $0.environmentID == tracked.environmentID }) {
                 HStack(spacing: 16) {
                     Text("The tracked game is no longer in this library.").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     Spacer(minLength: 0)
@@ -348,6 +378,19 @@ struct ContentView: View {
                     if !renderingSnapshot { SearchFocusDismissal(isFocused: searchFocused) { searchFocused = false } }
                 }
             Spacer(minLength: 0)
+            if !appsPage {
+                if renderingSnapshot { menuLabel(storeFilterTitle) }
+                else {
+                    Menu {
+                        Button("All games") { gameStoreFilter = "all" }
+                        Button("Steam") { gameStoreFilter = "steam" }
+                        Button("Epic Games") { gameStoreFilter = "epic" }
+                        Button("Ubisoft Connect") { gameStoreFilter = "ubisoft" }
+                        Button("Added .exe") { gameStoreFilter = "added" }
+                    } label: { menuLabel(storeFilterTitle) }
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().accessibilityLabel("Filter games by store")
+                }
+            }
             HStack(spacing: 2) {
                 presentationButton("grid", title: "Grid view", symbol: "square.grid.2x2")
                 presentationButton("list", title: "List view", symbol: "list.bullet")
@@ -356,6 +399,9 @@ struct ContentView: View {
         }
     }
 
+    private var storeFilterTitle: String {
+        switch gameStoreFilter { case "steam": "Steam"; case "epic": "Epic Games"; case "ubisoft": "Ubisoft Connect"; case "added": "Added .exe"; default: "All games" }
+    }
     private func presentationButton(_ mode: String, title: String, symbol: String) -> some View {
         let selected = (showingList ? "list" : "grid") == mode
         return Button { libraryPresentation = mode } label: {
@@ -372,7 +418,7 @@ struct ContentView: View {
                 artwork(game, compact: true).frame(width: 88, height: 56).clipShape(RoundedRectangle(cornerRadius: 4))
                 VStack(alignment: .leading, spacing: 6) {
                     Text(game.name).font(.system(size: 13, weight: .medium)).lineLimit(1).help(game.name)
-                    Text(gameState(game) + (game.sizeBytes > 0 ? " · " + ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""))
+                    Text(game.store.title + " · " + gameState(game) + (game.sizeBytes > 0 ? " · " + ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""))
                         .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) { manageMenu(game, compact: true); gameAction(game) }.fixedSize()
@@ -389,7 +435,7 @@ struct ContentView: View {
 
     private func session(for game: GameInstallation?) -> LaunchSession? {
         guard let game, let session = model.currentSession,
-              session.appID == game.appID, session.environmentID == game.environmentID else { return nil }
+              session.appID == game.sessionAppID, session.environmentID == game.environmentID else { return nil }
         return session
     }
 
@@ -426,30 +472,32 @@ struct ContentView: View {
     }
 
     private func artwork(_ game: GameInstallation?, compact: Bool = false) -> some View {
-        let isDemo = game == nil || game?.appID == "11020"
-        let image = isDemo ? model.trackManiaLogo ?? game.flatMap { model.artwork(for: $0) } : game.flatMap { model.artwork(for: $0) }
-        return ZStack {
-            (isDemo ? Color(white: 0.85) : Palette.sidebar)
-            if let image {
-                Image(nsImage: image).resizable().scaledToFit().padding(.horizontal, compact ? 8 : 22).padding(.vertical, compact ? 8 : 18)
-                    .accessibilityLabel("\(game?.name ?? "TrackMania Nations Forever") artwork")
-            } else if isDemo && !compact {
-                VStack(spacing: 5) {
-                    Text("TRACKMANIA").font(.system(size: 25, weight: .heavy, design: .rounded)).tracking(-1)
-                    Text("NATIONS FOREVER").font(.system(size: 10, weight: .semibold)).tracking(2)
-                }.foregroundStyle(Color(white: 0.12))
-            } else {
-                Image(systemName: "gamecontroller").font(.system(size: compact ? 20 : 26, weight: .ultraLight))
-                    .foregroundStyle(Palette.muted).accessibilityHidden(true)
+        let isDemo = game == nil || (game?.store == .steam && game?.appID == "11020")
+        let path = model.artworkPath(for: game)
+        return LibraryArtwork(path: path, preview: renderingSnapshot ? path.flatMap { model.previewArtwork[$0] } : nil) { image in
+            ZStack {
+                (isDemo ? Color(white: 0.85) : Palette.sidebar)
+                if let image {
+                    Image(decorative: image, scale: 1).resizable().scaledToFit().padding(.horizontal, compact ? 8 : 22).padding(.vertical, compact ? 8 : 18)
+                        .accessibilityLabel("\(game?.name ?? "TrackMania Nations Forever") artwork")
+                } else if isDemo && !compact {
+                    VStack(spacing: 5) {
+                        Text("TRACKMANIA").font(.system(size: 25, weight: .heavy, design: .rounded)).tracking(-1)
+                        Text("NATIONS FOREVER").font(.system(size: 10, weight: .semibold)).tracking(2)
+                    }.foregroundStyle(Color(white: 0.12))
+                } else {
+                    Image(systemName: "gamecontroller").font(.system(size: compact ? 20 : 26, weight: .ultraLight))
+                        .foregroundStyle(Palette.muted).accessibilityHidden(true)
+                }
             }
         }
     }
 
     private func gameDetails(_ game: GameInstallation?) -> some View {
-        let isDemo = game == nil || game?.appID == "11020"
+        let isDemo = game == nil || (game?.store == .steam && game?.appID == "11020")
         let experimental = game.flatMap { model.recipe(for: $0) }?.status == "experimental"
         return VStack(alignment: .leading, spacing: 0) {
-            Text(isDemo ? "DEMO" : experimental ? "EXPERIMENTAL" : "COMPATIBILITY UNTESTED").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
+            Text((game?.store.title.uppercased() ?? "STEAM") + " · " + (isDemo ? "DEMO" : experimental ? "EXPERIMENTAL" : "UNTESTED")).font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
                 .padding(.bottom, 10)
             Text(isDemo ? "TrackMania" : game?.name ?? "Windows game")
                 .font(.system(size: 17, weight: .medium)).tracking(-0.3).lineLimit(2)
@@ -492,17 +540,48 @@ struct ContentView: View {
             if renderingSnapshot { managementLabel(compact: compact) }
             else {
                 Menu {
-                    Button("Game properties…") { model.manage(game, command: .gameProperties) }
+                    Button("Game properties…") {
+                        if game.store != .steam { propertiesGame = game }
+                        else { model.manage(game, command: .gameProperties) }
+                    }
+                    if game.store != .steam { Button("Manage in \(game.managementStore.title)…") { model.manage(game, command: .gameProperties) } }
                     Button("Show game files") { model.showGameFiles(game) }
                     Button("Mods & files…") { moddingGame = game }
-                    Button("Verify game files…") { model.manage(game, command: .verifyGame) }.disabled(model.currentSession != nil)
+                    Button(game.store != .steam ? "Verify files in \(game.managementStore.title)…" : "Verify game files…") { model.manage(game, command: .verifyGame) }.disabled(model.currentSession != nil)
                     Divider()
-                    Button("Uninstall…", role: .destructive) { model.manage(game, command: .uninstallGame) }.disabled(model.currentSession != nil)
+                    Button(game.store != .steam ? "Uninstall in \(game.managementStore.title)…" : "Uninstall…", role: .destructive) { model.manage(game, command: .uninstallGame) }.disabled(model.currentSession != nil)
                 } label: { managementLabel(compact: compact) }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .accessibilityLabel("Manage \(game.name)").help("Manage \(game.name)")
             }
         }.disabled(model.busy)
+    }
+
+    private func gameProperties(_ game: GameInstallation) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(game.name).font(.system(size: 22, weight: .medium))
+                    Text(game.store.title).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                }
+                Spacer()
+                Button("Done") { propertiesGame = nil }.buttonStyle(SecondaryButton()).keyboardShortcut(.cancelAction)
+            }
+            Rule()
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Installed · " + ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file)).font(.system(size: 12))
+                Text(game.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                Button("Show game files") { model.showGameFiles(game) }.buttonStyle(SecondaryButton())
+            }
+            Rule()
+            Text("Graphics: " + (game.store != .steam ? "Metal + Performance D3D9" : model.environment?.profile.title ?? "Not configured")).font(.system(size: 12, weight: .medium))
+            Text(game.store == .ubisoft || game.epicPartnerGameID != nil ? "Ubisoft Connect handles this installation, including games Epic delegates to Ubisoft. Its launcher uses Metal and Direct3D 9 games use Performance rendering. Compatibility is experimental." : "Compatibility is untested for this title. Epic uses Metal for DirectX 10–11 and Performance for DirectX 9 when available. Steam and added apps keep their selected graphics profile.")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+            Text("For updates, verification, and uninstall, use this game's management controls inside \(game.managementStore.title). The launcher owns download progress and confirmation dialogs.")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+            Button("Manage in \(game.managementStore.title)…") { propertiesGame = nil; model.manage(game, command: .gameProperties) }.buttonStyle(SecondaryButton()).disabled(model.busy)
+        }.padding(30).frame(width: 550).foregroundStyle(Palette.ink).background(Palette.canvas)
     }
 
     private func modding(_ game: GameInstallation) -> some View {
@@ -525,14 +604,16 @@ struct ContentView: View {
                     Button("Windows Documents") { moddingGame = nil; model.showWindowsDocuments() }.buttonStyle(SecondaryButton())
                 }
             }
+            if game.store == .steam {
             VStack(alignment: .leading, spacing: 10) {
                 detailHeading("Steam Workshop")
                 Text("For games with Workshop support, subscribe to items in Windows Steam and let their downloads finish. Enable them inside the game if required.")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                 Button("Open Steam") { moddingGame = nil; model.openSteam() }.buttonStyle(SecondaryButton())
             }
+            }
             Rule()
-            Text("Quit the game before changing files. Mods that need a Windows mod manager, DLL overrides, or additional software may need extra setup. Steam verification and updates can replace modified files.")
+            Text("Quit the game before changing files. Mods that need a Windows mod manager, DLL overrides, or additional software may need extra setup. Game verification and updates can replace modified files.")
                 .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
         }.padding(30).frame(width: 540).foregroundStyle(Palette.ink).background(Palette.canvas)
     }
@@ -550,7 +631,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionLabel("WINDOWS ENVIRONMENT")
                 VStack(alignment: .leading, spacing: 0) {
-                settingRow("Graphics", detail: "Quit Steam and Windows apps before changing graphics.") {
+                settingRow("Steam & apps graphics", detail: "Quit Steam, Epic, and Windows apps before changing graphics.") {
                     Group {
                         if renderingSnapshot { menuLabel(model.environment?.profile.title ?? "Not set up") }
                         else {
@@ -604,6 +685,40 @@ struct ContentView: View {
                     }
                 }.panel().disabled(model.busy)
             }
+            VStack(alignment: .leading, spacing: 12) {
+                sectionLabel("WINDOWS EPIC GAMES")
+                VStack(spacing: 0) {
+                    settingRow("Epic Games Launcher", detail: "Your Epic account, library, and store.") {
+                        Button(model.epicInstalled ? "Open Epic" : "Set up Epic") { model.openEpic() }.buttonStyle(SecondaryButton())
+                    }
+                    if model.epicInstalled {
+                        Rule().padding(.horizontal, 22)
+                        settingRow("Graphics", detail: "Metal handles DirectX 10–11; Performance handles DirectX 9 when available. Compatibility varies by game.") {
+                            Text("Metal").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        }
+                        Rule().padding(.horizontal, 22)
+                        settingRow("Downloaded games", detail: "Default install folder. Each game's menu opens its actual files.") {
+                            Button("Open download folder") { model.openEpicGamesFolder() }.buttonStyle(SecondaryButton())
+                        }
+                        Rule().padding(.horizontal, 22)
+                        settingRow("Epic downloads", detail: "Open Epic, then use its Downloads control for progress and updates.") {
+                            Button("Open Epic") { model.openEpicDownloads() }.buttonStyle(SecondaryButton())
+                        }
+                    }
+                }.panel().disabled(model.busy)
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                sectionLabel("OTHER PLATFORMS")
+                VStack(spacing: 0) {
+                    settingRow("Xbox Cloud Gaming", detail: "Stream supported titles in your browser. Account, plan, region, and controller requirements vary. These are not local downloads.") {
+                        Link("Open Xbox Cloud", destination: URL(string: "https://www.xbox.com/play")!).buttonStyle(SecondaryButton())
+                    }
+                    Rule().padding(.horizontal, 22)
+                    settingRow("Xbox app & Minecraft Bedrock", detail: "Local installation is not supported by this runtime. Experimental Bedrock ports need a separate WineGDK runtime and Microsoft account integration; this does not enable the entire Xbox catalog.") {
+                        Link("Compatibility notes", destination: URL(string: "https://corypearl.github.io/crossedover/quickstart.html#xbox")!).buttonStyle(SecondaryButton())
+                    }
+                }.panel()
+            }
             VStack(spacing: 0) {
                 Button { advancedExpanded.toggle() } label: {
                     HStack(spacing: 16) {
@@ -636,7 +751,7 @@ struct ContentView: View {
             if let environment = model.environment {
                 VStack(alignment: .leading, spacing: 12) {
                     detailHeading("Recovery")
-                    Text("Quit Steam, games, and Windows apps before backing up or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text("Quit Steam, Epic, games, and Windows apps before backing up or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { recoveryActions(environment) }
                         VStack(alignment: .leading, spacing: 8) { recoveryActions(environment) }

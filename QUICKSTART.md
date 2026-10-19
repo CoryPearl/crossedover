@@ -1,14 +1,14 @@
-# crossedover v1.1.0 quickstart
+# crossedover v1.3.0 quickstart
 
 ## Before you start
 
-You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, an internet connection for setup. A Steam account is needed only for Steam games. Allow **8 GiB free for setup, plus space for apps and games**.
+You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, an internet connection for setup. Steam and Epic accounts are needed only for games from those stores. Allow **8 GiB free for setup, plus space for apps and games**.
 
 Compatibility is experimental. TrackMania Nations Forever is the first tested demo, CS2 is experimental, and compatibility with other games and apps varies. A version number does not certify every game or sustained performance.
 
 ## Install
 
-1. Download **crossedover-1.1.0.dmg** from the [v1.1.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.1.0).
+1. Download **crossedover-1.3.0.dmg** from the [v1.3.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.3.0).
 2. Open it and drag **crossedover** onto **Applications**.
 3. Eject the disk image and open crossedover from Applications.
 
@@ -20,7 +20,7 @@ If macOS offers to install Rosetta 2, follow Apple's prompt.
 
 ## Games and Apps
 
-**Games** contains your completed Windows Steam installs and Windows game cards you add yourself. **Apps** contains tools, mod managers, installers, and other Windows software. Both libraries support search (⌘F), refresh (⌘R), and grid/list views.
+**Games** contains completed Windows Steam and Epic installs and Windows game cards you add yourself. **Apps** contains tools, mod managers, installers, and other Windows software. Both libraries support search (⌘F), refresh (⌘R), and grid/list views.
 
 ## Add a Windows .exe
 
@@ -45,6 +45,22 @@ Apps share one Windows environment and its graphics profile with Steam games. Cl
 
 Your native Mac Steam installation stays separate. No Steam account, game files, or saved games are bundled with crossedover.
 
+## Epic Games
+
+1. Choose **Set up Epic**. crossedover downloads Epic’s official Windows MSI installer and installs it in the managed Windows environment; Steam is not required.
+2. Sign in **inside Epic’s own window**, including any two-factor prompt. crossedover does not ask for your Epic password.
+3. Install a Windows game through that Epic client. Use its default C: drive location, or another folder inside the same Windows C: drive.
+4. Completed installs appear automatically in **Games**, with an **Epic Games** label. Press **⌘R** to refresh, or use the **All games / Steam / Epic Games / Added .exe** filter.
+5. Press **Play** on the game’s card. Launches go through Windows Epic so it can handle account authorization and DRM; crossedover tracks the game process.
+
+**Open Steam** and **Open Epic** are separate sidebar buttons. Each uses crossedover’s Windows client; your native Mac launchers stay separate. Both clients and their downloads live under crossedover’s existing data folder. The in-app uninstaller removes both clients and all their managed games.
+
+Use an Epic card’s **⋯** menu for **Game properties**, **Show game files**, **Mods & files**, and **Manage in Epic**. **Verify files in Epic** and **Uninstall in Epic** open Epic Library: find the game, choose **⋯ → Manage → Verify / Uninstall**, then confirm in Epic. These buttons open the supported management flow; they do not silently verify or delete files. The card disappears after Epic finishes uninstalling and the library refreshes.
+
+**Settings → Windows Epic Games → Open download folder** opens the default `C:\Program Files\Epic Games` folder in Finder. Per-game **Show game files** opens the actual install folder if you chose a different C: location. The **Epic downloads → Open Epic** button opens Epic; use its Downloads control for progress, pause/resume, and updates.
+
+Epic’s current Windows launcher needs DirectX 11 and uses **Metal**. Its game processes use Metal for DirectX 10–11 and **Performance** for DirectX 9 when available. Steam and directly added apps retain their chosen graphics profile. The launcher can self-update. Compatibility, DRM, anti-cheat, and extra dependencies vary by game; inclusion in the library is not a compatibility guarantee.
+
 ## Play and manage
 
 Completed Steam installs appear automatically in **Games**. Press **⌘R** to refresh and **⌘F** to search. The grid/list selector remembers your preference.
@@ -59,7 +75,7 @@ Graphics profiles are explained in Settings:
 - **Performance:** DXVK and Metal for DirectX 9; recommended for TrackMania Nations Forever.
 - **Metal:** DXMT for DirectX 10–11; used by CS2. Compatibility varies by game.
 
-Quit Steam, games, and Windows apps before changing profiles. TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
+Quit Steam, Epic, games, and Windows apps before changing profiles. TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
 
 ## Mods
 
@@ -75,7 +91,7 @@ The managed Steam host is labelled **crossedover Steam** in macOS. For an older 
 
 ## Your files
 
-The app is in **/Applications/crossedover.app**. Games, imported apps, Windows Steam, runtimes, saves, and environment backups live separately under:
+The app is in **/Applications/crossedover.app**. Games, imported apps, Windows Steam and Epic, runtimes, saves, and environment backups live separately under:
 
 ~~~text
 ~/Library/Application Support/CrossedOver/
@@ -85,19 +101,33 @@ Use **Open download folder** to browse installed games, or **⋯ → Show game f
 
 ### Uninstall everything
 
-Quit Steam, games, and Windows apps, then choose **Settings → Uninstall crossedover → Uninstall app and data**. This moves the app, its Windows Steam client, runtimes, managed games and apps, local saves, and backups to Trash, clears app preferences, and quits. Empty Trash to reclaim storage. Export any local saves you want to keep first. Your separate Mac Steam installation is unaffected.
+Quit Steam, Epic, games, and Windows apps, then choose **Settings → Uninstall crossedover → Uninstall app and data**. This moves the app, its Windows Steam and Epic clients, runtimes, managed games and apps, local saves, and backups to Trash, clears app preferences, and quits. Empty Trash to reclaim storage. Export any local saves you want to keep first. Your separate Mac Steam installation is unaffected.
 
 Dragging just crossedover.app to Trash does **not** remove `~/Library/Application Support/CrossedOver/`. Use the in-app uninstaller for complete removal. Custom data locations and apps opened from a read-only DMG must be managed in Finder.
 
 ## Coming soon
 
-v1.1.0 adds local Windows .exe cards alongside our Steam game library. Support for more launchers and platforms, easier dependency setup, and broader app compatibility is coming soon.
+v1.3.0 adds Windows Epic Games alongside Steam and the local .exe cards introduced in v1.1.0. Support for more launchers and platforms, easier dependency setup, and broader app compatibility is coming soon.
 
 ## Need a hand?
 
-- **Missing game:** wait for its install to finish, then press ⌘R.
+- **Missing game:** wait for its install to finish, press ⌘R, and choose All games. Epic installs must stay inside the managed Windows C: drive.
 - **Slow first launch:** check Steam for a prerequisite/setup dialog.
 - **Frozen game:** try ⌘Tab and quit normally. Recovery tools are in **Settings → Advanced**; force quit can lose unsaved progress.
 - **Reporting a problem:** save a diagnostic report from **Settings → Advanced**, review it, and [open an issue](https://github.com/CoryPearl/crossedover/issues). Never share passwords or Steam Guard codes.
 
 [Project](https://github.com/CoryPearl/crossedover) · [Validation notes](docs/VALIDATION.md)
+
+## Epic games that use Ubisoft Connect
+
+Some Epic titles, including Brawlhalla, hand installation and launch to Ubisoft Connect. These installations have Ubisoft registry records rather than Epic `.item` manifests. crossedover combines Epic’s partner records with Ubisoft’s completed install registration. These games appear as **Epic Games** cards; Play opens their registered game link through Ubisoft Connect. Complete the initial account linking in Epic’s own Library first. Independent Ubisoft installs appear under **Ubisoft Connect**. Sign in/link accounts in the launcher's own window when requested. Play routes through the launcher that owns the installation. Files and mods open in Finder. Verification and uninstall continue in Ubisoft's own Library controls. Other Ubisoft titles remain untested.
+
+The launcher uses Metal for Direct3D 11, with Performance rendering for Direct3D 9 games such as Brawlhalla. This does not change Steam's saved profile. An observed process is not proof of a visible or playable game. If a title opens no window, check its own launcher for sign-in/linking prompts and report the title; compatibility varies.
+
+## Xbox and Minecraft Bedrock
+
+**The Windows Xbox app, local PC Game Pass downloads, and Minecraft Bedrock are not supported by the included runtime.** Adding a launcher button cannot supply Windows Gaming Services, account/licensing integration, and game-specific GDK support. This release does not promise the whole Xbox library.
+
+**Settings → Other platforms → Open Xbox Cloud** opens Microsoft's official site in your default browser. It streams only supported cloud titles; account, subscription, region, network, and controller requirements vary. This does not download games into crossedover or imply Minecraft Bedrock is available in the cloud.
+
+Experimental [Bedrock for Mac](https://github.com/1JRobertson/bedrock-mac) work uses a separate WineGDK/DXMT runtime and Microsoft account helper. It establishes a possible future Bedrock-specific route, not support in crossedover or the Windows Xbox app. See [the technical assessment](docs/XBOX_AND_BEDROCK.md). Minecraft Java already has a separate native Mac version. No Microsoft credentials or games are included or collected by crossedover.

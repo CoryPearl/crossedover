@@ -53,3 +53,9 @@ Use **crossedover**, all lowercase, as one word in product-facing text, the app 
 v1.1.0 keeps Steam as a specialty while adding local .exe cards in either library. Games uses Play; Apps uses Run. Add .exe is a small outlined header action (⌘O). The import sheet has a name, Games/Apps selector, executable path, and explicit containing-folder option. Its copy explains local storage, shared user permissions, and the installer-to-program workflow. Imported cards reuse the grid dimensions and monochrome fallback artwork. The menu supports editing the executable/name, moving libraries, files, launch logs, and card removal. Failed launches show a short persisted explanation on the card. Native Steam controls remain separate.
 
 `--preview-apps /path/to/fixture.json` supplies `WindowsApp` values; `--preview-page apps` checks the Apps library without running Windows software.
+
+## Epic Games (v1.2.0)
+
+Steam and Epic have separate outlined sidebar buttons. Games stays one library with a compact All games / Steam / Epic Games / Added .exe filter; Apps retains its own search and grid/list choice. Store labels distinguish game cards. Epic properties show its path, size, Metal backend, and compatibility status. Verify and Uninstall explicitly say “in Epic…” and explain the native Manage step. Settings keeps Steam/imported-app graphics separate from Epic’s Metal requirement and offers both launchers’ download controls and default folders. No extra dashboard or promotional content is added.
+
+Artwork is decoded away from the UI actor as lazy cards appear. Missing artwork uses the existing monochrome symbol. Original game artwork can retain its colors.

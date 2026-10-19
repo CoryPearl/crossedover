@@ -1,6 +1,6 @@
 # Developer reference
 
-For installation, see [the v1.1.0 quickstart](../QUICKSTART.md). The notes below describe implementation and runtime limitations.
+For installation, see [the v1.2.0 quickstart](../QUICKSTART.md). The notes below describe implementation and runtime limitations.
 
 ## Build
 
@@ -88,3 +88,9 @@ The optional runtime `steamLoaderRelativePath` points to a copy of Wine's native
 ## Windows app and game cards (v1.1.0)
 
 crossedover now runs local x86/x64 Windows .exe files alongside its Steam integration, with separate Games and Apps libraries. Use Add .exe in the GUI. For development, `crossedover app-add /path/to/app.exe --folder` creates a persistent Apps card (use `--game` for Games), `apps` lists the cards, `app-run UUID` requests a detached launch, and `app-runs` reports persisted results. These commands use the managed runtime and environment; Steam installation is optional. Cards can be retargeted after an installer finishes. Additional dependencies and compatibility remain app-specific.
+
+## Epic Games (v1.2.0)
+
+`epic-install` installs the official Windows MSI; `epic` opens its library. `games` discovers both stores. `epic-launch APPNAME` uses Epic’s composite launch URI. `epic-manage`, `epic-verify`, `epic-uninstall`, and `epic-downloads` open the official client; verification, removal, and download progress remain under its own controls. Never pass account credentials to the CLI.
+
+Run `python3 scripts/epic-integration.py` for the owned launcher handoff fixture, or add `--app dist/crossedover.app` to use packaged binaries/runtime. It tests complete/incomplete manifest discovery, URI handoff, a real D3D11 pixel-readback child, management library routes, and removal discovery in a temporary prefix without accounts. It does not test Epic authentication or real store downloads. Stop only that test prefix during cleanup.

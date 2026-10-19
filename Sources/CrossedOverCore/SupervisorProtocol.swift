@@ -8,8 +8,16 @@ public struct SupervisorRequest: Codable, Sendable {
     public var appID: String?
     public var windowsAppID: UUID?
     public var runID: UUID?
+    // Recomputed by execute; caller input cannot select a different program.
+    public var primeEpic: Bool? = nil
     public enum Command: String, Codable, Sendable {
+        case openUbisoft, launchUbisoftGame, ubisoftProperties, verifyUbisoftGame, uninstallUbisoftGame
+        case openEpic, launchEpicGame, epicProperties, verifyEpicGame, uninstallEpicGame, epicDownloads
         case launchWindowsApp, openSteam, installGame, launchGame, uninstallGame, gameProperties, verifyGame, openDownloads, shutdown, forceStop, observe
+        var isUbisoft: Bool { [.openUbisoft, .launchUbisoftGame, .ubisoftProperties, .verifyUbisoftGame, .uninstallUbisoftGame].contains(self) }
+        var requiresUbisoftGameID: Bool { isUbisoft && self != .openUbisoft }
+        var isEpic: Bool { [.openEpic, .launchEpicGame, .epicProperties, .verifyEpicGame, .uninstallEpicGame, .epicDownloads].contains(self) }
+        var requiresEpicGameID: Bool { [.launchEpicGame, .epicProperties, .verifyEpicGame, .uninstallEpicGame].contains(self) }
         var requiresGameID: Bool { [.installGame, .launchGame, .uninstallGame, .gameProperties, .verifyGame].contains(self) }
     }
     public init(root: URL, environmentID: UUID, command: Command, appID: String? = nil, windowsAppID: UUID? = nil, runID: UUID? = nil) {
@@ -47,6 +55,9 @@ public enum SupervisorEngine {
         let runtime = try await RuntimeManager(paths: paths).resolve(environment.runtimeID)
         let prefix = paths.prefix(environment)
         let variables = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile)
+        var launchRequest = request
+        launchRequest.primeEpic = false
+        var partnerLaunch = false
         let lock = try EnvironmentLock(prefix: prefix); defer { withExtendedLifetime(lock) {} }
         if request.command == .forceStop {
             _ = try await ProcessRunner.run(runtime.wineserver, arguments: ["-k"], environment: variables, timeout: 15)
@@ -70,7 +81,31 @@ public enum SupervisorEngine {
         guard environment.state == "ready" || request.command == .shutdown else {
             throw CrossedOverError.message("Repair the Windows environment in Settings → Advanced before launching Windows software.")
         }
-        if request.command == .launchWindowsApp {
+        if request.command.isEpic || request.command.isUbisoft {
+            try EpicService.requireSupportedRuntime(runtime)
+            if request.command.isUbisoft { _ = try UbisoftDiscovery.executable(prefix: prefix) }
+            else { _ = try EpicService.executable(prefix: prefix) }
+            if request.command.requiresEpicGameID || request.command.requiresUbisoftGameID {
+                let game = try request.command.isUbisoft ? ubisoftGame(request, environment: environment, prefix: prefix) : epicGame(request, environment: environment, prefix: prefix)
+                partnerLaunch = request.command == .launchEpicGame && game.epicPartnerGameID != nil
+                if partnerLaunch { _ = try UbisoftDiscovery.executable(prefix: prefix) }
+                if [.launchEpicGame, .verifyEpicGame, .uninstallEpicGame, .launchUbisoftGame, .verifyUbisoftGame, .uninstallUbisoftGame].contains(request.command) {
+                    let names = try GameProcessDetection.executableNames(for: game, recipe: nil)
+                    guard !names.isEmpty, let observer = runtime.manifest.observerRelativePath else { throw CrossedOverError.message("Could not confirm this game is closed. Manage it in Windows Epic.") }
+                    let source = try FileSafety.containedURL(observer, in: runtime.root)
+                    let destination = try FileSafety.containedURL("drive_c/crossedover/process-observer.exe", in: prefix)
+                    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    if !FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.copyItem(at: source, to: destination) }
+                    let result = try await ProcessRunner.run(runtime.wine, arguments: [destination.path], environment: variables, timeout: 15)
+                    guard result.status == 0, let processes = decodeObservation(result.output) else { throw CrossedOverError.message("Could not check this game's running state. Close it and retry.") }
+                    guard !processes.contains(where: { names.contains($0.executable.lowercased()) }) else { throw CrossedOverError.message("\(game.name) is running. Close it before retrying this action.") }
+                    if request.command == .launchEpicGame && !partnerLaunch {
+                        launchRequest.primeEpic = !processes.contains { $0.executable.lowercased() == "epicgameslauncher.exe" }
+                    }
+                }
+            }
+            try await EpicService.prepareGraphics(runtime: runtime, prefix: prefix, profile: environment.profile)
+        } else if request.command == .launchWindowsApp {
             let app = try windowsApp(request, store: store)
             _ = try WindowsApps.executable(for: app, prefix: prefix)
             guard let runID = request.runID else { throw CrossedOverError.message("Missing Windows app launch identifier.") }
@@ -126,7 +161,7 @@ public enum SupervisorEngine {
         }
         // A detached worker drains output into a bounded log for the whole session.
         let file = paths.logs.appendingPathComponent(".launch-" + UUID().uuidString + ".json")
-        try JSONEncoder().encode(request).write(to: file, options: .atomic)
+        try JSONEncoder().encode(launchRequest).write(to: file, options: .atomic)
         // Bundle.main can identify the outer GUI app when this tool lives in
         // Contents/MacOS. Re-execute the actual supervisor, never the GUI entrypoint.
         let worker = Process(); worker.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
@@ -139,6 +174,15 @@ public enum SupervisorEngine {
         }
         let message: String
         switch request.command {
+        case .openUbisoft: message = "Ubisoft Connect is opening."
+        case .launchUbisoftGame: message = "Launch requested through Ubisoft Connect. Waiting for the game process."
+        case .ubisoftProperties, .verifyUbisoftGame, .uninstallUbisoftGame: message = "Ubisoft Connect is opening. Choose the game in Library, then manage its files, verification, or uninstall there."
+        case .openEpic: message = "Epic Games is opening. Sign in and install games there; completed installs appear in Games."
+        case .launchEpicGame: message = partnerLaunch ? "Launch requested through Ubisoft Connect for this Epic installation. Waiting for the game process." : "Launch requested through Windows Epic. Waiting for the game process."
+        case .uninstallEpicGame: message = "Epic Library is opening. Find the game, choose ⋯ → Manage → Uninstall, and confirm there."
+        case .verifyEpicGame: message = "Epic Library is opening. Find the game, choose ⋯ → Manage → Verify, and check progress in Epic."
+        case .epicProperties: message = "Epic Library is opening. Choose the game's ⋯ → Manage menu."
+        case .epicDownloads: message = "Epic Library is opening. Use Epic's Downloads control for progress and updates."
         case .launchWindowsApp: message = "Windows app launch requested."
         case .launchGame: message = "Launch requested. Waiting for the game process."
         case .installGame: message = "Installation requested. Confirm the download in Windows Steam."
@@ -149,6 +193,20 @@ public enum SupervisorEngine {
         default: message = "Steam request sent."
         }
         return SupervisorReply(success: true, message: message)
+    }
+    private static func ubisoftGame(_ request: SupervisorRequest, environment: ManagedEnvironment, prefix: URL) throws -> GameInstallation {
+        guard let id = request.appID, SteamDiscovery.validAppID(id),
+              let game = try UbisoftDiscovery().discover(environment: environment, prefix: prefix).first(where: { $0.appID == id }) else {
+            throw CrossedOverError.message("This Ubisoft game is no longer installed. Refresh the library.")
+        }
+        return game
+    }
+    private static func epicGame(_ request: SupervisorRequest, environment: ManagedEnvironment, prefix: URL) throws -> GameInstallation {
+        guard let id = request.appID, EpicDiscovery.validIdentifier(id),
+              let game = try EpicDiscovery().discover(environment: environment, prefix: prefix).first(where: { $0.appID == id }) else {
+            throw CrossedOverError.message("This Epic game is no longer installed. Refresh the Games library.")
+        }
+        return game
     }
     private static func windowsApp(_ request: SupervisorRequest, store: Store) throws -> WindowsApp {
         guard let id = request.windowsAppID,
@@ -209,6 +267,11 @@ public enum SupervisorEngine {
         do { try launchWorker(requestFile: requestFile, validatedRequest: &validatedRequest) }
         catch {
             // The request is removed after validation, so preserve its identity separately.
+            if let request = validatedRequest, request.command.isEpic || request.command.isUbisoft {
+                let name = request.command.isEpic ? "epic-session.log" : "ubisoft-session.log"
+                let message = "Launch worker failed: " + Redaction.apply(error.localizedDescription).prefix(4096) + "\n"
+                try? Data(message.utf8).write(to: AppPaths(root: request.root).logs.appendingPathComponent(name), options: .atomic)
+            }
             if let request = validatedRequest, request.command == .launchWindowsApp,
                let id = request.runID,
                let store = try? Store(url: request.root.appendingPathComponent("crossedover.sqlite")),
@@ -224,6 +287,12 @@ public enum SupervisorEngine {
         guard data.count <= 65_536 else { throw CrossedOverError.message("Launch worker request is too large.") }
         let request = try JSONDecoder().decode(SupervisorRequest.self, from: data)
         guard request.version == 1, ![.forceStop, .observe].contains(request.command) else { throw CrossedOverError.message("Invalid launch worker request.") }
+        if request.command.requiresUbisoftGameID {
+            guard let id = request.appID, SteamDiscovery.validAppID(id) else { throw CrossedOverError.message("Invalid Ubisoft game identifier.") }
+        }
+        if request.command.requiresEpicGameID {
+            guard let id = request.appID, EpicDiscovery.validIdentifier(id) else { throw CrossedOverError.message("Invalid Epic game identifier.") }
+        }
         if request.command.requiresGameID {
             guard let id = request.appID, SteamDiscovery.validAppID(id) else { throw CrossedOverError.message("Invalid game identifier.") }
         }
@@ -245,8 +314,38 @@ public enum SupervisorEngine {
             try runWindowsAppWorker(request, paths: paths, store: store, environment: environment, runtime: runtime)
             return
         }
-        var arguments = [try SteamService.steamExecutable(prefix: prefix).path]
-        if request.command != .shutdown { arguments.append("-cef-disable-gpu") }
+        var arguments: [String]
+        var primeEpic = false
+        if request.command.isUbisoft {
+            try EpicService.requireSupportedRuntime(runtime)
+            arguments = [try UbisoftDiscovery.executable(prefix: prefix).path]
+            if request.command.requiresUbisoftGameID {
+                let game = try ubisoftGame(request, environment: environment, prefix: prefix)
+                if request.command == .launchUbisoftGame { arguments.append(try UbisoftDiscovery.launchURI(game.appID)) }
+            }
+        } else if request.command.isEpic {
+            try EpicService.requireSupportedRuntime(runtime)
+            let launcher = try EpicService.executable(prefix: prefix)
+            var uri = EpicService.libraryURI
+            var partnerID: String?
+            if request.command.requiresEpicGameID {
+                let game = try epicGame(request, environment: environment, prefix: prefix)
+                if request.command == .launchEpicGame {
+                    uri = try EpicService.launchURI(for: game)
+                    partnerID = game.epicPartnerGameID
+                }
+            }
+            if let partnerID {
+                // Epic installs these through Ubisoft. Use the installed
+                // Ubisoft URL entry point after the user's account linking.
+                arguments = [try UbisoftDiscovery.executable(prefix: prefix).path, try UbisoftDiscovery.launchURI(partnerID)]
+            } else {
+                // Match Epic’s registered URL handler: URI is the first argument.
+                arguments = request.command == .openEpic ? [launcher.path, "-SkipBuildPatchPrereq"] : [launcher.path, uri]
+                primeEpic = request.command == .launchEpicGame && request.primeEpic == true
+            }
+        } else { arguments = [try SteamService.steamExecutable(prefix: prefix).path] }
+        if !request.command.isEpic && !request.command.isUbisoft && request.command != .shutdown { arguments.append("-cef-disable-gpu") }
         if request.command == .shutdown { arguments += ["-shutdown"] }
         if request.command == .launchGame {
             guard let appID = request.appID, SteamDiscovery.validAppID(appID) else { throw CrossedOverError.message("Invalid game identifier.") }
@@ -263,9 +362,11 @@ public enum SupervisorEngine {
         if let route = routes[request.command], let appID = request.appID { arguments.append("steam://" + route + "/" + appID) }
         if request.command == .openDownloads { arguments.append("steam://nav/downloads") }
         let pipe = Pipe(), process = Process()
-        process.executableURL = runtime.steamLoader; process.arguments = arguments
+        process.executableURL = (request.command.isEpic || request.command.isUbisoft) ? runtime.wine : runtime.steamLoader; process.arguments = arguments
         process.currentDirectoryURL = prefix.appendingPathComponent("drive_c")
-        process.environment = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile)
+        if request.command.isUbisoft { process.environment = UbisoftDiscovery.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }
+        else if request.command.isEpic { process.environment = EpicService.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }
+        else { process.environment = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }
         process.standardInput = FileHandle.nullDevice; process.standardOutput = pipe; process.standardError = pipe
         // The parent releases its operation lock after the acknowledgement.
         var acquired: EnvironmentLock?
@@ -274,16 +375,41 @@ public enum SupervisorEngine {
             Thread.sleep(forTimeInterval: 0.05)
         }
         guard acquired != nil else { throw CrossedOverError.message("The environment remained locked during launch.") }
+        var primer: Process?
+        if primeEpic {
+            // Cold URI startup hides Epic's UI before sign-in/linking can finish
+            // under Wine. Start its normal UI first; then submit the URI to it.
+            let client = Process()
+            client.executableURL = runtime.wine
+            client.arguments = [try EpicService.executable(prefix: prefix).path, "-SkipBuildPatchPrereq"]
+            client.currentDirectoryURL = process.currentDirectoryURL
+            client.environment = process.environment
+            // Foundation transfers a Pipe's writer when Process.run starts.
+            // Reusing that same Pipe for the URI process raises an Objective-C
+            // file-handle exception before the handoff can run.
+            client.standardInput = FileHandle.nullDevice
+            client.standardOutput = FileHandle.nullDevice; client.standardError = FileHandle.nullDevice
+            try withExtendedLifetime(acquired) { try client.run() }
+            primer = client
+            Thread.sleep(forTimeInterval: 3)
+        }
         try withExtendedLifetime(acquired) { try process.run() }; acquired = nil
+        defer { withExtendedLifetime(primer) {} }
         try pipe.fileHandleForWriting.close()
         defer { try? pipe.fileHandleForReading.close() }
-        var bounded = Data()
-        let log = paths.logs.appendingPathComponent("wine-session.log")
+        var bounded = Data(), lastWrite = Date.distantPast
+        let log = paths.logs.appendingPathComponent(request.command.isUbisoft ? "ubisoft-session.log" : request.command.isEpic ? "epic-session.log" : "wine-session.log")
+        try bounded.write(to: log, options: .atomic)
         while let chunk = try pipe.fileHandleForReading.read(upToCount: 65_536), !chunk.isEmpty {
             bounded.append(chunk)
             if bounded.count > 1_048_576 { bounded.removeFirst(bounded.count - 1_048_576) }
-            try bounded.write(to: log, options: .atomic)
+            // Drain continuously, but avoid rewriting a megabyte on every tiny
+            // Wine diagnostic chunk during launcher activity and downloads.
+            if Date().timeIntervalSince(lastWrite) >= 0.25 {
+                try bounded.write(to: log, options: .atomic); lastWrite = Date()
+            }
         }
+        try bounded.write(to: log, options: .atomic)
     }
 }
 

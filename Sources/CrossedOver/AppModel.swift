@@ -11,6 +11,7 @@ import CrossedOverCore
     let runtimeManager: RuntimeManager
     let environmentManager: EnvironmentManager
     let steamService: SteamService
+    let epicService: EpicService
     var host: HostReport?
     var runtimes: [InstalledRuntime] = []
     var environment: ManagedEnvironment?
@@ -34,8 +35,8 @@ import CrossedOverCore
     private var observationCount = 0
     private var refreshing = false
     private var steamPath: URL?
+    private var epicPath: URL?
     private var logoPath: String?
-    @ObservationIgnored private var missingArtwork = Set<String>()
     var runtime: InstalledRuntime? {
         if let environment { return runtimes.first { $0.id == environment.runtimeID } }
         return runtimes.first { $0.id.hasPrefix("wine-11.0-cx") } ?? runtimes.first
@@ -45,27 +46,21 @@ import CrossedOverCore
               FileManager.default.fileExists(atPath: url.appendingPathComponent("runtime.json").path) else { return nil }
         return url
     }
+    var epicInstalled: Bool { environment != nil && epicPath != nil }
     var steamInstalled: Bool { environment != nil && steamPath != nil }
-    var trackManiaLogo: NSImage? { logoPath.flatMap { cachedImage(at: $0) } }
-    @ObservationIgnored private let artworkCache: NSCache<NSString, NSImage> = {
-        let cache = NSCache<NSString, NSImage>(); cache.countLimit = 64; cache.totalCostLimit = 64 * 1024 * 1024; return cache
-    }()
-    func artwork(for game: GameInstallation) -> NSImage? { game.artworkPath.flatMap { cachedImage(at: $0) } }
-    private func cachedImage(at path: String) -> NSImage? {
-        if let cached = artworkCache.object(forKey: path as NSString) { return cached }
-        guard !missingArtwork.contains(path) else { return nil }
-        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
-              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: 640
-              ] as CFDictionary) else { missingArtwork.insert(path); return nil }
-        let image = NSImage(cgImage: thumbnail, size: .zero)
-        artworkCache.setObject(image, forKey: path as NSString, cost: thumbnail.bytesPerRow * thumbnail.height)
-        return image
+    @ObservationIgnored var previewArtwork: [String: CGImage] = [:]
+    func artworkPath(for game: GameInstallation?) -> String? {
+        if game == nil || (game?.store == .steam && game?.appID == "11020") { return logoPath ?? game?.artworkPath }
+        return game?.artworkPath
+    }
+    func preparePreviewArtwork() async {
+        for path in Set(games.compactMap { artworkPath(for: $0) } + [logoPath].compactMap { $0 }) {
+            previewArtwork[path] = await LibraryArtworkCache.shared.image(at: path)
+        }
     }
     func updateSteamLocation() {
         steamPath = environment.flatMap { try? SteamService.steamExecutable(prefix: paths.prefix($0)) }
+        epicPath = environment.flatMap { try? EpicService.executable(prefix: paths.prefix($0)) }
         logoPath = steamPath.flatMap { try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: $0.deletingLastPathComponent()).path }
     }
     var setupStep: Int { runtimes.isEmpty ? 0 : environment == nil ? 1 : !steamInstalled ? 2 : 3 }
@@ -77,7 +72,7 @@ import CrossedOverCore
         if let root = ProcessInfo.processInfo.environment["CROSSEDOVER_DATA_ROOT"] { paths = AppPaths(root: URL(fileURLWithPath: root)) }
         else { paths = AppPaths() }
         try paths.prepare(); store = try Store(url: paths.root.appendingPathComponent("crossedover.sqlite"))
-        runtimeManager = RuntimeManager(paths: paths); environmentManager = EnvironmentManager(paths: paths, store: store); steamService = SteamService(paths: paths)
+        runtimeManager = RuntimeManager(paths: paths); environmentManager = EnvironmentManager(paths: paths, store: store); steamService = SteamService(paths: paths); epicService = EpicService(paths: paths)
         recipes = try ResourceCatalog.recipes()
         // A previous process may have ended during an operation. Preserve its journal entry.
         for var record in try store.all(OperationRecord.self, kind: "operation") where recoverInterruptedOperations && record.state == "running" {
@@ -90,7 +85,7 @@ import CrossedOverCore
         host = await HostInspector.inspect(at: paths.root)
         await refresh()
         if let previous = sessions.first(where: { ["requested", "running", "unknown"].contains($0.state) && $0.endedAt == nil }),
-           let game = games.first(where: { $0.appID == previous.appID }), let environment {
+           let game = games.first(where: { $0.sessionAppID == previous.appID && $0.environmentID == previous.environmentID }), let environment {
             currentSession = previous; monitor(game: game, environment: environment)
         }
         refreshTask = Task { [weak self] in
@@ -115,7 +110,7 @@ import CrossedOverCore
                 if let environment {
                     let saved = try store.all(GameInstallation.self, kind: "game").filter { $0.environmentID == environment.id }
                         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                    games = (try? SteamDiscovery().discover(environment: environment, prefix: paths.prefix(environment))) ?? saved
+                    games = GameLibrary.discover(environment: environment, prefix: paths.prefix(environment), previous: saved)
                     if games != saved { try store.replaceGames(games, environmentID: environment.id) }
                 }
                 let operations = try store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
@@ -131,7 +126,8 @@ import CrossedOverCore
                     runs[index].detail = "The launch worker stopped. You can try opening the app again."
                     try store.put(runs[index], kind: "windowsRun", id: runs[index].id.uuidString)
                 }
-                return (environment, games, operations, sessions, steam, logo, apps, runs)
+                let epic = environment.flatMap { try? EpicService.executable(prefix: paths.prefix($0)) }
+                return (environment, games, operations, sessions, steam, logo, apps, runs, epic)
             }.value
             guard !Task.isCancelled else { return }
             if runtimes != installed { runtimes = installed }
@@ -143,7 +139,7 @@ import CrossedOverCore
             if logoPath != snapshot.5 { logoPath = snapshot.5 }
             if windowsApps != snapshot.6 { windowsApps = snapshot.6 }
             if windowsRuns != snapshot.7 { windowsRuns = snapshot.7 }
-            missingArtwork.removeAll()
+            if epicPath != snapshot.8 { epicPath = snapshot.8 }
         } catch { self.error = error.localizedDescription }
     }
     func perform(_ title: String, action: @escaping @MainActor () async throws -> Void) {
@@ -201,6 +197,34 @@ import CrossedOverCore
             _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openSteam))
             self.notice = "Steam is opening."
         }
+    }
+    func openEpic(reinstall: Bool = false) {
+        perform(reinstall ? "Repair Windows Epic" : "Open Windows Epic") {
+            let environment = try await self.prepareWindowsEnvironment()
+            let runtime = try await self.runtimeManager.resolve(environment.runtimeID)
+            if reinstall || (try? EpicService.executable(prefix: self.paths.prefix(environment))) == nil {
+                self.progress = "Downloading and installing Epic's Windows launcher…"
+                try await self.epicService.install(environment: environment, runtime: runtime)
+            }
+            self.progress = "Opening Epic Games…"
+            let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openEpic))
+            self.notice = reply.message
+        }
+    }
+    func openEpicDownloads() {
+        guard let environment else { openEpic(); return }
+        perform("Open Epic downloads") {
+            let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .epicDownloads))
+            self.notice = reply.message
+        }
+    }
+    func openEpicGamesFolder() {
+        guard let environment else { return }
+        do {
+            let folder = try EpicService.gamesFolder(prefix: paths.prefix(environment))
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            guard NSWorkspace.shared.open(folder) else { throw CrossedOverError.message("Finder couldn't open the Epic games folder.") }
+        } catch { self.error = error.localizedDescription }
     }
     /// App imports need Wine, but never require downloading or signing into Steam.
     private func prepareWindowsEnvironment() async throws -> ManagedEnvironment {
@@ -295,6 +319,12 @@ import CrossedOverCore
         if [.uninstallGame, .verifyGame].contains(command), currentSession != nil {
             error = "Close the game before managing its files."; return
         }
+        let operation: SupervisorRequest.Command
+        if game.managementStore == .ubisoft {
+            operation = command == .uninstallGame ? .uninstallUbisoftGame : command == .verifyGame ? .verifyUbisoftGame : .ubisoftProperties
+        } else if game.store == .epic {
+            operation = command == .uninstallGame ? .uninstallEpicGame : command == .verifyGame ? .verifyEpicGame : .epicProperties
+        } else { operation = command }
         let title: String
         switch command {
         case .uninstallGame: title = "Uninstall \(game.name)"
@@ -302,7 +332,7 @@ import CrossedOverCore
         default: title = "Open \(game.name) properties"
         }
         perform(title) {
-            let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: command, appID: game.appID))
+            let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: operation, appID: game.epicPartnerGameID ?? game.appID))
             self.notice = reply.message
         }
     }
@@ -327,7 +357,10 @@ import CrossedOverCore
         Task {
             do {
                 let folder = try await Task.detached(priority: .utility) {
-                    guard let current = try SteamDiscovery().discover(environment: environment, prefix: prefix).first(where: { $0.appID == game.appID }) else {
+                    let games = try game.store == .epic ? EpicDiscovery().discover(environment: environment, prefix: prefix)
+                        : game.store == .ubisoft ? UbisoftDiscovery().discover(environment: environment, prefix: prefix)
+                        : SteamDiscovery().discover(environment: environment, prefix: prefix)
+                    guard let current = games.first(where: { $0.id == game.id }) else {
                         throw CrossedOverError.message("This game is no longer installed.")
                     }
                     return URL(fileURLWithPath: current.directory, isDirectory: true)
@@ -343,9 +376,9 @@ import CrossedOverCore
             guard NSWorkspace.shared.open(folder) else { throw CrossedOverError.message("Finder couldn't open Windows Documents.") }
         } catch { self.error = error.localizedDescription }
     }
-    func recipe(for game: GameInstallation) -> GameRecipe? { recipes.first { $0.appID == game.appID } }
+    func recipe(for game: GameInstallation) -> GameRecipe? { game.store == .steam ? recipes.first { $0.appID == game.appID } : nil }
     func gameName(appID: String) -> String {
-        games.first { $0.appID == appID }?.name ?? recipes.first { $0.appID == appID }?.name ?? "Steam game \(appID)"
+        games.first { $0.sessionAppID == appID }?.name ?? recipes.first { $0.appID == appID }?.name ?? "Game \(appID)"
     }
     func requestLaunch(_ game: GameInstallation) {
         guard currentSession == nil else { error = "Finish the current session before launching another game."; return }
@@ -370,11 +403,11 @@ import CrossedOverCore
                     do { try await self.environmentManager.requireStopped(environment, runtime: runtime); stopped = true; break }
                     catch { try await Task.sleep(for: .seconds(1)) }
                 }
-                guard stopped else { throw CrossedOverError.message("Steam is still running. Close its windows or use Force Stop in Environment, then retry.") }
+                guard stopped else { throw CrossedOverError.message("Close Steam, Epic, and Windows apps before changing graphics. Force quit is available in Settings → Advanced.") }
                 updated = try await self.environmentManager.setProfile(recipe.profile, environment: environment, runtime: runtime)
             }
-            _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: updated.id, command: .launchGame, appID: game.appID))
-            let session = LaunchSession(id: UUID(), appID: game.appID, environmentID: updated.id, startedAt: Date(), state: "requested")
+            _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: updated.id, command: game.store == .epic ? .launchEpicGame : game.store == .ubisoft ? .launchUbisoftGame : .launchGame, appID: game.appID))
+            let session = LaunchSession(id: UUID(), appID: game.sessionAppID, environmentID: updated.id, startedAt: Date(), state: "requested")
             try self.store.put(session, kind: "session", id: session.id.uuidString); self.currentSession = session
             self.monitor(game: game, environment: updated)
         }
@@ -394,7 +427,7 @@ import CrossedOverCore
                 do {
                     let reply = try await supervisor.send(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .observe))
                     guard let processes = reply.processes, !executableNames.isEmpty else {
-                        session.state = "unknown"; session.detail = "Launch requested; this runtime or game has no validated process observer. Check the Steam window."
+                        session.state = "unknown"; session.detail = "Launch requested; this runtime or game has no validated process observer. Check the game's Windows launcher."
                         currentSession = session; try store.put(session, kind: "session", id: session.id.uuidString); return
                     }
                     let running = processes.contains { executableNames.contains($0.executable.lowercased()) }
@@ -403,7 +436,7 @@ import CrossedOverCore
                         session.state = "exited"; session.endedAt = Date(); session.detail = "Game process exited."
                         try store.put(session, kind: "session", id: session.id.uuidString); currentSession = nil; await refresh(); return
                     } else if Date().timeIntervalSince(session.startedAt) > 90 {
-                        session.state = "failed"; session.endedAt = Date(); session.detail = "No matching game process appeared within 90 seconds. Check Steam for prompts."
+                        session.state = "failed"; session.endedAt = Date(); session.detail = "No matching game process appeared within 90 seconds. Check the game's Windows launcher for prompts."
                         try store.put(session, kind: "session", id: session.id.uuidString); currentSession = nil; error = session.detail; return
                     }
                     if currentSession != session {
@@ -414,7 +447,7 @@ import CrossedOverCore
                 } catch {
                     observationCount += 1
                     if observationCount >= 3 {
-                        session.state = "unknown"; session.detail = "Process observation was interrupted. Check Windows Steam."
+                        session.state = "unknown"; session.detail = "Process observation was interrupted. Check the game's Windows launcher."
                         currentSession = session; try? store.put(session, kind: "session", id: session.id.uuidString); return
                     }
                 }

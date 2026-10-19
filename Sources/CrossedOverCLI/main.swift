@@ -50,6 +50,18 @@ import CrossedOverCore
             guard let runtime = try await runtimes.installed().first else { throw CrossedOverError.message("Install a runtime first.") }
             try await printJSON(environments.create(runtime: runtime))
         case "environments": try printJSON(store.all(ManagedEnvironment.self, kind: "environment"))
+        case "epic-install":
+            let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
+            try await EpicService(paths: paths).install(environment: environment, runtime: runtime)
+            print("Windows Epic Games Launcher installed.")
+        case "epic", "epic-launch", "epic-manage", "epic-verify", "epic-uninstall", "epic-downloads":
+            let environment = try current()
+            let operation: SupervisorRequest.Command = ["epic": .openEpic, "epic-launch": .launchEpicGame, "epic-manage": .epicProperties, "epic-verify": .verifyEpicGame, "epic-uninstall": .uninstallEpicGame, "epic-downloads": .epicDownloads][command]!
+            try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: operation, appID: arguments.count > 1 ? arguments[1] : nil)))
+        case "ubisoft", "ubisoft-launch", "ubisoft-manage", "ubisoft-verify", "ubisoft-uninstall":
+            let environment = try current()
+            let operation: SupervisorRequest.Command = ["ubisoft": .openUbisoft, "ubisoft-launch": .launchUbisoftGame, "ubisoft-manage": .ubisoftProperties, "ubisoft-verify": .verifyUbisoftGame, "ubisoft-uninstall": .uninstallUbisoftGame][command]!
+            try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: operation, appID: arguments.count > 1 ? arguments[1] : nil)))
         case "steam-install":
             let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
             try await SteamService(paths: paths).install(environment: environment, runtime: runtime)
@@ -73,7 +85,7 @@ import CrossedOverCore
             try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchWindowsApp, windowsAppID: id, runID: UUID())))
         case "games":
             let environment = try current()
-            try printJSON(SteamDiscovery().discover(environment: environment, prefix: paths.prefix(environment)))
+            try printJSON(GameLibrary.discover(environment: environment, prefix: paths.prefix(environment)))
         case "smoke", "benchmark":
             let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
             let prefix = paths.prefix(environment), lock = try EnvironmentLock(prefix: paths.prefix(environment))
@@ -146,7 +158,19 @@ import CrossedOverCore
               app-add FILE [--folder] [--game]  Add a local .exe to the library
               app-run UUID              Run a saved Windows app card
               app-runs                  Inspect Windows app launch results
-              games                     Discover installed Steam games
+              epic-install              Download and install Windows Epic Games Launcher
+              epic                      Open the managed Windows Epic library
+              epic-launch APPNAME       Request launch through Epic
+              epic-manage APPNAME       Open Epic Library for game management
+              epic-verify APPNAME       Open Epic for Manage → Verify
+              epic-uninstall APPNAME    Open Epic for Manage → Uninstall
+              epic-downloads            Open Epic for downloads and updates
+              ubisoft                   Open an existing managed Ubisoft Connect
+              ubisoft-launch ID         Request a Ubisoft-only installation launch
+              ubisoft-manage ID         Open Ubisoft for game management
+              ubisoft-verify ID         Open Ubisoft for file verification
+              ubisoft-uninstall ID      Open Ubisoft for uninstall
+              games                     Discover installed Steam, Epic, and Ubisoft games
               smoke [--graphics]        Check 32/64-bit execution and optional GPU readback
               benchmark                 Run a synthetic D3D9 workload (not game FPS)
               install APPID             Open the game's Windows Steam install dialog
