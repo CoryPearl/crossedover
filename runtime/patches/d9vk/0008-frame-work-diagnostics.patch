@@ -1,0 +1,66 @@
+Subject: hud: Include bounded renderer workload diagnostics with frame samples.
+
+Original CrossedOver change. No new GPU queries or synchronization; reads the existing HUD counters only once every five seconds when opted in. Queue occupancy is not hardware GPU utilization.
+
+--- a/src/dxvk/hud/dxvk_hud.cpp
++++ b/src/dxvk/hud/dxvk_hud.cpp
+@@ -37,7 +37,7 @@
+ 
+     addItem<HudVersionItem>("version", -1);
+     addItem<HudDeviceInfoItem>("devinfo", -1, m_device);
+-    addItem<HudFpsItem>("fps", -1);
++    addItem<HudFpsItem>("fps", -1, device);
+     addItem<HudFrameTimeItem>("frametimes", -1);
+     addItem<HudSubmissionStatsItem>("submissions", -1, device);
+     addItem<HudDrawCallStatsItem>("drawcalls", -1, device);
+--- a/src/dxvk/hud/dxvk_hud_item.h
++++ b/src/dxvk/hud/dxvk_hud_item.h
+@@ -188,7 +188,7 @@
+     constexpr static int64_t UpdateInterval = 500'000;
+   public:
+ 
+-    HudFpsItem();
++    HudFpsItem(const Rc<DxvkDevice>& device);
+ 
+     ~HudFpsItem();
+ 
+@@ -204,6 +204,8 @@
+     dxvk::high_resolution_clock::time_point m_lastUpdate
+       = dxvk::high_resolution_clock::now();
+ 
++    Rc<DxvkDevice> m_logDevice;
++    DxvkStatCounters m_logCounters;
+     bool m_logFrames = false;
+     dxvk::high_resolution_clock::time_point m_lastLog = dxvk::high_resolution_clock::now();
+     std::string m_frameRate;
+--- a/src/dxvk/hud/dxvk_hud_item.cpp
++++ b/src/dxvk/hud/dxvk_hud_item.cpp
+@@ -170,7 +170,7 @@
+   }
+ 
+ 
+-  HudFpsItem::HudFpsItem() {
++  HudFpsItem::HudFpsItem(const Rc<DxvkDevice>& device) : m_logDevice(device) {
+     m_logFrames = env::getEnvVar("CROSSEDOVER_FRAME_LOG") == "1";
+   }
+   HudFpsItem::~HudFpsItem() { }
+@@ -187,6 +187,19 @@
+       m_frameRate = str::format(fps / 10, ".", fps % 10);
+       if (m_logFrames && std::chrono::duration_cast<std::chrono::seconds>(time - m_lastLog).count() >= 5) {
+         Logger::warn(str::format("CrossedOver frame rate: ", m_frameRate, " FPS"));
++        auto counters = m_logDevice->getStatCounters();
++        auto work = counters.diff(m_logCounters);
++        auto us = std::chrono::duration_cast<std::chrono::microseconds>(time - m_lastLog).count();
++        auto frames = std::max<uint64_t>(work.getCtr(DxvkStatCounter::QueuePresentCount), 1);
++        auto idle = std::min<uint64_t>(work.getCtr(DxvkStatCounter::GpuIdleTicks), uint64_t(us));
++        Logger::warn(str::format("CrossedOver frame work: draws/frame=",
++          work.getCtr(DxvkStatCounter::CmdDrawCalls) / frames,
++          " gpuWaitMs/frame=", double(work.getCtr(DxvkStatCounter::GpuSyncTicks)) / (1000.0 * frames),
++          " csWaitMs/frame=", double(work.getCtr(DxvkStatCounter::CsSyncTicks)) / (1000.0 * frames),
++          " queueBusyPct=", 100 * (uint64_t(us) - idle) / uint64_t(us),
++          " graphicsPipelinesAdded=", work.getCtr(DxvkStatCounter::PipeCountGraphics),
++          " compilerBusy=", counters.getCtr(DxvkStatCounter::PipeCompilerBusy)));
++        m_logCounters = counters;
+         m_lastLog = time;
+       }
+       m_frameCount = 0;

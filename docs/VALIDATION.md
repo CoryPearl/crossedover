@@ -1,0 +1,175 @@
+# Validation record
+
+Validated locally on 2026-10-18: Apple M4, 16 GiB, macOS 26.6.2, Xcode 26.1.1 / Swift 6.2.1.
+
+## Automated core checks
+
+22 tests cover defensive VDF parsing, partial manifests, hash verification, traversal and symlink rejection, shell-free process arguments, cancellation/timeouts, environment locks, bounded runtime logs, transactional library replacement, backups/restores, failed upgrade rollback, deferred Wine registry writes, idempotent shutdown, Steam installation request routing with invalid identifier rejection, and graphics profile migration. The initial 19 tests passed in both debug and optimized release builds; all 22 passed in the updated optimized release build. The additions cover both DXVK architectures, switching back to builtin Legacy graphics, rejecting an incomplete Performance runtime, and reading older synchronization manifests.
+
+## Real runtime integration
+
+Runtime: `wine-11.0-cx26.3.0-dxmt0.80-c6be777f29`. Wine 11.0 compiled from the pinned CrossOver 26.3.0 FOSS source archive; pinned development dependency libraries and DXMT 0.80. Payload hashes cover 1836 files.
+
+Fresh-environment integration succeeded: **13 checks passed**. The run imported and verified the runtime, created a fresh prefix, changed profiles only after shutdown, ran Windows execution and graphics probes, queried Windows processes, backed up/restored the prefix, and installed official Windows Steam.
+
+| Probe | Result |
+|---|---|
+| 32-bit Windows program | Passed; reported 32-bit pointers |
+| 64-bit Windows program | Passed; reported 64-bit pointers |
+| 32-bit Direct3D 9 hardware clear/readback | Passed; pixel `ff4080bf` |
+| 64-bit Direct3D 9 hardware clear/readback | Passed; pixel `ff4080bf` |
+| 32-bit Direct3D 11 through DXMT | Passed; RGBA `[64,128,191,255]` |
+| 64-bit Direct3D 11 through DXMT | Passed; RGBA `[64,128,191,255]` |
+| Windows process observer | Passed; returned seven process observations |
+| Official Windows Steam installation in a fresh prefix | Passed |
+| Existing Steam environment migrated from community Wine to source Wine | Passed; backup preserved |
+
+Raw integration evidence is retained locally under `.cache/integration-212ccd3d-d682-4137-af6a-c7912c3faea3/results.json` and its sibling phase logs. Reproduce with `python3 scripts/integration.py --runtime runtime/output/source-wine --steam-install`. No Steam credentials are needed for these checks.
+
+## Steam UI investigation
+
+The initial community Wine runtime produced a black window, confirmed by the user. Logs identified CEF/ANGLE failures. The source runtime now appends software/single-process flags specifically to Steam's main browser helper. Process observations confirm those flags and a single helper process. Steam binaries were not replaced or patched. The user subsequently signed in and confirmed TrackMania's installation and game window. Computer Use still cannot access the Wine window, so interactive evidence comes from the user. Credentials were not embedded in code, command-line arguments, or project files.
+
+## TrackMania Nations Forever
+
+The managed Windows Steam client downloaded app `11020`. Its completed manifest reports `StateFlags=4`, 510,081,328 bytes downloaded, and 776,953,234 bytes installed. CrossedOver discovers the real installation in its library. The installed Steam release reports version `2.11.16`. Launch was requested through Windows Steam using the Legacy profile, and the user confirmed a game menu or playable race. The user subsequently confirmed that the game runs with sound but is severely laggy, especially during races. Startup and audio are confirmed; comfortable play, saves and sustained play are not certified.
+
+The new **Install in Steam** action routes an install URI through the managed Windows Steam executable. It acknowledges the request and directs the user to Steam's download confirmation; it does not report a completed installation until Steam's manifest is ready.
+
+A separate test environment also installed the publisher's standalone `2.11.26` build successfully from `https://nadeo-download.cdn.ubi.com/trackmaniaforever/tmnationsforever_setup.exe` (530,600,781 bytes; SHA-256 `2f659138ed4409da404970841e18f03d29921beaf6a424824c8312ddb20f6355`). Its command-line benchmark exited with status 1 and a Wine OpenGL framebuffer error. Normal startup remained running until the test environment was stopped. This is not benchmark or gameplay certification. The user's Steam files were not replaced with this build, and game files are not included in the app package.
+
+## Application packaging
+
+The SwiftUI views have an app-owned static rendering path for layout inspection. This does not certify native control interaction or actual window behavior. The final full package includes the independently compiled runtime, passes strict signature verification, and is ad-hoc signed for local use. Its disk image passed `hdiutil verify`. The packaged supervisor also passed a real JSON IPC and worker handoff check launching Steam from the normal app data directory. Worker selection uses the current process executable, avoiding an outer application bundle executable being selected accidentally. The normal app data directory has the source runtime and Windows Steam installed; the app and Steam have been launched. It is not notarized or approved for public release.
+
+No game is marked verified. M1/macOS 15 hardware validation, sustained gameplay, audio/input/controller checks, account-dependent flows, source-complete dependency builds, release signing, and notarization remain release gates.
+
+## TrackMania performance iteration
+
+The GUI now exposes only TrackMania Nations Forever. The other suggested games have been removed. Steam discovery and CLI services remain general purpose; the demo UI filters to app `11020`.
+
+New runtime: `wine-11.0-cx26.3.0-dxmt0.80-dxvk3.1-46e9a27c41`. The optional Performance profile selects the pinned DXVK-MacOS 3.1 D3D9 backend and its MoltenVK library. Source-runtime MSync support is explicitly advertised and enabled consistently across processes. The D3D9 texture-memory report is limited to 1024 MiB for this 32-bit game. A visible FPS/frame-time HUD supports the next real-game comparison.
+
+Fresh integration passed **19 checks**, including all three graphics paths, returning to Legacy after native D3D9 installation, backup/restore, process observation and a fresh official Steam installation. Evidence: `.cache/integration-644f5a6c-3213-4f0d-ae9f-492d139256d6/results.json`.
+
+The existing user's environment was stopped and backed up during runtime migration, switched to Performance, and TrackMania was relaunched. Process observation found `TmForever.exe`; its new `TmForever_d3d9.log` confirms that DXVK is active. The user is currently unavailable for gameplay testing. Improved playability and in-game FPS remain unverified.
+
+A fixed synthetic 1280×720 workload with 256 draw calls and GPU completion measured 2.268 ms/440.93 FPS for the original OpenGL path, 2.031 ms/492.28 FPS with MSync, and 8.333 ms/120.01 FPS for DXVK with MSync. These are synthetic throughput results, not TrackMania frame rates. The later textured-draw investigation invalidated the old DXVK result as a workload comparison: that graphics stack could pass clears while failing to render textures. The old figures are historical evidence only. The DXVK result is consistent with a presentation limit in this workload; no game speedup is inferred from these results. The new backend's 32-bit and 64-bit pixel readback also passed. Evidence: `.cache/trackmania-performance/benchmark-results.json` and sibling logs.
+
+Unattended attempts to run the installed game's `Bench.Replay.Gbx` through its command-line interface produced no fresh benchmark result within the observation windows. Isolated attempts and a live Steam launch were tried; neither counts as a successful game benchmark. The game's normal launch is restored afterward. Existing numeric display settings report 1512×982; the user's graphics configuration was inspected but not rewritten. Game launches now request Steam's documented `-silent` tray-start mode; opening Steam explicitly still presents its normal UI.
+
+## Monochrome interface
+
+The home screen now contains the TrackMania title, Play action and Open Steam link on a flat charcoal canvas. Settings holds graphics and Steam controls; recovery, runtime management, backups and diagnostics are under Advanced. The icon is monochrome as well.
+
+The release build passed. App-owned static renders of home at 1100×760 and 840×620, plus Settings, were visually inspected. Pixel checks confirmed grayscale throughout all three renders and the icon. These checks cover layout, not live window interaction. The existing TrackMania process remained running during the update. Evidence: `.cache/monochrome/validation.json` and sibling images.
+
+## TrackMania rendering correction and logo
+
+The user reported wrong colors, missing/flickering textures and blurry/blocky rendering with the original Performance runtime. A new fixed-function textured-draw probe reproduced a rendering defect in the DXVK 3.1 stack: all 15 initial 2D/volume color samples retained the blue clear color instead of the expected texture color. Legacy/OpenGL passed the same probe. Strict shader arithmetic did not fix it. Native D3DX30 was already selected correctly and passed the legacy shader-qualifier check; no compiler override was added.
+
+D9VK with the old bundled MoltenVK also failed those draws. D9VK with the community MoltenVK 1.4.0 passed the 64-bit probe but failed 32-bit buffer creation. Source-built D9VK at `f229921c1b7f14edeadeccff04a9e65d0a016148`, with the two attributed volume/reflection patches and official MoltenVK 1.4.2, passed the 32-bit probe. DXVK 3.1 with official MoltenVK 1.4.2 still failed; both components were therefore replaced.
+
+New runtime: `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-442df3c8e1`. `runtime/build.py --d3d9` now builds the pinned D9VK source and verifies the official MoltenVK archive hash. Native D3D9 selection and the Performance profile remain unchanged. No asynchronous pipeline draw skipping is enabled.
+
+The permanent `runtime/d3d9-textures.c` check exercises actual draws in six formats, including promoted A4R4G4B4 volume slices: 18 expected-color checks per Windows architecture. `smoke --graphics` now runs this probe in addition to clear/readback. Fresh integration passed all 19 phases, including 32/64-bit Legacy and Performance drawing, switching back to Legacy, DXMT D3D11 readback, backup/restore, and fresh official Steam installation. All 22 release unit tests passed. Evidence: `.cache/integration-d5b26b5b-1bfd-41cf-b6cc-8138413c6967/results.json` and `.cache/rendering-investigation/`.
+
+The home screen displays TrackMania's official logo from the user's Steam artwork cache. The app converts it to grayscale and lifts its dark details for contrast on the charcoal background. The app-owned render was visually inspected and has zero RGB channel difference throughout. No game artwork is bundled. Missing cache artwork falls back to the existing title.
+
+These probes establish that the reproduced texture-drawing defect is corrected in the replacement runtime. Actual TrackMania appearance and frame rate still require the user's next gameplay check; no speedup is inferred from the probes.
+
+The existing environment was backed up as `E22534FA-41E6-46FE-938F-16538FE14431`, then migrated to the new runtime with Performance preserved. Both installed D3D9 DLL hashes match the built runtime. The updated app and TrackMania were launched; `TmForever.exe` was observed. App signature and disk-image verification passed. Final evidence: `.cache/rendering-investigation/results.json`.
+
+## Frozen game investigation
+
+The user confirmed that the replacement runtime renders colors and textures correctly, but reported a frozen game at 0 FPS. A three-second macOS process sample found the game thread largely waiting in alertable delay/server calls while the D9VK submission and command threads waited idle. This sample does not establish the cause of the freeze. The game later exited. A 32-bit timing probe completed 20,000 zero-time alertable waits in 173.754 ms and correctly delivered a queued APC. A separate D9VK synthetic workload completed at 120.14 FPS; neither number establishes actual game responsiveness.
+
+Added an explicit, prefix-local standard-server synchronization fallback shared by app, CLI and detached workers. Changing it requires the environment to be stopped. The marker is included in prefix backups and restores. `crossedover sync server` selects it; `crossedover sync automatic` restores runtime-advertised MSync. No graphics backend or game settings changed for this comparison.
+
+All 23 release tests passed, including backup/restore of the synchronization choice. The isolated environment also passed 32/64-bit execution, clear/readback, and all 36 textured-draw checks with standard synchronization. Steam and the native app were stopped before selecting the fallback in the user's environment; a normal TrackMania launch was then requested. The actual-game result of this comparison is awaiting user confirmation. Evidence: `.cache/trackmania-stall/`.
+
+The user subsequently confirmed the stall is in the main menu and that standard synchronization remains around 0.4 FPS. The synchronization comparison did not resolve the problem.
+
+## x87 translation iteration
+
+The standard-synchronization process sample showed substantial Rosetta exception/translation activity. This led to an isolated x87 acceleration trial. The pinned PC24-aware x87sidecar from TrackMania-MacOS 0.3.0 passed its host compatibility probe. A locally adapted opt-in Wine loader handshake supports cooperative startup without privileged attachment or changes to system Rosetta files. With no selected helper, the loader follows its existing path.
+
+An isolated 32-bit 100,000-square-root loop measured 14.148 ms on stock translation and 0.315 ms with the helper. Both produced exactly 2 and passed the tested PC24/PC53 precision boundary. These numbers describe one math loop, not game FPS. A later packaged-runtime probe measured 0.228/0.225 ms in 32/64-bit modes, with the same numeric checks passing.
+
+Manifests now optionally advertise a contained, executable `x87RelativePath`. Only Performance selects it; Legacy and DXMT remove inherited helper/handshake settings. All 24 release tests passed, including helper validation, containment, profile selection, and old manifest compatibility. The full accelerated runtime passed all 19 integration phases with 32/64-bit textured rendering, precision probes, graphics fallback, DXMT, backups, and official Steam installation. Evidence: `.cache/integration-488cde8e-f844-43f1-b293-5ffe5674b5e8/results.json`.
+
+Final runtime `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-x87-eda6a2935f` also contains an original, opt-in D9VK HUD diagnostic patch. It records presentation rate at most once every five seconds when requested by the managed launcher. The final artifact separately passed graphics, precision and synthetic benchmark checks; evidence: `.cache/trackmania-stall/frame-verify-results.json`. The diagnostic patch changes logging only. Presentation rate does not by itself certify input responsiveness or race simulation.
+
+
+## Data-buffer stall correction (build 6)
+
+The user confirmed that x87 acceleration and the GDI auxiliary path both left the menu around 0.4 FPS. A later 1280×720/lower-shader-quality settings trial briefly showed 30–60 FPS, but the user reported recurring freezes and a whole-Mac hang. That trial does not establish playability. All user-game and diagnostic Wine processes were stopped following the report. The previous settings are saved beside the active config as `Default.SystemConfig.pre-performance-trial.Gbx`; the trial preserves every non-display GBX chunk byte-for-byte.
+
+Read-only Windows thread samples repeatedly found the game inside UCRT's SSE copy, writing 64-byte shader constants into mapped graphics memory. The executable lacks NX compatibility. Wine's loader therefore enables executable data mappings; `vmmap` confirmed writable/executable shared graphics buffers. A small isolated test, submitting no draws or presentation commands, reproduced the distinction: 1,000 64-byte mapped-buffer copies timed out after five seconds under the legacy policy, while enabling process DEP completed them in 0.006 ms with identical bytes. Ordinary heap copies completed in both modes. Evidence: `.cache/trackmania-stall/mapped-copy-results.json` and `mapped-copy-{legacy,nx}.log`. This strongly identifies a reproduced buffer-write stall; it does not establish the cause of the reported whole-Mac hang.
+
+The new opt-in D9VK patch uses Windows' process DEP API before creating graphics buffers. The packaged configuration enables it only for `TmForever.exe`, caps presentation at 60 FPS, and limits frame latency to one frame. Explicitly executable allocations remain supported; game executables and system Rosetta files are unchanged. A non-NX mapped-buffer regression probe verifies permanent DEP, 16 copy alignments, and byte correctness with a ten-second watchdog. Prefix setup, migration and repair now use Wineboot's restart option with update, skipping Steam's Windows startup entry.
+
+The TrackMania logo now retains its source colors, as requested; the surrounding interface remains monochrome. An app-owned render was visually inspected at `.cache/trackmania-stall/color-logo-preview.png`. Game artwork is still read from the user's Steam cache, not bundled.
+
+
+The packaged-policy candidate passed the non-NX regression: 2,048 copies across 16 source/destination alignments completed in 0.038 ms, with permanent DEP and exact bytes verified. Evidence: `.cache/trackmania-stall/dep-probe.log`. The initial parallel recovery-test runs exposed one-second process-exit deadline failures under build/import load. Recovery fixtures now run serially and the stopped-environment precondition allows three seconds; all 24 release tests then passed (`dep-final-tests-serialized.log`). Packaging now verifies runtime contents and every manifest hash both before and after copying the runtime, preventing a partially rebuilt runtime from being bundled.
+
+
+Final runtime `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-x87-4aef9c4cf2` passed 32/64-bit execution, both D3D9 clear/readback probes, all 36 textured-readback checks, the non-NX mapped-buffer regression (0.036 ms), and both x87 precision probes. Evidence: `.cache/trackmania-stall/dep-final-graphics.log`. The app's signature and disk-image checksum passed; the bundle contains the final runtime and its hashed regression executable. These checks do not certify sustained races or explain the whole-host hang.
+
+
+The first two bounded real-game observations saw the game process but no on-disk diagnostics. Source inspection showed that the D9VK logger buffered messages without flushing warning records; zero file size therefore did not establish that the process policy was missing or that no frames were presented. A follow-up patch flushes warning/error output so policy confirmation and five-second frame samples can be observed during a bounded run. Exact full-string scans are also unsuitable for optimized C++ literals, which this compiler may split into constants and immediate stores. No game-performance conclusion is drawn from those two observations.
+
+
+The final live-logging runtime is `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-x87-6e49701432`. It passed the full graphics/precision checks in the user's managed prefix (`live-user-graphics.log`), package hash verification, app signature validation, and DMG checksum verification. The bounded menu run confirmed process DEP in the real game and repeatedly logged 59.9–60 FPS. The user explicitly confirmed that the menu stayed smooth. Evidence: `.cache/trackmania-stall/live-menu-results.json` and `live-game-d3d9.log`. The monitor stopped the managed environment at the end of the bounded observation. Sustained race performance remains a separate check.
+
+
+### Window controls and race follow-up
+
+The user confirmed a smooth menu but reported significant race drops, a vertical click offset, and inability to leave exclusive fullscreen. The first race log sampled approximately 4–25 FPS during its slower portion (`race-check-observation.json`). Menu rates do not qualify racing.
+
+Build 7 prepares TrackMania's own windowed display mode before launch, preserves unrelated GBX chunks byte for byte, disables its keyboard capture flag, and backs up the original settings. An original bounded LZO1X decoder handles compressed settings; malformed/truncated inputs fail without rewriting the original. A per-game Wine Mac Driver policy releases pointer confinement, keeps Command keys native, allows moving/minimizing, and avoids display capture. Other executables retain Wine defaults. The user reported that window/pointer behavior looked better, but racing remained around 5–10 FPS. MSync was restored to Automatic; its startup messages also exposed and prompted correction of observer JSON parsing.
+
+All 28 release tests passed, including compressed settings preservation/idempotency, malformed input bounds, overlapping/long-distance LZO matches, and observer output with runtime diagnostics. The first window runtime `3012a84ccf` passed the complete graphics/precision checks and package/signature/DMG verification. Runtime logs confirmed windowed presentation with a 1280×720 drawable. CPU samples during the slower session are saved as `race-windowed-cpu-1.txt`.
+
+The user additionally reported a centered image filling neither fullscreen dimension. Wine's native-fullscreen delegate clamps its proposed size to the game's content maximum. A second opt-in patch bypasses that maximum only during native fullscreen and restores normal window constraints on exit. A separate reversible shader-quality trial changes the existing custom shader word from 0 to 2; no race improvement is claimed until observed. The command-line replay benchmark still opened a menu and produced no fresh result, so its samples are not a race benchmark.
+
+
+The fullscreen candidate runtime is `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-x87-097d800106`. It passed all graphics/precision probes (`fullscreen-graphics.log`), package runtime-hash checks, strict app signature verification, and DMG checksum verification. All 29 release tests passed, including repeated preparation preserving the first backup and releasing only the keyboard-capture field. The active prefix was backed up during migration. The shader-2/fullscreen race check is pending user feedback.
+
+
+The user confirmed fullscreen now looks correct. The shader-2 trial still produced roughly 1–7 FPS while driving, so its shader word was restored to 0. Its renderer resized to 1512×949 in native fullscreen. The module inventory showed the old Creative `wrap_oal.dll` software audio mixer and Steam's injected `gameoverlayrenderer.dll`. A bounded silent OpenAL device probe with 32 playing sources verified audio progression for both the original mixer and official OpenAL Soft 1.25.2; 32,000 position updates took 7.072 ms and 2.482 ms respectively. These API timings do not establish game performance. The official binary archive SHA-256 matched GitHub's release digest. A reversible local audio-library replacement and per-TrackMania overlay-disable policy are being tested; neither is yet a validated race fix.
+
+
+The user confirmed the audio/overlay trial was better: about 30 FPS, with occasional drops near 10. A subsequent trial retained OpenAL Soft and disabled overlay injection, raised the D9VK frame latency cap to two, lowered car detail to 1 and background detail to 0, and disabled ghost-car rendering via the maximum-opponents field. The user reported roughly 40 FPS with drops near 20 and requested a steady minimum of 60. That target has not been achieved. Frame samples and CPU observations are under `openal-no-overlay-check*` and `scene-queue-check`.
+
+Build 8 packages the official hash-verified OpenAL Soft 1.25.2 payload and license as an optional runtime component. Launch preparation verifies that component, backs up every distinct original Steam library by content hash, and atomically installs it only for TrackMania. Repeated launch preparation and Steam repair/update preservation are covered by tests. The reduced scene preset applies once per existing settings file, preserving subsequent user graphics choices. A new bounded renderer log reports existing queue wait/counter data without new GPU queries or extra synchronization; queue occupancy is explicitly not hardware GPU utilization.
+
+
+### Build 9: game management
+
+Added per-game properties, Show game files, Steam file verification and Steam uninstall requests. The application passes only validated numeric App IDs to the managed Windows Steam executable; uninstall uses Steam’s own confirmation instead of deleting installation directories directly. Verification/uninstall require a currently discovered installation and an observer-confirmed absence of game processes. The GUI also disables these operations during a tracked session. Steam owns completion; the regular library refresh then switches the demo between Play and Install. Downloads is accessible from Settings.
+
+Open Steam is now a secondary outlined header control with an external-window icon, separated from the solid Play button under the game title. Original-color TrackMania artwork and the monochrome spacious layout are preserved. App-owned normal and compact renders were inspected under `.cache/trackmania-stall/game-management-*.png`. CLI request forwarding and rejection tests cover management routes, malformed IDs, and a running game; the installed demo was not uninstalled for testing.
+
+
+Build 9 passed all 33 release tests after an unloaded repeat (`game-management-tests-final.log`), app signature validation and DMG checksum verification. The initial test run overlapped package/runtime startup work and one recovery fixture hit its stopped-server deadline; no assertion in the new management tests failed. CLI properties/downloads requests were acknowledged by the managed Steam worker. Steam dialogs and an actual uninstall were not visually confirmed. Full graphics/audio regression passed for the included audio runtime (`audio-final-graphics.log`), including playback clock progression and the no-NX mapped-buffer probe. The live 60-FPS target remains incomplete; current confirmed race behavior is roughly 40 FPS with drops near 20.
+
+
+The current workload-instrumented live session logged an initial compilation stall, then a series around 57–60 FPS with roughly 170–460 draws per frame and negligible measured GPU/command-thread wait. The queue occupancy counter was around 11–16%; it is not a hardware utilization measurement. CPU stack sampling was disabled for the continued observation to avoid perturbing interactive performance. These samples are saved under `frame-work-live-*`; the exact gameplay phase and steady 60 FPS responsiveness are still awaiting user confirmation.
+
+
+**Latest user result:** “it ran smoothly at 55–60 fps” during the requested short race with runtime `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-x87-openal1.25.2-e0a631ed57`. The working audio/overlay policy and reduced scene/two-frame configuration are retained. This confirms a smooth short race near the 60 FPS target, not a strict minimum or long-session stability. The read-only monitor was ended without stopping the game. Build 9 includes the separately validated management interface.
+
+### Build 10: structured monochrome interface
+
+Replaced the floating header/content layout with a fixed navigation rail, shared page gutters and headings, and bordered content groups. Library now has one adaptive TrackMania card with an artwork area, game details, and a separated action footer. Play and Manage share that footer; Windows Steam opens from its own outlined sidebar control. Settings, Advanced, Activity, notices, and Diagnostics follow the same border and control sizing. Existing game-management actions and runtime configuration are retained.
+
+Validation on 2026-10-18:
+
+- Release compilation passed (`.cache/visual-refresh/build.log`). No new core behavior was introduced; the existing 33-test result belongs to Build 9.
+- Generated and inspected app-owned SwiftUI renders at 1100 × 760 and 840 × 620. Checked Library, Settings, expanded Advanced, Activity, setup, installation, running, busy, and notice states. Also checked first launch and empty Activity using an isolated data root. Expanded Advanced uses a tall preview to inspect normally scrolling content.
+- Native menus and the indeterminate spinner use static equivalents in ImageRenderer. The render checks establish composition and state layout, not native menu interaction, keyboard focus, live scrolling, or window chrome.
+- Packaged app build 10, verified its deep/strict code signature, and verified the DMG checksum. Opened the packaged app and confirmed its process remained running. No game was launched, uninstalled, or reconfigured for this visual pass.
+
+Preview images and command output are under `.cache/visual-refresh/`. Design constraints and reproduction commands are in [DESIGN.md](DESIGN.md). The game-performance result above remains the latest user-confirmed gameplay evidence.

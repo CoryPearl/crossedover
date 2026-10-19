@@ -1,0 +1,92 @@
+Subject: winemac: Opt selected legacy games into the full native fullscreen size.
+
+Original CrossedOver change. Normal windows retain the application sizing limits.
+
+--- a/dlls/winemac.drv/macdrv_cocoa.h
++++ b/dlls/winemac.drv/macdrv_cocoa.h
+@@ -140,6 +140,7 @@
+ extern bool allow_immovable_windows;
+ extern bool use_confinement_cursor_clipping;
+ extern bool allow_cursor_clipping;
++extern bool fullscreen_ignore_max_size;
+ extern bool cursor_clipping_locks_windows;
+ extern bool use_precise_scrolling;
+ extern int gl_surface_mode;
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -56,6 +56,7 @@
+ bool allow_immovable_windows = true;
+ bool use_confinement_cursor_clipping = true;
+ bool allow_cursor_clipping = true;
++bool fullscreen_ignore_max_size = false;
+ bool cursor_clipping_locks_windows = true;
+ bool use_precise_scrolling = true;
+ int gl_surface_mode = GL_SURFACE_IN_FRONT_OPAQUE;
+@@ -368,6 +369,9 @@
+ 
+     if (!get_config_key(hkey, appkey, "UseConfinementCursorClipping", buffer, sizeof(buffer)))
+         use_confinement_cursor_clipping = IS_OPTION_TRUE(buffer[0]);
++
++    if (!get_config_key(hkey, appkey, "FullscreenIgnoreMaxSize", buffer, sizeof(buffer)))
++        fullscreen_ignore_max_size = IS_OPTION_TRUE(buffer[0]);
+ 
+     if (!get_config_key(hkey, appkey, "AllowCursorClipping", buffer, sizeof(buffer)))
+         allow_cursor_clipping = IS_OPTION_TRUE(buffer[0]);
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -1143,7 +1143,9 @@
+         }
+         else
+         {
+-            [self setContentMaxSize:savedContentMaxSize];
++            [self setContentMaxSize:(fullscreen_ignore_max_size && !exitingFullScreen &&
++                (enteringFullScreen || ([self styleMask] & NSWindowStyleMaskFullScreen)))
++                ? NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX) : savedContentMaxSize];
+             [self setContentMinSize:savedContentMinSize];
+         }
+ 
+@@ -2165,7 +2167,9 @@
+         if (![self preventResizing])
+         {
+             [self setContentMinSize:minSize];
+-            [self setContentMaxSize:maxSize];
++            [self setContentMaxSize:(fullscreen_ignore_max_size && !exitingFullScreen &&
++                (enteringFullScreen || ([self styleMask] & NSWindowStyleMaskFullScreen)))
++                ? NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX) : maxSize];
+         }
+     }
+ 
+@@ -3012,6 +3016,8 @@
+         macdrv_query* query;
+         NSSize size;
+ 
++        if (fullscreen_ignore_max_size) return proposedSize;
++
+         query = macdrv_create_query();
+         query->type = QUERY_MIN_MAX_INFO;
+         query->window = (macdrv_window)[self retain];
+@@ -3098,6 +3104,7 @@
+     - (void) windowDidExitFullScreen:(NSNotification*)notification
+     {
+         exitingFullScreen = FALSE;
++        if (fullscreen_ignore_max_size) [self adjustFeaturesForState];
+         [self setFrameAndWineFrame:nonFullscreenFrame];
+         [self windowDidResize:nil];
+         if (pendingOrderOut)
+@@ -3108,6 +3115,7 @@
+     {
+         enteringFullScreen = FALSE;
+         enteredFullScreenTime = 0;
++        if (fullscreen_ignore_max_size) [self adjustFeaturesForState];
+         if (pendingOrderOut)
+             [self doOrderOut];
+     }
+@@ -3237,6 +3245,8 @@
+     {
+         enteringFullScreen = TRUE;
+         nonFullscreenFrame = self.wine_fractionalFrame;
++        if (fullscreen_ignore_max_size)
++            [self setContentMaxSize:NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX)];
+     }
+ 
+     - (void) windowWillExitFullScreen:(NSNotification*)notification

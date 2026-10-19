@@ -1,0 +1,16 @@
+[
+  {
+    "appID": "11020",
+    "name": "TrackMania Nations Forever",
+    "profile": "performance",
+    "executableNames": [
+      "TmForever.exe"
+    ],
+    "status": "experimental",
+    "notes": "Current demo. Game startup and sound confirmed by the user on M4/macOS 26.6.2. Legacy performance is too low for comfortable play; graphics optimization is in progress.",
+    "compatibleProfiles": [
+      "performance",
+      "legacy"
+    ]
+  }
+]

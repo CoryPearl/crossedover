@@ -1,0 +1,44 @@
+Subject: hud: Log the sampled presentation rate when CrossedOver requests metrics.
+
+Original CrossedOver diagnostic change. At most one line every five seconds;
+records the HUD presentation rate, not a claim about race or input responsiveness.
+
+diff --git a/src/dxvk/hud/dxvk_hud_item.cpp b/src/dxvk/hud/dxvk_hud_item.cpp
+index 5dfb7fac..056dddd0 100644
+--- a/src/dxvk/hud/dxvk_hud_item.cpp
++++ b/src/dxvk/hud/dxvk_hud_item.cpp
+@@ -170,7 +170,9 @@ namespace dxvk::hud {
+   }
+ 
+ 
+-  HudFpsItem::HudFpsItem() { }
++  HudFpsItem::HudFpsItem() {
++    m_logFrames = env::getEnvVar("CROSSEDOVER_FRAME_LOG") == "1";
++  }
+   HudFpsItem::~HudFpsItem() { }
+ 
+ 
+@@ -183,6 +185,10 @@ namespace dxvk::hud {
+       int64_t fps = (10'000'000ll * m_frameCount) / elapsed.count();
+ 
+       m_frameRate = str::format(fps / 10, ".", fps % 10);
++      if (m_logFrames && std::chrono::duration_cast<std::chrono::seconds>(time - m_lastLog).count() >= 5) {
++        Logger::warn(str::format("CrossedOver frame rate: ", m_frameRate, " FPS"));
++        m_lastLog = time;
++      }
+       m_frameCount = 0;
+       m_lastUpdate = time;
+     }
+diff --git a/src/dxvk/hud/dxvk_hud_item.h b/src/dxvk/hud/dxvk_hud_item.h
+index 275461c6..17a883aa 100644
+--- a/src/dxvk/hud/dxvk_hud_item.h
++++ b/src/dxvk/hud/dxvk_hud_item.h
+@@ -204,6 +204,8 @@ namespace dxvk::hud {
+     dxvk::high_resolution_clock::time_point m_lastUpdate
+       = dxvk::high_resolution_clock::now();
+ 
++    bool m_logFrames = false;
++    dxvk::high_resolution_clock::time_point m_lastLog = dxvk::high_resolution_clock::now();
+     std::string m_frameRate;
+ 
+   };

@@ -1,0 +1,96 @@
+import AppKit
+import Sparkle
+import SwiftUI
+import CrossedOverCore
+
+@main @MainActor enum EntryPoint {
+    static func main() async {
+        if let index = CommandLine.arguments.firstIndex(of: "--render-preview"), index + 1 < CommandLine.arguments.count {
+            do {
+                // Preview reads real library metadata without starting operations
+                // or changing interrupted-operation records.
+                let model = try AppModel(recoverInterruptedOperations: false)
+                model.runtimes = try await model.runtimeManager.installed()
+                model.environment = try model.store.all(ManagedEnvironment.self, kind: "environment").first
+                if let environment = model.environment {
+                    model.games = try SteamDiscovery().discover(environment: environment, prefix: model.paths.prefix(environment)).filter { $0.appID == "11020" }
+                }
+                model.operations = try model.store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
+                model.sessions = try model.store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
+                if let page = CommandLine.arguments.firstIndex(of: "--preview-page"), page + 1 < CommandLine.arguments.count {
+                    model.selectedPage = CommandLine.arguments[page + 1]
+                }
+                let compact = CommandLine.arguments.contains("--compact-preview")
+                if let stateIndex = CommandLine.arguments.firstIndex(of: "--preview-state"), stateIndex + 1 < CommandLine.arguments.count {
+                    switch CommandLine.arguments[stateIndex + 1] {
+                    case "setup": model.environment = nil; model.games = []
+                    case "install": model.games = []
+                    case "running":
+                        if let environment = model.environment {
+                            model.currentSession = LaunchSession(appID: "11020", environmentID: environment.id, state: "running")
+                        }
+                    case "busy": model.busy = true; model.progress = "Preparing your game. This may take a moment…"
+                    case "notice": model.notice = "Uninstall requested. Confirm in Steam; the library will update when it finishes."
+                    default: break
+                    }
+                }
+                let advanced = CommandLine.arguments.contains("--preview-advanced")
+                let tall = CommandLine.arguments.contains("--tall-preview")
+                let renderer = ImageRenderer(content: ContentView(model: model, renderingSnapshot: true, previewAdvanced: advanced).environment(\.colorScheme, .dark).frame(width: compact ? 840 : 1100, height: tall ? 1400 : compact ? 620 : 760))
+                renderer.scale = 2
+                guard let image = renderer.cgImage, let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { throw CrossedOverError.message("Could not render the SwiftUI preview.") }
+                try data.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+                return
+            } catch { FileHandle.standardError.write(Data((error.localizedDescription + "\n").utf8)); exit(1) }
+        }
+        CrossedOverApp.main()
+    }
+}
+
+struct CrossedOverApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    private let model: AppModel?
+    private let startupError: String?
+    init() {
+        do { model = try AppModel(); startupError = nil }
+        catch { model = nil; startupError = error.localizedDescription }
+    }
+    var body: some Scene {
+        WindowGroup {
+            if let model { ContentView(model: model)
+                .frame(minWidth: 840, minHeight: 620)
+                .preferredColorScheme(.dark)
+                .task { await model.start() }
+            } else {
+                ContentUnavailableView("Couldn't open your game library", systemImage: "externaldrive.badge.exclamationmark", description: Text(startupError ?? "The local data directory could not be opened. Your existing files have not been removed."))
+                    .frame(width: 700, height: 420).preferredColorScheme(.dark)
+            }
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1100, height: 760)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { delegate.checkForUpdates() }
+                    .disabled(!delegate.updatesConfigured)
+            }
+            CommandGroup(replacing: .newItem) {}
+            CommandMenu("Steam") {
+                Button("Open Windows Steam") { model?.openSteam() }.keyboardShortcut("s", modifiers: [.command, .shift]).disabled(model == nil || model?.busy == true)
+                Button("Refresh Library") { Task { await model?.refresh() } }.keyboardShortcut("r").disabled(model == nil || model?.busy == true)
+                Divider()
+                Button("Close Windows Steam") { model?.stop(force: false) }.disabled(model?.busy == true || model?.environment == nil)
+            }
+        }
+    }
+}
+
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var updater: SPUStandardUpdaterController?
+    var updatesConfigured: Bool { Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil && Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") != nil }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true)
+        if updatesConfigured { updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil) }
+    }
+    func checkForUpdates() { updater?.checkForUpdates(nil) }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}

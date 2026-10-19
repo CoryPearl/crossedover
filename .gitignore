@@ -1,0 +1,29 @@
+# Generated builds, downloads, and runtime artifacts
+.build/
+.cache/
+dist/
+runtime/work/
+runtime/output/
+.swiftpm/
+__pycache__/
+*.pyc
+
+# Local machine and editor state
+.DS_Store
+*.xcuserstate
+
+# Local configuration, credentials, and signing material
+.env
+.env.*
+!.env.example
+!.env.sample
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Runtime data and diagnostic output
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log

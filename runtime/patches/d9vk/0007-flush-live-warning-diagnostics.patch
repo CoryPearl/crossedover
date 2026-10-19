@@ -1,0 +1,19 @@
+Subject: log: Flush warnings so bounded runtime diagnostics are observable while running.
+
+Original CrossedOver change. Frame samples are requested at most every five seconds.
+
+--- a/src/util/log/log.cpp
++++ b/src/util/log/log.cpp
+@@ -82,8 +82,11 @@
+             std::cerr << adjusted;
+         }
+ 
+-        if (m_fileStream)
++        if (m_fileStream) {
+           m_fileStream << adjusted;
++          if (level >= LogLevel::Warn)
++            m_fileStream.flush();
++        }
+       }
+     }
+   }

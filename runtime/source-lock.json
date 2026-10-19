@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "wine": {
+    "version": "11.0-cx26.3.0",
+    "url": "https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz",
+    "sha256": "ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872"
+  },
+  "developmentDependencies": {
+    "version": "wine-devel-11.18-osx64",
+    "url": "https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.18/wine-devel-11.18-osx64.tar.xz",
+    "sha256": "aa0ea4c82e636ae7bca2076387cb0a5affa26509ad13f119ecd0d62bd7ba6f82",
+    "note": "Development shortcut: x86-64 shared libraries from the pinned community build. Wine itself is rebuilt from CodeWeavers FOSS source. Public distribution requires a source-complete dependency build and license review."
+  },
+  "dxmt": {
+    "version": "0.80",
+    "url": "https://github.com/3Shain/dxmt/releases/download/v0.80/dxmt-v0.80-builtin.tar.gz",
+    "sha256": "8f260e36b5739e68f3bad613381441385c4dc7b85b78ba8de653d5a6a264529d",
+    "source": "https://github.com/3Shain/dxmt/tree/v0.80"
+  },
+  "d9vk": {
+    "version": "1.10.3-f229921",
+    "source": "https://github.com/Sikarugir-App/d9vk.git",
+    "revision": "f229921c1b7f14edeadeccff04a9e65d0a016148",
+    "note": "Built from pinned source with two attributed TrackMania texture/reflection patches in runtime/patches/d9vk."
+  },
+  "moltenvk": {
+    "version": "1.4.2",
+    "url": "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.2/MoltenVK-macos.tar",
+    "sha256": "f95765a6229cb7b915990a2890ce12ebe36a730b021545d3d52ae69ce4c4024e",
+    "source": "https://github.com/KhronosGroup/MoltenVK/tree/v1.4.2",
+    "note": "Official development binary; source-complete dependency build remains a public-release gate."
+  },
+  "x87": {
+    "version": "mactmnf-0.3.0",
+    "url": "https://github.com/vakesz/TrackMania-MacOS/releases/download/v0.3.0/mactmnf-0.3.0-runtime.tar.xz",
+    "sha256": "1bf2323f20baac586d8ba5282b597d725d030ea716088491c5c4dc1b6279b97e",
+    "sourceURL": "https://github.com/vakesz/TrackMania-MacOS/releases/download/v0.3.0/mactmnf-0.3.0-source.tar.xz",
+    "sourceSHA256": "e6f16361d8a5196fc9e353b77e4b4f1a7f21a504419040416bcd2dfa39b06354",
+    "upstream": "https://github.com/athei/x87sidecar",
+    "note": "Only the PC24-aware x87 helper and its license are extracted. Wine is still built locally from the locked CodeWeavers FOSS source."
+  },
+  "openal": {
+    "version": "1.25.2",
+    "url": "https://github.com/kcat/openal-soft/releases/download/1.25.2/openal-soft-1.25.2-bin.zip",
+    "sha256": "67a0c4b800bd860c93c04f38caf8cbe4875f9c84700ac430efc451f70e265434",
+    "source": "https://github.com/kcat/openal-soft/tree/1.25.2",
+    "note": "Official 32-bit LGPL binary, used only for the TrackMania demo; original game library is backed up before replacement."
+  }
+}

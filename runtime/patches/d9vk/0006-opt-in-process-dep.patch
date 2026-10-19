@@ -1,0 +1,49 @@
+Subject: d3d9: Allow selected 32-bit applications to preserve non-executable data mappings.
+
+Original CrossedOver change. Disabled by default; configured only for TrackMania.
+Uses the documented process DEP API; explicitly executable allocations are unaffected.
+
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -39,6 +39,9 @@
+     /// Whether or not to set the process as DPI aware in Windows when the API interface is created.
+     bool dpiAware;
+ 
++    /// Opt in to non-executable data mappings for selected legacy 32-bit apps.
++    bool forceProcessDEP;
++
+     /// True:  Copy our constant set into UBO if we are relative indexing ever.
+     /// False: Copy our constant set into UBO if we are relative indexing at the start of a defined constant
+     /// Why?:  In theory, FXC should never generate code where this would be an issue.
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -45,6 +45,7 @@
+     this->maxFrameRate                  = config.getOption<int32_t>     ("d3d9.maxFrameRate",                  0);
+     this->presentInterval               = config.getOption<int32_t>     ("d3d9.presentInterval",               -1);
+     this->shaderModel                   = config.getOption<int32_t>     ("d3d9.shaderModel",                   3);
++    this->forceProcessDEP              = config.getOption<bool>        ("d3d9.forceProcessDEP",              false);
+     this->dpiAware                      = config.getOption<bool>        ("d3d9.dpiAware",                      true);
+     this->strictConstantCopies          = config.getOption<bool>        ("d3d9.strictConstantCopies",          false);
+     this->strictPow                     = config.getOption<bool>        ("d3d9.strictPow",                     true);
+--- a/src/d3d9/d3d9_interface.cpp
++++ b/src/d3d9/d3d9_interface.cpp
+@@ -16,6 +16,19 @@
+     : m_instance    ( g_dxvkInstance.acquire() )
+     , m_extended    ( bExtended ) 
+     , m_d3d9Options ( nullptr, m_instance->config() ) {
++#if defined(_WIN32) && !defined(_WIN64)
++    // A legacy image can cause Wine to add execute permission to data pages.
++    // Imported Metal buffers must remain writable data, avoiding Rosetta's
++    // write-to-executable handling. Explicitly executable allocations still work.
++    if (m_d3d9Options.forceProcessDEP) {
++      DWORD policy = 0;
++      BOOL permanent = FALSE;
++      if (!GetProcessDEPPolicy(GetCurrentProcess(), &policy, &permanent)
++       || (!(policy & PROCESS_DEP_ENABLE) && !SetProcessDEPPolicy(PROCESS_DEP_ENABLE)))
++        throw DxvkError("CrossedOver: Could not enable non-executable data mappings");
++      Logger::warn("CrossedOver: Process DEP enabled for legacy data-buffer compatibility");
++    }
++#endif
+     // D3D9 doesn't enumerate adapters like physical adapters...
+     // only as connected displays.
+ 

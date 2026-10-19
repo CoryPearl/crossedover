@@ -1,0 +1,20 @@
+name: Build and test
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Test core behavior
+        run: swift test
+      - name: Package local development build
+        run: python3 scripts/package.py --debug --skip-build --thin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrossedOver-development
+          path: dist/
