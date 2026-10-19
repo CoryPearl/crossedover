@@ -1,4 +1,4 @@
-# Xbox and Minecraft Bedrock assessment — v1.3.0
+# Xbox and Minecraft Bedrock assessment — v1.3.1
 
 The included Wine 11.0-cx26.3.0 runtime does not implement a supported Windows Xbox client, Microsoft Store installation/licensing, or the additional Bedrock GDK account bridge. Local Xbox/PC Game Pass downloads and Bedrock are therefore not exposed as working installers. We do not promise all games from any store.
 
@@ -6,6 +6,6 @@ Microsoft documents that packaged PC games invoke the PC Bootstrapper through Ga
 
 A specific Bedrock path is plausible: WineGDK implements selected GDK/WinRT components, and Bedrock for Mac publishes an experimental Apple silicon implementation using WineGDK, DXMT, and Xodus. Its current source describes owned-account download, a separate credential helper, runtime patches, and isolated game/world storage. The project's evidence and open issues belong to its tested build, not crossedover. This is not equivalent to running the Xbox app or every Game Pass game. [WineGDK source](https://github.com/Weather-OS/WineGDK), [Bedrock for Mac](https://github.com/1JRobertson/bedrock-mac), [its release evidence](https://github.com/1JRobertson/bedrock-mac/blob/main/docs/RELEASE.md)
 
-A future local Bedrock integration needs a separate pinned runtime and prefix, a reviewed Microsoft sign-in/licensed download flow, protected account storage, cancellation and recovery, contained world saves, and actual launch/input/audio/multiplayer validation on supported Macs. It must preserve the existing Steam/Epic environment and never treat copied game files as account ownership. No components of this experimental port are bundled in v1.3.0.
+A future local Bedrock integration needs a separate pinned runtime and prefix, a reviewed Microsoft sign-in/licensed download flow, protected account storage, cancellation and recovery, contained world saves, and actual launch/input/audio/multiplayer validation on supported Macs. It must preserve the existing Steam/Epic environment and never treat copied game files as account ownership. No components of this experimental port are bundled in v1.3.1.
 
 Settings offers an explicit browser link to Xbox Cloud Gaming. Microsoft supports browser streaming on macOS for eligible cloud games, accounts, regions, and plans. This is streaming, creates no local crossedover installation/card, and does not establish Minecraft's availability. [Microsoft cloud gaming guide](https://news.xbox.com/en-us/2025/12/19/getting-started-with-xbox-cloud-gaming/), [current supported catalog](https://www.xbox.com/play)

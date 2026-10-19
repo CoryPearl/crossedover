@@ -454,7 +454,7 @@ import CrossedOverCore
                 updated = try await self.environmentManager.setProfile(recipe.profile, environment: environment, runtime: runtime)
             }
             try Task.checkCancellation()
-            self.progress = "Preparing graphics and contacting \(game.managementStore.title)…"
+            self.progress = "Preparing graphics and contacting \(game.store.title)…"
             _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: updated.id, command: game.store == .epic ? .launchEpicGame : game.store == .ubisoft ? .launchUbisoftGame : .launchGame, appID: game.appID))
             try Task.checkCancellation()
             let session = LaunchSession(id: UUID(), appID: game.sessionAppID, environmentID: updated.id, startedAt: Date(), state: "requested")

@@ -121,7 +121,7 @@ public enum SupervisorEngine {
                     let result = try await ProcessRunner.run(runtime.wine, arguments: [destination.path], environment: variables, timeout: 15)
                     guard result.status == 0, let processes = decodeObservation(result.output) else { throw CrossedOverError.message("Could not check this game's running state. Close it and retry.") }
                     guard !processes.contains(where: { names.contains($0.executable.lowercased()) }) else { throw CrossedOverError.message("\(game.name) is running. Close it before retrying this action.") }
-                    if request.command == .launchEpicGame && !partnerLaunch {
+                    if request.command == .launchEpicGame {
                         launchRequest.primeEpic = !processes.contains { $0.executable.lowercased() == "epicgameslauncher.exe" }
                     }
                 }
@@ -201,7 +201,7 @@ public enum SupervisorEngine {
         case .launchUbisoftGame: message = "Launch requested through Ubisoft Connect. Waiting for the game process."
         case .ubisoftProperties, .verifyUbisoftGame, .uninstallUbisoftGame: message = "Ubisoft Connect is opening. Choose the game in Library, then manage its files, verification, or uninstall there."
         case .openEpic: message = "Epic Games is opening. Sign in and install games there; completed installs appear in Games."
-        case .launchEpicGame: message = partnerLaunch ? "Launch requested through Ubisoft Connect for this Epic installation. Waiting for the game process." : "Launch requested through Windows Epic. Waiting for the game process."
+        case .launchEpicGame: message = "Launch requested through Windows Epic. Waiting for the game process."
         case .uninstallEpicGame: message = "Epic Library is opening. Find the game, choose ⋯ → Manage → Uninstall, and confirm there."
         case .verifyEpicGame: message = "Epic Library is opening. Find the game, choose ⋯ → Manage → Verify, and check progress in Epic."
         case .epicProperties: message = "Epic Library is opening. Choose the game's ⋯ → Manage menu."
@@ -351,23 +351,17 @@ public enum SupervisorEngine {
             try EpicService.requireSupportedRuntime(runtime)
             let launcher = try EpicService.executable(prefix: prefix)
             var uri = EpicService.libraryURI
-            var partnerID: String?
             if request.command.requiresEpicGameID {
                 let game = try epicGame(request, environment: environment, prefix: prefix)
                 if request.command == .launchEpicGame {
                     uri = try EpicService.launchURI(for: game)
-                    partnerID = game.epicPartnerGameID
                 }
             }
-            if let partnerID {
-                // Epic installs these through Ubisoft. Use the installed
-                // Ubisoft URL entry point after the user's account linking.
-                arguments = [try UbisoftDiscovery.executable(prefix: prefix).path, try UbisoftDiscovery.launchURI(partnerID)]
-            } else {
-                // Match Epic’s registered URL handler: URI is the first argument.
-                arguments = request.command == .openEpic ? [launcher.path, "-SkipBuildPatchPrereq"] : [launcher.path, uri]
-                primeEpic = request.command == .launchEpicGame && request.primeEpic == true
-            }
+            // Epic owns the entitlement and partner handoff. Dispatch Epic
+            // cards through Epic, including Ubisoft-managed installations;
+            // a bare uplay: link omits the owning launcher's flow.
+            arguments = request.command == .openEpic ? [launcher.path, "-SkipBuildPatchPrereq"] : [launcher.path, uri]
+            primeEpic = request.command == .launchEpicGame && request.primeEpic == true
         } else { arguments = [try SteamService.steamExecutable(prefix: prefix).path] }
         if !request.command.isEpic && !request.command.isUbisoft && request.command != .shutdown { arguments.append("-cef-disable-gpu") }
         if request.command == .shutdown { arguments += ["-shutdown"] }
@@ -387,7 +381,8 @@ public enum SupervisorEngine {
         if request.command == .openDownloads { arguments.append("steam://nav/downloads") }
         let pipe = Pipe(), process = Process()
         process.executableURL = (request.command.isEpic || request.command.isUbisoft) ? runtime.wine : runtime.steamLoader; process.arguments = arguments
-        process.currentDirectoryURL = prefix.appendingPathComponent("drive_c")
+        process.currentDirectoryURL = (request.command.isEpic || request.command.isUbisoft)
+            ? URL(fileURLWithPath: arguments[0]).deletingLastPathComponent() : prefix.appendingPathComponent("drive_c")
         if request.command.isUbisoft { process.environment = UbisoftDiscovery.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }
         else if request.command.isEpic { process.environment = EpicService.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }
         else { process.environment = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }

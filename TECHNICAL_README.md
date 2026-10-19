@@ -1,8 +1,8 @@
 # crossedover — Technical README
 
-This document explains how the **v1.3.0 source implementation** works, from the macOS interface to Windows process execution. It is intended for contributors and readers who want to understand the whole app. For installation, use the [quickstart](QUICKSTART.md); for system requirements, see the [hardware guidelines](docs/HARDWARE.md).
+This document explains how the **v1.3.1 source implementation** works, from the macOS interface to Windows process execution. It is intended for contributors and readers who want to understand the whole app. For installation, use the [quickstart](QUICKSTART.md); for system requirements, see the [hardware guidelines](docs/HARDWARE.md).
 
-v1.3.0 is a development candidate. Describing a launch path or runtime patch here does not mean every affected game has passed interactive validation. The [validation record](docs/VALIDATION.md) distinguishes automated checks, user observations, and pending work.
+v1.3.1 is a development candidate. Describing a launch path or runtime patch here does not mean every affected game has passed interactive validation. The [validation record](docs/VALIDATION.md) distinguishes automated checks, user observations, and pending work.
 
 ## Contents
 
@@ -282,12 +282,12 @@ sequenceDiagram
 | --- | --- | --- |
 | Steam | Windows `steam.exe -silent -applaunch <id>`, plus any fixed recipe arguments | Steam install/uninstall/properties/validate/download routes |
 | Normal Epic | Composite namespace/catalog/artifact URI passed to Windows Epic | Opens Epic Library; the user chooses Manage → Verify or Uninstall |
-| Epic with Ubisoft partner ID | Installed `UbisoftConnect.exe` with validated `uplay://launch/<id>/0` | Ubisoft's own Library controls |
-| Independent Ubisoft | Same Ubisoft URL bootstrapper, using its own store identity | Ubisoft's own Library controls |
+| Epic with Ubisoft partner ID | Epic composite launch URI; Epic handles authorization and the Ubisoft handoff | Ubisoft's own Library controls |
+| Independent Ubisoft | `UbisoftConnect.exe` with validated `uplay://launch/<id>/0`, using its own store identity | Ubisoft's own Library controls |
 
-Epic partner cards still look like Epic games in crossedover. Their completed installation is managed by Ubisoft, so Play uses Ubisoft's registered bootstrapper rather than the internal `upc.exe`. Initial account linking and entitlement setup remain inside Epic's own Library. This route is implemented and tested with owned fixtures; current real-game card/window confirmation remains tracked in the validation record.
+Epic partner cards keep their Epic identity and launch through Epic, including Brawlhalla. Ubisoft still supplies their completed install registration and management controls. Sending a bare Ubisoft link failed in real Brawlhalla checks, so crossedover leaves authorization and partner dispatch to the owning Epic client. Initial account linking remains inside Epic's Library. Current real-game launch/window confirmation remains tracked in the validation record.
 
-Normal Open Epic starts its visible client directly. A cold non-partner Epic game launch primes that client before submitting the URI. The supervisor computes this hint from observed processes. The primer uses separate output handles: sharing the URI process's `Pipe` caused a Foundation file-handle exception and is covered by a regression test.
+Normal Open Epic starts its visible client directly. Any cold Epic game launch, including a partner installation, primes that client before submitting the URI. Windows launchers start with their own executable directory as the working directory. The supervisor computes this hint from observed processes. The primer uses separate output handles: sharing the URI process's `Pipe` caused a Foundation file-handle exception and is covered by a regression test.
 
 ### Session tracking
 

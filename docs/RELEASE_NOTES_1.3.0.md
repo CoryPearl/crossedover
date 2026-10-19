@@ -1,5 +1,7 @@
 # crossedover v1.3.0
 
+> Historical development notes. This candidate was superseded by [v1.3.1](RELEASE_NOTES_1.3.1.md) before publication.
+
 Windows Epic Games joins Steam and local Windows apps in one library, with smoother native scrolling and discovery of Ubisoft handoffs.
 
 - Separate **Open Steam** and **Open Epic** controls, with official Windows launcher setup.

@@ -43,17 +43,36 @@ import Testing
         #expect(epic.source == .epic); #expect(epic.epicPartnerGameID == "16382")
         #expect(epic.directory == game.directory)
         #expect(try EpicService.launchURI(for: epic) == "com.epicgames.launcher://apps/epic-ns%3Aepic-item%3Aepic-brawl?action=launch&silent=false")
-        // Keep the Epic card identity while dispatching to the installed
-        // Ubisoft URL bootstrapper, even with a stale cold-Epic hint.
+        // Epic cards must preserve Epic's entitlement and partner handoff;
+        // a bare Ubisoft URL opened the client without starting Brawlhalla.
         let original = try String(contentsOf: runtime.wine, encoding: .utf8)
-        try original.replacingOccurrences(of: "#!/bin/sh\n", with: "#!/bin/sh\n/usr/bin/printf '%s\\n' \"$@\" >> \"$WINEPREFIX/launch-order.txt\"\n").write(to: runtime.wine, atomically: true, encoding: .utf8)
+        try original.replacingOccurrences(of: "#!/bin/sh\n", with: "#!/bin/sh\n/usr/bin/printf '%s\\n' \"$@\" >> \"$WINEPREFIX/launch-order.txt\"\n/bin/pwd >> \"$WINEPREFIX/launch-directories.txt\"\n").write(to: runtime.wine, atomically: true, encoding: .utf8)
         var request = SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchEpicGame, appID: epic.appID)
-        request.primeEpic = true
         let requestFile = paths.logs.appendingPathComponent(".launch-partner.json")
-        try JSONEncoder().encode(request).write(to: requestFile)
-        try SupervisorEngine.runLaunchWorker(requestFile: requestFile)
-        let actual = try String(contentsOf: prefix.appendingPathComponent("launch-order.txt"), encoding: .utf8).split(separator: "\n").map(String.init)
-        #expect(actual == [launcher.path, "uplay://launch/16382/0"])
+        let epicLauncher = try EpicService.executable(prefix: prefix)
+        for cold in [false, true] {
+            let order = prefix.appendingPathComponent("launch-order.txt")
+            try? FileManager.default.removeItem(at: order)
+            let directories = prefix.appendingPathComponent("launch-directories.txt")
+            try? FileManager.default.removeItem(at: directories)
+            request.primeEpic = cold
+            try JSONEncoder().encode(request).write(to: requestFile)
+            try SupervisorEngine.runLaunchWorker(requestFile: requestFile)
+            let actual = try String(contentsOf: order, encoding: .utf8).split(separator: "\n").map(String.init)
+            let dispatch = [epicLauncher.path, try EpicService.launchURI(for: epic)]
+            #expect(actual == (cold ? [epicLauncher.path, "-SkipBuildPatchPrereq"] + dispatch : dispatch))
+            #expect(!actual.contains(launcher.path))
+            #expect(!actual.contains(where: { $0.hasPrefix("uplay:") }))
+            let workingDirectories = try String(contentsOf: directories, encoding: .utf8).split(separator: "\n").map(String.init)
+            #expect(workingDirectories.count == (cold ? 2 : 1))
+            // macOS may spell the same temporary directory as /var or /private/var.
+            let expectedDirectory = try FileManager.default.attributesOfItem(atPath: epicLauncher.deletingLastPathComponent().path)
+            for directory in workingDirectories {
+                let actualDirectory = try FileManager.default.attributesOfItem(atPath: directory)
+                #expect(actualDirectory[.systemFileNumber] as? UInt64 == expectedDirectory[.systemFileNumber] as? UInt64)
+                #expect(actualDirectory[.systemNumber] as? UInt64 == expectedDirectory[.systemNumber] as? UInt64)
+            }
+        }
         try FileManager.default.removeItem(at: folder)
         #expect(try UbisoftDiscovery().discover(environment: environment, prefix: prefix).isEmpty)
         #expect(try EpicDiscovery().discover(environment: environment, prefix: prefix).isEmpty)

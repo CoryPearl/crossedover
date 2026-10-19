@@ -1,4 +1,4 @@
-# Hardware guidelines — crossedover v1.3.0
+# Hardware guidelines — crossedover v1.3.1
 
 These guidelines cover the included Windows runtime. Meeting them lets you try compatible software; each game still has its own requirements. Recommendations are planning guidance, not certified minimums or a promise of 60 FPS.
 

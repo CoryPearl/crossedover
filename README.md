@@ -18,14 +18,14 @@
   <a href="TECHNICAL_README.md">Technical README</a>
 </p>
 
-<p align="center"><sub>v1.3.0 &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
+<p align="center"><sub>v1.3.1 &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
 
 <br>
 
 <p align="center">
   <img src="website/assets/library.png" width="1100" alt="crossedover’s monochrome game library with search, game cards, and a Game Launchers menu">
   <br>
-  <sub>A little less launcher. A little more library. Interface preview · v1.3.0.</sub>
+  <sub>A little less launcher. A little more library. Interface preview · v1.3.1.</sub>
 </p>
 
 Run Windows software on your Mac through Wine. **Games** for what you play. **Apps** for everything else. Steam games are our focus, with Epic Games and Ubisoft Connect handoffs alongside them. More launcher and platform support is coming soon.

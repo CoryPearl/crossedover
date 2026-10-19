@@ -13,7 +13,9 @@ int main(int argc, char **argv) {
     if (!order) return 26;
     fprintf(order, "%s\n", uri); fclose(order);
     if (!strcmp(uri, "com.epicgames.launcher://store/library")) return 0;
-    if (strcmp(uri, "com.epicgames.launcher://apps/probe-ns%3Aprobe-item%3AOwnedProbe?action=launch&silent=false") && strcmp(uri, "uplay://launch/16382/0")) return 22;
+    if (strcmp(uri, "com.epicgames.launcher://apps/probe-ns%3Aprobe-item%3AOwnedProbe?action=launch&silent=false") &&
+        strcmp(uri, "com.epicgames.launcher://apps/probe-ns%3Apartner-item%3AOwnedPartner?action=launch&silent=false") &&
+        strcmp(uri, "uplay://launch/16382/0")) return 22;
     STARTUPINFOA si = {0}; PROCESS_INFORMATION pi = {0}; si.cb = sizeof(si);
     SECURITY_ATTRIBUTES sa = {sizeof(sa), NULL, TRUE};
     HANDLE output = CreateFileA("C:\\crossedover\\epic-readback.txt", GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);

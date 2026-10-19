@@ -1,4 +1,4 @@
-# crossedover v1.3.0 quickstart
+# crossedover v1.3.1 quickstart
 
 ## Before you start
 
@@ -8,7 +8,7 @@ Compatibility is experimental. TrackMania Nations Forever is the first tested de
 
 ## Install
 
-1. Download **crossedover-1.3.0.dmg** from the [v1.3.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.3.0).
+1. Download **crossedover-1.3.1.dmg** from the [v1.3.1 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.3.1).
 2. Open it and drag **crossedover** onto **Applications**.
 3. Eject the disk image and open crossedover from Applications.
 
@@ -109,7 +109,7 @@ Dragging just crossedover.app to Trash does **not** remove `~/Library/Applicatio
 
 ## Coming soon
 
-v1.3.0 adds Windows Epic Games alongside Steam and the local .exe cards introduced in v1.1.0. Support for more launchers and platforms, easier dependency setup, and broader app compatibility is coming soon.
+v1.3.1 adds Windows Epic Games alongside Steam and the local .exe cards introduced in v1.1.0. Support for more launchers and platforms, easier dependency setup, and broader app compatibility is coming soon.
 
 ## Need a hand?
 
@@ -122,7 +122,7 @@ v1.3.0 adds Windows Epic Games alongside Steam and the local .exe cards introduc
 
 ## Epic games that use Ubisoft Connect
 
-Some Epic titles, including Brawlhalla, hand installation and launch to Ubisoft Connect. These installations have Ubisoft registry records rather than Epic `.item` manifests. crossedover combines Epic’s partner records with Ubisoft’s completed install registration. These games appear as **Epic Games** cards; Play opens their registered game link through Ubisoft Connect. Complete the initial account linking in Epic’s own Library first. Independent Ubisoft installs appear under **Ubisoft Connect**. Sign in/link accounts in the launcher's own window when requested. Play routes through the launcher that owns the installation. Files and mods open in Finder. Verification and uninstall continue in Ubisoft's own Library controls. Other Ubisoft titles remain untested.
+Some Epic titles, including Brawlhalla, hand installation and launch to Ubisoft Connect. These installations have Ubisoft registry records rather than Epic `.item` manifests. crossedover combines Epic’s partner records with Ubisoft’s completed install registration. These games appear as **Epic Games** cards; Play asks Epic to launch them, preserving Epic’s own authorization and Ubisoft handoff. Complete the initial account linking in Epic’s own Library first. Independent Ubisoft installs appear under **Ubisoft Connect**. Sign in/link accounts in the launcher's own window when requested. Play routes through the launcher that owns the installation. Files and mods open in Finder. Verification and uninstall continue in Ubisoft's own Library controls. Other Ubisoft titles remain untested.
 
 The launcher uses Metal for Direct3D 11, with Performance rendering for Direct3D 9 games such as Brawlhalla. This does not change Steam's saved profile. An observed process is not proof of a visible or playable game. If a title opens no window, check its own launcher for sign-in/linking prompts and report the title; compatibility varies.
 

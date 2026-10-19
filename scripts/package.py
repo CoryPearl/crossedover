@@ -69,7 +69,7 @@ def main():
     info = {
         "CFBundleIdentifier": "org.crossedover.CrossedOver", "CFBundleName": "crossedover", "CFBundleDisplayName": "crossedover",
         "CFBundleExecutable": "CrossedOver", "CFBundlePackageType": "APPL", "CFBundleShortVersionString": VERSION,
-        "CFBundleVersion": "24", "LSMinimumSystemVersion": "15.0", "NSHighResolutionCapable": True,
+        "CFBundleVersion": "25", "LSMinimumSystemVersion": "15.0", "NSHighResolutionCapable": True,
         "NSPrincipalClass": "NSApplication", "NSHumanReadableCopyright": "crossedover contributors. GPL-3.0-or-later.",
         "LSApplicationCategoryType": "public.app-category.games", "CFBundleIconFile": "CrossedOver"
     }

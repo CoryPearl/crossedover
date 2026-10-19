@@ -74,7 +74,7 @@ try:
    time.sleep(.1)
   assert handoff.exists() and handoff.read_text()=='com.epicgames.launcher://store/library',operation
  # Epic's Ubisoft-managed installs have partner records rather than .items.
- # Exercise the registered Ubisoft bootstrapper with an owned stand-in too.
+ # Epic retains launch ownership even when Ubisoft manages installation.
  item.unlink()
  ubisoft=prefix/'drive_c/Program Files (x86)/Ubisoft/Ubisoft Game Launcher/UbisoftConnect.exe'
  ubisoft.parent.mkdir(parents=True); shutil.copy2(launcher,ubisoft)
@@ -93,13 +93,13 @@ try:
   if result.exists(): break
   time.sleep(.1)
  assert result.exists() and result.read_text()=='0'
- assert handoff.read_text()=='uplay://launch/16382/0'
- assert len((prefix/'drive_c/crossedover/epic-handoff-order.txt').read_text().splitlines())==count+1
+ assert handoff.read_text()=='com.epicgames.launcher://apps/probe-ns%3Apartner-item%3AOwnedPartner?action=launch&silent=false'
+ assert len((prefix/'drive_c/crossedover/epic-handoff-order.txt').read_text().splitlines())==count+2
  # Simulate a completed uninstall and remove only its card.
  partner.unlink(); shutil.rmtree(game)
  assert json.loads(command('games'))==[]
  assert not list((root/'Backups').iterdir())
- output={'ownedFixture':True,'officialEpicAuthenticationTested':False,'runtime':manifest['id'],'completeInstallDiscovery':True,'launchURIHandoff':True,'coldClientPrimed':True,'d3d11MetalReadback':True,'d3d9ScopedReadback':True,'partnerBootstrapper':True,'managementLibraryRoutes':True,'uninstallDiscovery':True,'automaticBackups':False}
+ output={'ownedFixture':True,'officialEpicAuthenticationTested':False,'runtime':manifest['id'],'completeInstallDiscovery':True,'launchURIHandoff':True,'coldClientPrimed':True,'d3d11MetalReadback':True,'d3d9ScopedReadback':True,'partnerThroughEpic':True,'managementLibraryRoutes':True,'uninstallDiscovery':True,'automaticBackups':False}
  output_file=PROJECT/'.cache/release-preview/epic-results.json'
  output_file.parent.mkdir(parents=True,exist_ok=True)
  output_file.write_text(json.dumps(output,indent=2))
