@@ -1,6 +1,6 @@
 # Developer reference
 
-For installation, see [the v1.2.0 quickstart](../QUICKSTART.md). The notes below describe implementation and runtime limitations.
+For installation, see [the v1.3.0 quickstart](../QUICKSTART.md). For a full implementation walkthrough, see the [Technical README](../TECHNICAL_README.md). The notes below describe build tools and runtime limitations.
 
 ## Build
 

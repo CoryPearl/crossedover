@@ -1,5 +1,7 @@
 # Architecture
 
+For a consolidated walkthrough of the current implementation, see the [Technical README](../TECHNICAL_README.md). The notes below also retain context from earlier development stages.
+
 `CrossedOver` is the SwiftUI app. `CrossedOverCore` owns Codable models, runtime installation, validation, SQLite records through GRDB, Wine configuration, Steam VDF and Epic installation-manifest parsers, process execution, backups, migrations, and diagnostic redaction. `CrossedOverSupervisor` accepts one versioned JSON request on stdin and returns a JSON reply. `CrossedOverCLI` exposes the same services for development and verification.
 
 ## Data flow

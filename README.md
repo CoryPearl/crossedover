@@ -30,6 +30,8 @@ The Windows Xbox app and Minecraft Bedrock are **not supported by the included r
 
 ## Build
 
+Read the [Technical README](TECHNICAL_README.md) for an in-depth explanation of the architecture, Windows runtime, launchers, graphics, storage, recovery, and release process.
+
 ~~~sh
 swift test
 python3 scripts/package.py --thin --dmg
