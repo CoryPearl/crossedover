@@ -105,7 +105,7 @@ struct CrossedOverApp: App {
                 if let model { GameLauncherActions(model: model) }
                 Divider()
                 Button("Epic Downloads") { model?.openEpicDownloads() }.disabled(model?.busy == true || model?.epicInstalled != true)
-                Button("Refresh Library") { Task { await model?.refresh() } }.keyboardShortcut("r").disabled(model == nil || model?.busy == true)
+                Button("Refresh Library") { Task { await model?.refresh(refreshSizes: true) } }.keyboardShortcut("r").disabled(model == nil || model?.busy == true)
                 Divider()
                 Button("Close Windows Steam") { model?.stop(force: false) }.disabled(model?.busy == true || model?.environment == nil)
             }

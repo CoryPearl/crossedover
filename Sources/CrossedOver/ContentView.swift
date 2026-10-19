@@ -183,7 +183,7 @@ struct ContentView: View {
                     Button { beginImport() } label: { Label("Add .exe", systemImage: "plus") }
                         .buttonStyle(SecondaryButton()).disabled(model.busy).keyboardShortcut("o")
                         .help("Add a Windows app or game (⌘O)")
-                    Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 12) }
+                    Button { Task { await model.refresh(refreshSizes: true) } } label: { Image(systemName: "arrow.clockwise").frame(width: 12) }
                         .buttonStyle(SecondaryButton()).disabled(model.busy).help("Refresh library (⌘R)").accessibilityLabel("Refresh library")
                 }
             }
@@ -454,9 +454,9 @@ struct ContentView: View {
                         Circle().fill(Palette.muted).frame(width: 5, height: 5)
                         Text(gameState(game)).font(.system(size: 11, weight: .medium)).lineLimit(1).help(gameState(game))
                     }
-                    if let game, session(for: game) == nil, game.sizeBytes > 0 {
+                    if let game, game.sizeBytes > 0 {
                         Text(ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file))
-                            .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1).help("Space used on disk")
+                            .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1).help("Installed game files")
                     }
                 }
                 Spacer(minLength: 8)
@@ -571,7 +571,7 @@ struct ContentView: View {
             }
             Rule()
             VStack(alignment: .leading, spacing: 12) {
-                Text("Installed · " + ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file)).font(.system(size: 12))
+                Text("Installed · " + (game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : "Size unavailable")).font(.system(size: 12))
                 Text(game.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                     .font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                 Button("Show game files") { model.showGameFiles(game) }.buttonStyle(SecondaryButton())

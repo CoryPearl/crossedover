@@ -122,7 +122,7 @@ import CrossedOverCore
             }
         }
     }
-    func refresh() async {
+    func refresh(refreshSizes: Bool = false) async {
         guard !refreshing && !busy else { return }
         refreshing = true; defer { refreshing = false }
         do {
@@ -136,7 +136,7 @@ import CrossedOverCore
                 if let environment {
                     let saved = try store.all(GameInstallation.self, kind: "game").filter { $0.environmentID == environment.id }
                         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                    games = GameLibrary.discover(environment: environment, prefix: paths.prefix(environment), previous: saved)
+                    games = GameLibrary.discover(environment: environment, prefix: paths.prefix(environment), previous: saved, refreshSizes: refreshSizes)
                     if games != saved { try store.replaceGames(games, environmentID: environment.id) }
                 }
                 let operations = try store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }

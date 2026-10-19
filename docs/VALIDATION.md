@@ -1,5 +1,9 @@
 # Validation record
 
+## Installed-size reporting — October 19, 2026
+
+All 70 tests in 12 suites passed after adding the installed-size fallback. Regression coverage includes Epic/Ubisoft partner discovery, nested and hidden files, symbolic links and loops, cached refreshes, explicit recount, and expiry. The installed Brawlhalla folder measured **1,601,448,683 bytes** across **7,794 regular files**, matching an independent Python metadata walk. An app-owned SwiftUI preview showed **1.6 GB** on its card during the Opening state. This verifies size reporting, not the still-pending Brawlhalla card-launch or native-window-controls behavior. Evidence is local in `.cache/brawlhalla-size-*`.
+
 Validated locally on 2026-10-18: Apple M4, 16 GiB, macOS 26.6.2, Xcode 26.1.1 / Swift 6.2.1.
 
 ## Automated core checks

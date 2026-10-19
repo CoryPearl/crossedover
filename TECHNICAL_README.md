@@ -227,6 +227,8 @@ Discovery never executes a record's arbitrary `AdditionalCommandArgs` or follows
 
 `GameLibrary` merges Steam, Epic, and independent Ubisoft results. If one provider throws while its metadata is being rewritten, its prior saved cards are retained while other providers can still update. A successful scan that no longer contains a game removes its card.
 
+When a launcher omits installed-size metadata (including Epic's Ubisoft-managed Brawlhalla), discovery sums regular-file lengths in the game folder without following symbolic links. This runs in the background snapshot and caches complete measurements for up to five minutes; **Refresh Library / ⌘R** requests a fresh measurement. Incomplete, failed, or bounded-out scans remain unavailable rather than displaying a partial total. Cards retain the size during a tracked launch, and properties distinguish an unavailable size from zero bytes. These values describe installed file lengths, not APFS physical allocation or shared launcher storage.
+
 Automatic refresh runs every eight seconds while the Mac app is active and not busy. Manual refresh is available through the interface and ⌘R. Discovery and database work run away from the UI actor; equal snapshots are not reassigned.
 
 ## 7. What happens when you press Play

@@ -81,12 +81,19 @@ public struct EpicDiscovery: Sendable {
 
 /// A transient rewrite in one launcher must not erase the other store's library.
 public enum GameLibrary {
-    public static func discover(environment: ManagedEnvironment, prefix: URL, previous: [GameInstallation] = []) -> [GameInstallation] {
+    public static func discover(environment: ManagedEnvironment, prefix: URL, previous: [GameInstallation] = [], refreshSizes: Bool = false) -> [GameInstallation] {
         let steam = (try? SteamDiscovery().discover(environment: environment, prefix: prefix)) ?? previous.filter { $0.store == .steam && $0.environmentID == environment.id }
         let epic = (try? EpicDiscovery().discover(environment: environment, prefix: prefix)) ?? previous.filter { $0.store == .epic && $0.environmentID == environment.id }
         let ubisoft = (try? UbisoftDiscovery().discover(environment: environment, prefix: prefix)) ?? previous.filter { $0.store == .ubisoft && $0.environmentID == environment.id }
         let partners = ubisoft.filter { partner in !epic.contains { URL(fileURLWithPath: $0.directory).standardizedFileURL == URL(fileURLWithPath: partner.directory).standardizedFileURL } }
-        return (steam + epic + partners).sorted {
+        return (steam + epic + partners).map { installation in
+            var game = installation
+            if game.sizeBytes <= 0,
+               let bytes = GameInstallationSize.shared.size(in: URL(fileURLWithPath: game.directory), refresh: refreshSizes) {
+                game.sizeBytes = bytes
+            }
+            return game
+        }.sorted {
             let order = $0.name.localizedCaseInsensitiveCompare($1.name)
             return order == .orderedSame ? $0.id < $1.id : order == .orderedAscending
         }

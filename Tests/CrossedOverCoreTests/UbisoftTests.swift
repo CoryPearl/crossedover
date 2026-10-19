@@ -12,7 +12,8 @@ import Testing
         try Data().write(to: launcher)
         let folder = launcher.deletingLastPathComponent().appendingPathComponent("games/Brawlhalla")
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("icons"), withIntermediateDirectories: true)
-        try Data().write(to: folder.appendingPathComponent("Brawlhalla.exe"))
+        try Data(repeating: 1, count: 1024).write(to: folder.appendingPathComponent("Brawlhalla.exe"))
+        try Data(repeating: 2, count: 2048).write(to: folder.appendingPathComponent("icons/game-data.bin"))
         try Data().write(to: folder.appendingPathComponent("icons/desktop128.png"))
         let registry = #"""
         WINE REGISTRY Version 2
@@ -42,6 +43,7 @@ import Testing
         let epic = try #require(merged.first)
         #expect(epic.source == .epic); #expect(epic.epicPartnerGameID == "16382")
         #expect(epic.directory == game.directory)
+        #expect(epic.sizeBytes == 3072)
         #expect(try EpicService.launchURI(for: epic) == "com.epicgames.launcher://apps/epic-ns%3Aepic-item%3Aepic-brawl?action=launch&silent=false")
         // Epic cards must preserve Epic's entitlement and partner handoff;
         // a bare Ubisoft URL opened the client without starting Brawlhalla.
