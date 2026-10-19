@@ -38,6 +38,27 @@ import Testing
         #expect(restored.runtimeID == runtime.id)
         #expect(try String(contentsOf: save, encoding: .utf8) == "original save")
     }
+    @Test func manualBackupRestoresExecutableCardsAndLegacyBackupClearsThem() async throws {
+        let (paths, store, environment, runtime) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        let app = WindowsApp(environmentID: environment.id, name: "Saved app", category: .apps, executablePath: "drive_c/App/app.exe")
+        try store.put(app, kind: "windowsApp", id: app.id.uuidString)
+        let manager = EnvironmentManager(paths: paths, store: store)
+        let backup = try await manager.backup(environment, runtime: runtime)
+        try store.remove(kind: "windowsApp", id: app.id.uuidString)
+        let later = WindowsApp(environmentID: environment.id, name: "Newer game", category: .games, executablePath: "drive_c/new.exe")
+        try store.put(later, kind: "windowsApp", id: later.id.uuidString)
+        _ = try await manager.restore(backup, current: environment, runtimeManager: RuntimeManager(paths: paths))
+        #expect(try store.all(WindowsApp.self, kind: "windowsApp") == [app])
+        // A malformed metadata file must leave current files and cards intact.
+        var escaping = app; escaping.executablePath = "drive_c/../../escape.exe"
+        try JSONEncoder().encode([escaping]).write(to: backup.appendingPathComponent("windows-apps.json"))
+        await #expect(throws: (any Error).self) { try await manager.restore(backup, current: environment, runtimeManager: RuntimeManager(paths: paths)) }
+        #expect(try store.all(WindowsApp.self, kind: "windowsApp") == [app])
+        try FileManager.default.removeItem(at: backup.appendingPathComponent("windows-apps.json"))
+        _ = try await manager.restore(backup, current: environment, runtimeManager: RuntimeManager(paths: paths))
+        #expect(try store.all(WindowsApp.self, kind: "windowsApp").isEmpty)
+    }
     @Test func failedUpgradePreservesFilesRequiresRepairAndDoesNotBackUp() async throws {
         let (paths, store, environment, runtime) = try fixture()
         defer { try? FileManager.default.removeItem(at: paths.root) }

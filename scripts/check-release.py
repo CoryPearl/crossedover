@@ -45,7 +45,7 @@ for path, page in pages.items():
         if url.fragment and target.suffix == ".html":
             assert unquote(url.fragment) in pages[target].ids, f"Missing fragment: {link}"
 
-for name in ("library.png", "list.png"):
+for name in ("library.png", "list.png", "apps.png"):
     data = (site / "assets" / name).read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n", f"Invalid PNG: {name}"
     assert struct.unpack(">II", data[16:24]) == (2200, 1520), f"Unexpected image size: {name}"

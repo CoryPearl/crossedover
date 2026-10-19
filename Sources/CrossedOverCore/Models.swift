@@ -15,7 +15,7 @@ public enum GraphicsProfile: String, Codable, CaseIterable, Sendable, Identifiab
         switch self {
         case .legacy: "Uses OpenGL for older DirectX 9 games. Try this compatibility fallback if Performance has rendering problems."
         case .performance: "Translates DirectX 9 through DXVK and Metal. Recommended for TrackMania Nations Forever and other compatible older games."
-        case .metal: "Translates DirectX 10 and 11 directly to Metal with DXMT. Used by CS2; support and performance vary by game."
+        case .metal: "Translates DirectX 10 and 11 directly to Metal with DXMT. Used by CS2; support and performance vary by app or game."
         }
     }
     public var subtitle: String {
@@ -75,7 +75,7 @@ public struct ManagedEnvironment: Codable, Sendable, Identifiable, Equatable {
     public var createdAt: Date
     public var state: String
     public init(runtimeID: String) {
-        id = UUID(); name = "Steam"; self.runtimeID = runtimeID; profile = .legacy; createdAt = Date(); state = "creating"
+        id = UUID(); name = "Windows"; self.runtimeID = runtimeID; profile = .legacy; createdAt = Date(); state = "creating"
     }
 }
 

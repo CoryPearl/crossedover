@@ -63,7 +63,7 @@ public actor EnvironmentManager {
     public let store: Store
     public init(paths: AppPaths, store: Store) { self.paths = paths; self.store = store }
     public func create(runtime: InstalledRuntime) async throws -> ManagedEnvironment {
-        guard try store.all(ManagedEnvironment.self, kind: "environment").isEmpty else { throw CrossedOverError.message("Version 1 manages one Steam environment. Repair or restore the existing environment instead.") }
+        guard try store.all(ManagedEnvironment.self, kind: "environment").isEmpty else { throw CrossedOverError.message("crossedover manages one shared Windows environment. Repair or restore the existing environment instead.") }
         var environment = ManagedEnvironment(runtimeID: runtime.id)
         if runtime.manifest.profiles.contains(.performance) { environment.profile = .performance }
         let prefix = paths.prefix(environment)
@@ -137,8 +137,8 @@ public actor EnvironmentManager {
     public func requireStopped(_ environment: ManagedEnvironment, runtime: InstalledRuntime) async throws {
         do {
             let result = try await ProcessRunner.run(runtime.wineserver, arguments: ["-w"], environment: WineConfiguration.environment(runtime: runtime, prefix: paths.prefix(environment), profile: environment.profile), timeout: 3)
-            guard result.status == 0 else { throw CrossedOverError.message("Stop Windows Steam and its games before modifying the environment.") }
-        } catch { throw CrossedOverError.message("Stop Windows Steam and its games before modifying the environment.") }
+            guard result.status == 0 else { throw CrossedOverError.message("Close Steam, games, and Windows apps before modifying the environment.") }
+        } catch { throw CrossedOverError.message("Close Steam, games, and Windows apps before modifying the environment.") }
     }
     public func setProfile(_ profile: GraphicsProfile, environment: ManagedEnvironment, runtime: InstalledRuntime) async throws -> ManagedEnvironment {
         guard runtime.manifest.profiles.contains(profile) else { throw CrossedOverError.message("This runtime does not include \(profile.title). Import a runtime that advertises this capability.") }
@@ -169,6 +169,8 @@ public actor EnvironmentManager {
             let result = try await ProcessRunner.run(URL(fileURLWithPath: "/bin/cp"), arguments: ["-cR", paths.prefix(environment).path, destination.appendingPathComponent("prefix").path], timeout: 1800)
             guard result.status == 0 else { throw CrossedOverError.message("Backup failed: \(result.output)") }
             try JSONEncoder().encode(environment).write(to: destination.appendingPathComponent("environment.json"), options: .atomic)
+            let apps = try store.all(WindowsApp.self, kind: "windowsApp").filter { $0.environmentID == environment.id }
+            try JSONEncoder().encode(apps).write(to: destination.appendingPathComponent("windows-apps.json"), options: .atomic)
             return destination
         } catch { try? FileManager.default.removeItem(at: destination); throw error }
     }
@@ -196,13 +198,21 @@ public actor EnvironmentManager {
             _ = try? await ProcessRunner.run(replacement.wineserver, arguments: ["-k"], environment: WineConfiguration.environment(runtime: replacement, prefix: prefix, profile: updated.profile), timeout: 15)
             // An in-place Wine update may have changed registry files. Preserve the
             // prefix and block launches until repair or an explicit manual restore.
-            throw CrossedOverError.message("Runtime upgrade failed. Your files are still in the environment, but it needs repair before Steam can launch. Restore a manual backup if you have one, or use Repair. No automatic backup was created.")
+            throw CrossedOverError.message("Runtime upgrade failed. Your files are still in the environment, but it needs repair before Windows software can launch. Restore a manual backup if you have one, or use Repair. No automatic backup was created.")
         }
     }
     public func restore(_ backup: URL, current: ManagedEnvironment, runtimeManager: RuntimeManager) async throws -> ManagedEnvironment {
         guard backup.deletingLastPathComponent().standardizedFileURL == paths.backups.standardizedFileURL else { throw CrossedOverError.message("Select a managed backup.") }
         let saved = try JSONDecoder().decode(ManagedEnvironment.self, from: Data(contentsOf: backup.appendingPathComponent("environment.json")))
         guard saved.id == current.id else { throw CrossedOverError.message("This backup belongs to a different environment.") }
+        let appMetadata = backup.appendingPathComponent("windows-apps.json")
+        // Backups made before v1.1.0 contain no imported executable cards.
+        let apps = FileManager.default.fileExists(atPath: appMetadata.path)
+            ? try JSONDecoder().decode([WindowsApp].self, from: Data(contentsOf: appMetadata)) : []
+        guard apps.allSatisfy({ $0.environmentID == saved.id && $0.executablePath.hasPrefix("drive_c/") }), Set(apps.map(\.id)).count == apps.count else {
+            throw CrossedOverError.message("The backup contains invalid Windows app cards.")
+        }
+        for app in apps { _ = try FileSafety.containedURL(app.executablePath, in: backup.appendingPathComponent("prefix")) }
         let currentRuntime = try await runtimeManager.resolve(current.runtimeID)
         _ = try await runtimeManager.resolve(saved.runtimeID)
         let prefix = paths.prefix(current), lock = try EnvironmentLock(prefix: paths.prefix(current))
@@ -216,7 +226,7 @@ public actor EnvironmentManager {
         try FileManager.default.moveItem(at: prefix, to: previous)
         do {
             try FileManager.default.moveItem(at: stage, to: prefix)
-            try store.put(saved, kind: "environment", id: saved.id.uuidString)
+            try store.restoreEnvironment(saved, apps: apps)
         } catch {
             try? FileManager.default.removeItem(at: prefix); try? FileManager.default.moveItem(at: previous, to: prefix); throw error
         }

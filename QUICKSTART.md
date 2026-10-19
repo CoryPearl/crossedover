@@ -1,14 +1,14 @@
-# crossedover v1.0.0 quickstart
+# crossedover v1.1.0 quickstart
 
 ## Before you start
 
-You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, an internet connection, and your own Steam account. Allow **8 GiB free for setup, plus space for your games**.
+You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, an internet connection for setup. A Steam account is needed only for Steam games. Allow **8 GiB free for setup, plus space for apps and games**.
 
-Compatibility is experimental. TrackMania Nations Forever is the first tested demo, CS2 is experimental, and other games are untested. A version number does not certify every game or sustained performance.
+Compatibility is experimental. TrackMania Nations Forever is the first tested demo, CS2 is experimental, and compatibility with other games and apps varies. A version number does not certify every game or sustained performance.
 
 ## Install
 
-1. Download **crossedover-1.0.0.dmg** from the [v1.0.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.0.0-build.21).
+1. Download **crossedover-1.1.0.dmg** from the [v1.1.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.1.0).
 2. Open it and drag **crossedover** onto **Applications**.
 3. Eject the disk image and open crossedover from Applications.
 
@@ -17,6 +17,25 @@ Compatibility is experimental. TrackMania Nations Forever is the first tested de
 The release is locally signed and **not notarized by Apple**. If macOS blocks it and you trust the download, try opening it once, then use **System Settings → Privacy & Security → Open Anyway**. Confirm the app name before continuing. See [Apple's instructions](https://support.apple.com/en-us/102445). Do not disable Gatekeeper system-wide.
 
 If macOS offers to install Rosetta 2, follow Apple's prompt.
+
+## Games and Apps
+
+**Games** contains your completed Windows Steam installs and Windows game cards you add yourself. **Apps** contains tools, mod managers, installers, and other Windows software. Both libraries support search (⌘F), refresh (⌘R), and grid/list views.
+
+## Add a Windows .exe
+
+1. Choose **Add .exe** (⌘O), then select a local x86 or x64 Windows executable.
+2. Give it a name and choose **Games** or **Apps**.
+3. Enable **Include files from the containing folder** if it needs nearby DLLs, assets, or installer data. Extract archives first and select a folder containing only that app.
+4. Choose **Add to library**, then **Run** (Apps) or **Play** (Games) on its card. Steam is not required; the included runtime is prepared on the first import.
+
+Files outside the Windows environment are copied into its `C:\crossedover\Apps` folder. Your source files stay in place. Executables already inside its C: drive are used in place. Nothing is uploaded. Apps run with your Mac user permissions: add software you trust. Windows ARM executables, DLLs, and incomplete downloads are rejected; accepting a file does not certify compatibility.
+
+**Installers:** run the installer card and finish its Windows setup. Then choose **⋯ → Edit app / choose executable → Choose** and select the installed program under the Windows C: drive (usually Program Files). Save the card; subsequent launches open the program instead of its installer.
+
+The imported card’s **⋯** menu lets you rename it, change its executable, move it between Games and Apps, show files, inspect its launch log, or remove it from the library. **Remove from library** keeps files and installed software. To uninstall installed Windows software, run its supplied uninstaller from the C: drive; delete unused portable app folders in Finder only after closing Windows apps. Full removal through **Settings → Uninstall crossedover** includes all managed imported files and installed apps. Your original source files outside the environment stay on your Mac.
+
+Apps share one Windows environment and its graphics profile with Steam games. Close Windows software before changing profiles. Extra frameworks, DLL overrides, drivers, anti-cheat, and some launchers may need setup or be unsupported. Use **Show launch log** if a launch fails.
 
 ## Set up Steam
 
@@ -28,7 +47,7 @@ Your native Mac Steam installation stays separate. No Steam account, game files,
 
 ## Play and manage
 
-Completed installs appear automatically. Press **⌘R** to refresh and **⌘F** to search. The grid/list selector remembers your preference.
+Completed Steam installs appear automatically in **Games**. Press **⌘R** to refresh and **⌘F** to search. The grid/list selector remembers your preference.
 
 Press **Play** to launch. If a known game's graphics profile needs to change, close your current game and accept the Steam restart.
 
@@ -40,7 +59,7 @@ Graphics profiles are explained in Settings:
 - **Performance:** DXVK and Metal for DirectX 9; recommended for TrackMania Nations Forever.
 - **Metal:** DXMT for DirectX 10–11; used by CS2. Compatibility varies by game.
 
-Quit Steam and all games before changing profiles. TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
+Quit Steam, games, and Windows apps before changing profiles. TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
 
 ## Mods
 
@@ -50,29 +69,29 @@ Games keep their normal Windows files, so manual mods can be installed in the lo
 - **Steam:** open the game's **Properties → Installed Files → Browse**. This uses the runtime's Windows file explorer for the same installed game. Use crossedover's Finder action if you prefer.
 - **Steam Workshop:** for games that support it, subscribe to items in Windows Steam, let downloads finish, and enable them in the game if needed. [Valve's Workshop guide](https://partner.steamgames.com/doc/features/workshop/implementation) explains how subscriptions are delivered.
 
-Mod compatibility depends on the game and mod. Windows mod managers, script extenders, DLL overrides, and additional frameworks may need separate Wine setup; crossedover does not currently install or configure them. Steam updates and verification can replace modified files. Save a copy of files you replace yourself; crossedover does not make automatic full backups.
+Mod compatibility depends on the game and mod. Windows mod managers, script extenders, DLL overrides, and additional frameworks may need separate Wine setup; you can add their .exe as an App card, but crossedover does not automatically configure their extra dependencies. Steam updates and verification can replace modified files. Save a copy of files you replace yourself; crossedover does not make automatic full backups.
 
 The managed Steam host is labelled **crossedover Steam** in macOS. For an older installation, quit Windows Steam and all games, then choose **Settings → Advanced → Use included runtime** after updating the app. Reopen Steam to apply the label. Game names and descriptive Steam dialog titles are retained.
 
 ## Your files
 
-The app is in **/Applications/crossedover.app**. Games, Windows Steam, runtimes, saves, and environment backups live separately under:
+The app is in **/Applications/crossedover.app**. Games, imported apps, Windows Steam, runtimes, saves, and environment backups live separately under:
 
 ~~~text
 ~/Library/Application Support/CrossedOver/
 ~~~
 
-Use **Open download folder** to browse installed games, or **⋯ → Show game files** for one game. Full environment backups are **manual only** and include all installed games. Small copies of settings changed by crossedover are kept for recovery. Use **Settings → Clear backups** to move old full backups to Trash; your current games and saves stay in place. Empty Trash in Finder to reclaim space (APFS clones can share blocks).
+Use **Open download folder** to browse installed games, or **⋯ → Show game files** for one game. Full environment backups are **manual only** and include all installed games, apps, and imported cards. Restoring a pre-v1.1.0 backup clears imported cards because that version did not have them. Small copies of settings changed by crossedover are kept for recovery. Use **Settings → Clear backups** to move old full backups to Trash; your current games and saves stay in place. Empty Trash in Finder to reclaim space (APFS clones can share blocks).
 
 ### Uninstall everything
 
-Quit Steam and all games, then choose **Settings → Uninstall crossedover → Uninstall app and data**. This moves the app, its Windows Steam client, runtimes, managed games, local saves, and backups to Trash, clears app preferences, and quits. Empty Trash to reclaim storage. Export any local saves you want to keep first. Your separate Mac Steam installation is unaffected.
+Quit Steam, games, and Windows apps, then choose **Settings → Uninstall crossedover → Uninstall app and data**. This moves the app, its Windows Steam client, runtimes, managed games and apps, local saves, and backups to Trash, clears app preferences, and quits. Empty Trash to reclaim storage. Export any local saves you want to keep first. Your separate Mac Steam installation is unaffected.
 
 Dragging just crossedover.app to Trash does **not** remove `~/Library/Application Support/CrossedOver/`. Use the in-app uninstaller for complete removal. Custom data locations and apps opened from a read-only DMG must be managed in Finder.
 
 ## Coming soon
 
-More than Steam games is coming soon: other games, launchers, and platforms are planned. v1.0.0 focuses on Windows Steam.
+v1.1.0 adds local Windows .exe cards alongside our Steam game library. Support for more launchers and platforms, easier dependency setup, and broader app compatibility is coming soon.
 
 ## Need a hand?
 

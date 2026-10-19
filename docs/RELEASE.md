@@ -1,6 +1,6 @@
 # Public release gates
 
-v1.0.0 is being packaged for private evaluation. It is locally signed and is not a certified game-compatibility or notarized public release. The following public-release gates remain open.
+v1.1.0 is being packaged for private evaluation. It is locally signed and is not a certified game-compatibility or notarized public release. The following public-release gates remain open.
 
 - [ ] Independent source-complete runtime and dependency builds.
 - [ ] Every runtime component's license, source, notices, and SBOM delivered.

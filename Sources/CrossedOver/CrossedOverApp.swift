@@ -15,6 +15,11 @@ import CrossedOverCore
                 if let environment = model.environment {
                     model.games = try SteamDiscovery().discover(environment: environment, prefix: model.paths.prefix(environment))
                 }
+                model.windowsApps = try model.store.all(WindowsApp.self, kind: "windowsApp")
+                model.windowsRuns = try model.store.all(WindowsAppRun.self, kind: "windowsRun").sorted { $0.startedAt > $1.startedAt }
+                if let fixture = CommandLine.arguments.firstIndex(of: "--preview-apps"), fixture + 1 < CommandLine.arguments.count {
+                    model.windowsApps = try JSONDecoder().decode([WindowsApp].self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[fixture + 1])))
+                }
                 model.updateSteamLocation()
                 model.operations = try model.store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
                 model.sessions = try model.store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
@@ -75,7 +80,7 @@ struct CrossedOverApp: App {
                 .preferredColorScheme(.dark)
                 .task { await model.start() }
             } else {
-                ContentUnavailableView("Couldn't open your game library", systemImage: "externaldrive.badge.exclamationmark", description: Text(startupError ?? "The local data directory could not be opened. Your existing files have not been removed."))
+                ContentUnavailableView("Couldn't open your library", systemImage: "externaldrive.badge.exclamationmark", description: Text(startupError ?? "The local data directory could not be opened. Your existing files have not been removed."))
                     .frame(width: 700, height: 420).preferredColorScheme(.dark)
             }
         }
@@ -88,7 +93,7 @@ struct CrossedOverApp: App {
             }
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .textEditing) {
-                Button("Find Game…") { librarySearch?() }.keyboardShortcut("f").disabled(librarySearch == nil)
+                Button("Search Library…") { librarySearch?() }.keyboardShortcut("f").disabled(librarySearch == nil)
             }
             CommandMenu("Steam") {
                 Button("Open Windows Steam") { model?.openSteam() }.keyboardShortcut("s", modifiers: [.command, .shift]).disabled(model == nil || model?.busy == true)

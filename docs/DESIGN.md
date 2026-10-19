@@ -1,16 +1,16 @@
 # Interface
 
-crossedover uses a monochrome shell with original game artwork. Keep the library quiet: installed games, one primary action per game, and ample room around the content. TrackMania remains the first tested demo; other games are labeled with untested compatibility.
+crossedover uses a monochrome shell with original game artwork. Keep the libraries quiet: games and Windows apps, one primary action per card, and ample room around the content. TrackMania remains the first tested demo; other games are labeled with untested compatibility.
 
 ## Layout
 
-The 196-point sidebar owns navigation and the Windows Steam launcher. The main pane uses 32-point side gutters; the library, page heading, and rules expand with the window. Settings forms retain a 940-point reading width. Native window controls retain their own space above the sidebar wordmark.
+The 196-point sidebar owns Games, Apps, Settings, and Activity navigation plus the Windows Steam launcher. The main pane uses 32-point side gutters; the library, page heading, and rules expand with the window. Settings forms retain a 940-point reading width. Native window controls retain their own space above the sidebar wordmark.
 
 Game cards separate 112-point artwork and compact game details from their action footers. All installed games, including a single title, use the same adaptive grid with columns between 250 and 320 points and 16-point gaps. More columns fit as the window expands; cards do not become oversized. List mode uses compact artwork, a title, session/storage details, and trailing controls in 88-point rows. Play is the filled primary button; the outlined ellipsis menu retains properties, file access, verification, and uninstall. Steam stays in the sidebar. Only the active game displays its session status.
 
 Settings uses bordered groups with consistent rows and trailing controls. Recovery and runtime tools stay in Advanced. Activity uses separated rows. Notices and progress appear at the bottom of the main pane, outside the scrolling content.
 
-The library toolbar provides live title search and a grid/list selector. Search ignores case, accents, and surrounding whitespace. The clear button and Escape clear the query; Command-F focuses search from any page. Clicking elsewhere in the app window dismisses search focus without clearing its text or consuming the click. A no-results state preserves the toolbar and offers Clear search. The view preference persists across launches; filtering does not change game discovery or session tracking.
+Each library toolbar provides live title search and a grid/list selector. Search ignores case, accents, and surrounding whitespace. The clear button and Escape clear the query; Command-F focuses search from any page. Clicking elsewhere in the app window dismisses search focus without clearing its text or consuming the click. A no-results state preserves the toolbar and offers Clear search. The view preference persists across launches; filtering does not change game discovery or session tracking.
 
 ## Visual rules
 
@@ -46,3 +46,10 @@ Build 13 uses an original vector branch mark with two outward diagonal arrowhead
 ## Wordmark
 
 Use **crossedover**, all lowercase, as one word in product-facing text, the app display name, and distribution filenames. The wordmark uses the existing compact semibold typography and branch icon. Internal executable, bundle, and data identifiers keep their established names.
+
+
+## Windows apps
+
+v1.1.0 keeps Steam as a specialty while adding local .exe cards in either library. Games uses Play; Apps uses Run. Add .exe is a small outlined header action (⌘O). The import sheet has a name, Games/Apps selector, executable path, and explicit containing-folder option. Its copy explains local storage, shared user permissions, and the installer-to-program workflow. Imported cards reuse the grid dimensions and monochrome fallback artwork. The menu supports editing the executable/name, moving libraries, files, launch logs, and card removal. Failed launches show a short persisted explanation on the card. Native Steam controls remain separate.
+
+`--preview-apps /path/to/fixture.json` supplies `WindowsApp` values; `--preview-page apps` checks the Apps library without running Windows software.

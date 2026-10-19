@@ -28,6 +28,8 @@ struct ContentView: View {
     @State private var pendingRuntime: InstalledRuntime?
     @State private var pendingIncludedRuntime = false
     @State private var moddingGame: GameInstallation?
+    @State private var executableDraft: WindowsAppDraft?
+    @State private var removingApp: WindowsApp?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -48,7 +50,7 @@ struct ContentView: View {
         .foregroundStyle(Palette.ink).background(Palette.canvas).tint(Palette.ink)
         .ignoresSafeArea(.container, edges: .top)
         .focusedSceneValue(\.librarySearch, {
-            model.selectedPage = "library"
+            if !["library", "apps"].contains(model.selectedPage) { model.selectedPage = "library" }
             searchFocused = true
         })
         .alert("Couldn't complete the action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
@@ -62,24 +64,31 @@ struct ContentView: View {
         .confirmationDialog("Force quit the Windows environment?", isPresented: $forceStopConfirmation, titleVisibility: .visible) {
             Button("Force quit", role: .destructive) { model.stop(force: true) }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("Unsaved game progress may be lost.") }
+        } message: { Text("Unsaved work and game progress may be lost.") }
         .confirmationDialog("Move all environment backups to Trash?", isPresented: $clearBackupsConfirmation, titleVisibility: .visible) {
             Button("Move backups to Trash", role: .destructive) { model.clearBackups() }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Your installed games and current saves stay in place. Backups remain in Trash until you empty it in Finder.") }
-        .confirmationDialog("Uninstall crossedover and all its games?", isPresented: $uninstallConfirmation, titleVisibility: .visible) {
+        .confirmationDialog("Uninstall crossedover and all its data?", isPresented: $uninstallConfirmation, titleVisibility: .visible) {
             Button("Uninstall app and data", role: .destructive) { model.uninstallApplication() }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("Quit Steam and all games first. This moves crossedover, its Windows Steam client, every managed game, local saves, runtimes, and backups to Trash, then quits. Empty Trash to reclaim space. Your separate Mac Steam library stays in place.") }
+        } message: { Text("Quit Steam, games, and Windows apps first. This moves crossedover, its Windows Steam client, every managed game and Windows app, local saves, runtimes, and backups to Trash, then quits. Empty Trash to reclaim space. Your separate Mac Steam library stays in place.") }
         .confirmationDialog("Create a full manual backup?", isPresented: $manualBackupConfirmation, titleVisibility: .visible) {
             Button("Create backup") { model.backup() }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("This copies the entire Windows environment, including all games and local saves, and can take substantial disk space. No backups are created automatically.") }
+        } message: { Text("This copies the entire Windows environment, including all games, apps, and local saves, and can take substantial disk space. No backups are created automatically.") }
         .confirmationDialog("Change the Windows runtime?", isPresented: Binding(get: { pendingRuntime != nil || pendingIncludedRuntime }, set: { if !$0 { pendingRuntime = nil; pendingIncludedRuntime = false } }), titleVisibility: .visible) {
             if let runtime = pendingRuntime { Button("Change runtime") { pendingRuntime = nil; model.useRuntime(runtime) } }
             if pendingIncludedRuntime { Button("Use included runtime") { pendingIncludedRuntime = false; model.useIncludedRuntime() } }
             Button("Cancel", role: .cancel) { pendingRuntime = nil; pendingIncludedRuntime = false }
-        } message: { Text("Quit Steam and all games first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Advanced before continuing.") }
+        } message: { Text("Quit Steam, games, and Windows apps first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Advanced before continuing.") }
+        .confirmationDialog("Remove this card from your library?", isPresented: Binding(get: { removingApp != nil }, set: { if !$0 { removingApp = nil } }), titleVisibility: .visible) {
+            if let app = removingApp { Button("Remove card", role: .destructive) { model.removeWindowsApp(app); removingApp = nil } }
+            Button("Cancel", role: .cancel) { removingApp = nil }
+        } message: { Text("The app’s files and installed software stay in the Windows environment. Removing a card does not uninstall the program.") }
+        .sheet(item: $executableDraft) { draft in
+            WindowsAppEditor(model: model, draft: draft) { executableDraft = nil }
+        }
         .sheet(item: $moddingGame) { game in modding(game) }
         .sheet(isPresented: Binding(get: { model.diagnostics != nil }, set: { if !$0 { model.diagnostics = nil } })) { diagnostics }
     }
@@ -91,7 +100,8 @@ struct ContentView: View {
                 Text("crossedover").font(.system(size: 14, weight: .semibold)).tracking(-0.25)
             }.padding(.horizontal, 20).padding(.top, 54).padding(.bottom, 36)
             VStack(spacing: 5) {
-                navigation("Library", icon: "square.grid.2x2", page: "library")
+                navigation("Games", icon: "gamecontroller", page: "library")
+                navigation("Apps", icon: "square.grid.2x2", page: "apps")
                 navigation("Settings", icon: "slider.horizontal.3", page: "settings")
             }.padding(.horizontal, 12)
             Spacer(minLength: 36)
@@ -135,6 +145,8 @@ struct ContentView: View {
             case "activity": activity
             case "mods" where renderingSnapshot:
                 if let game = model.games.first { modding(game) }
+            case "import" where renderingSnapshot:
+                WindowsAppEditor(model: model, draft: WindowsAppDraft(url: URL(fileURLWithPath: "/Users/you/Downloads/Windows App/app.exe"), category: .apps), renderingSnapshot: true, dismiss: {})
             default: library
             }
         }.padding(.horizontal, 32).padding(.top, 46).padding(.bottom, 40)
@@ -145,13 +157,16 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 22) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(model.selectedPage == "settings" ? "Settings" : model.selectedPage == "activity" ? "Activity" : "Library")
+                    Text(model.selectedPage == "settings" ? "Settings" : model.selectedPage == "activity" ? "Activity" : appsPage ? "Apps" : "Games")
                         .font(.system(size: 25, weight: .medium)).tracking(-0.6).accessibilityAddTraits(.isHeader)
-                    Text(model.selectedPage == "settings" ? "Steam and game preferences." : model.selectedPage == "activity" ? "Recent actions and game sessions." : "Your Windows games, on Mac.")
+                    Text(model.selectedPage == "settings" ? "Windows, Steam, and app preferences." : model.selectedPage == "activity" ? "Recent actions and sessions." : appsPage ? "Your Windows apps, on Mac." : "Steam favorites and Windows games, together.")
                         .font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
                 Spacer()
-                if model.selectedPage == "library" {
+                if ["library", "apps"].contains(model.selectedPage) {
+                    Button { beginImport() } label: { Label("Add .exe", systemImage: "plus") }
+                        .buttonStyle(SecondaryButton()).disabled(model.busy).keyboardShortcut("o")
+                        .help("Add a Windows app or game (⌘O)")
                     Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 12) }
                         .buttonStyle(SecondaryButton()).disabled(model.busy).help("Refresh library (⌘R)").accessibilityLabel("Refresh library")
                 }
@@ -160,38 +175,57 @@ struct ContentView: View {
         }
     }
 
+    private var appsPage: Bool { model.selectedPage == "apps" }
+    private var importedApps: [WindowsApp] { model.windowsApps.filter { $0.category == (appsPage ? .apps : .games) } }
+    private var filteredApps: [WindowsApp] { query.isEmpty ? importedApps : importedApps.filter { $0.name.localizedStandardContains(query) } }
+    private var query: String { (previewSearch ?? searchText).trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var showingList: Bool { (previewLibraryMode ?? libraryPresentation) == "list" }
+    private var filteredGames: [GameInstallation] {
+        appsPage ? [] : query.isEmpty ? model.games : model.games.filter { $0.name.localizedStandardContains(query) }
+    }
+    private var totalCount: Int { importedApps.count + (appsPage ? 0 : model.games.count) }
+    private var libraryCount: String {
+        let count = filteredGames.count + filteredApps.count, noun = appsPage ? "APPS" : "GAMES"
+        return query.isEmpty ? "\(count) \(noun)" : "\(count) OF \(totalCount) \(noun)"
+    }
     private var library: some View {
-        let games = filteredGames
+        let games = filteredGames, apps = filteredApps
         return VStack(alignment: .leading, spacing: 18) {
             libraryToolbar
-            sectionLabel(model.games.isEmpty ? "GET STARTED" : "INSTALLED GAMES",
-                         trailing: model.games.isEmpty ? nil : libraryCount)
-            if model.games.isEmpty {
-                gameCard(nil).frame(maxWidth: 320)
-                if model.steamInstalled {
-                    Text("Games installed through Windows Steam appear here automatically.")
+            sectionLabel(totalCount == 0 ? "GET STARTED" : appsPage ? "YOUR APPS" : "YOUR GAMES", trailing: totalCount == 0 ? nil : libraryCount)
+            if totalCount == 0 && query.isEmpty {
+                if appsPage {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Image(systemName: "app.dashed").font(.system(size: 30, weight: .ultraLight)).foregroundStyle(Palette.muted)
+                        Text("Bring a Windows app.").font(.system(size: 18, weight: .medium))
+                        Text("Add an .exe to keep it here. Run it whenever you need it, with no Steam account required.")
+                            .font(.system(size: 12)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        Button("Add Windows app…") { beginImport() }.buttonStyle(PrimaryButton()).disabled(model.busy)
+                    }.padding(28).frame(maxWidth: 420, alignment: .leading).panel()
+                } else {
+                    gameCard(nil).frame(maxWidth: 320)
+                    Text("Steam installs appear automatically. Use Add .exe for games from elsewhere.")
                         .font(.system(size: 11)).foregroundStyle(Palette.muted)
                 }
-            } else if games.isEmpty {
+            } else if games.isEmpty && apps.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "magnifyingglass").font(.system(size: 24, weight: .light)).foregroundStyle(Palette.muted)
-                    Text("No games found").font(.system(size: 15, weight: .medium))
+                    Text(appsPage ? "No apps found" : "No games found").font(.system(size: 15, weight: .medium))
                     Text("No titles match “\(query)”.").font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
                     Button("Clear search") { searchText = ""; searchFocused = true }.buttonStyle(SecondaryButton())
                 }.padding(.vertical, 64).padding(.horizontal, 24).frame(maxWidth: .infinity)
             } else if showingList {
                 LazyVStack(spacing: 0) {
-                    ForEach(games) { game in
-                        gameRow(game)
-                        if game.id != games.last?.id { Rule().padding(.horizontal, 16) }
-                    }
+                    ForEach(games) { game in gameRow(game); if game.id != games.last?.id || !apps.isEmpty { Rule().padding(.horizontal, 16) } }
+                    ForEach(apps) { app in windowsAppRow(app); if app.id != apps.last?.id { Rule().padding(.horizontal, 16) } }
                 }.panel()
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 320), spacing: 16, alignment: .top)], alignment: .leading, spacing: 16) {
                     ForEach(games) { game in gameCard(game) }
+                    ForEach(apps) { app in windowsAppCard(app) }
                 }
             }
-            if let tracked = model.currentSession,
+            if !appsPage, let tracked = model.currentSession,
                !model.games.contains(where: { $0.appID == tracked.appID && $0.environmentID == tracked.environmentID }) {
                 HStack(spacing: 16) {
                     Text("The tracked game is no longer in this library.").font(.system(size: 11)).foregroundStyle(Palette.muted)
@@ -204,15 +238,90 @@ struct ContentView: View {
             }
         }
     }
-
-    private var query: String { (previewSearch ?? searchText).trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var showingList: Bool { (previewLibraryMode ?? libraryPresentation) == "list" }
-    private var filteredGames: [GameInstallation] {
-        query.isEmpty ? model.games : model.games.filter { $0.name.localizedStandardContains(query) }
+    private func beginImport(_ app: WindowsApp? = nil) {
+        if let app, let environment = model.environment {
+            let url = model.paths.prefix(environment).appendingPathComponent(app.executablePath)
+            executableDraft = WindowsAppDraft(url: url, category: app.category, app: app)
+        } else if let url = model.chooseWindowsExecutable() {
+            executableDraft = WindowsAppDraft(url: url, category: appsPage ? .apps : .games)
+        }
     }
-    private var libraryCount: String {
-        let count = filteredGames.count
-        return query.isEmpty ? "\(count) \(count == 1 ? "GAME" : "GAMES")" : "\(count) OF \(model.games.count) GAMES"
+    private func windowsAppState(_ app: WindowsApp) -> String {
+        switch model.latestRun(for: app)?.state {
+        case "requested": "Opening…"
+        case "running": "Running"
+        case "failed": "Last launch failed"
+        case "interrupted": "Launch interrupted"
+        default: "Ready"
+        }
+    }
+    private func windowsAppIcon(_ app: WindowsApp, compact: Bool = false) -> some View {
+        ZStack {
+            Palette.sidebar
+            Image(systemName: app.category == .games ? "gamecontroller" : "app")
+                .font(.system(size: compact ? 22 : 32, weight: .ultraLight)).foregroundStyle(Palette.muted)
+        }.accessibilityHidden(true)
+    }
+    private func windowsAppCard(_ app: WindowsApp) -> some View {
+        VStack(spacing: 0) {
+            windowsAppIcon(app).frame(height: 112)
+            Rule()
+            VStack(alignment: .leading, spacing: 10) {
+                Text("WINDOWS · .EXE").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
+                Text(app.name).font(.system(size: 17, weight: .medium)).tracking(-0.3).lineLimit(2).help(app.name)
+            }.frame(height: 66, alignment: .topLeading).frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            Rule()
+            HStack(spacing: 12) {
+                Text(windowsAppState(app)).font(.system(size: 11)).foregroundStyle(Palette.muted).lineLimit(1)
+                Spacer(minLength: 0)
+                windowsAppMenu(app)
+                windowsAppAction(app)
+            }.padding(.horizontal, 16).padding(.vertical, 14)
+            windowsAppFailure(app)
+        }.panel()
+    }
+    private func windowsAppRow(_ app: WindowsApp) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 16) {
+                windowsAppIcon(app, compact: true).frame(width: 88, height: 56).clipShape(RoundedRectangle(cornerRadius: 4))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(app.name).font(.system(size: 13, weight: .medium)).lineLimit(1).help(app.name)
+                    Text("Windows .exe · " + windowsAppState(app)).font(.system(size: 10)).foregroundStyle(Palette.muted)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) { windowsAppMenu(app); windowsAppAction(app) }.fixedSize()
+            }.padding(16)
+            windowsAppFailure(app)
+        }
+    }
+    @ViewBuilder private func windowsAppFailure(_ app: WindowsApp) -> some View {
+        if let run = model.latestRun(for: app), ["failed", "interrupted"].contains(run.state), let detail = run.detail {
+            Rule()
+            Text(detail).font(.system(size: 11)).foregroundStyle(Palette.muted).lineLimit(3).help(detail)
+                .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    private func windowsAppAction(_ app: WindowsApp) -> some View {
+        let run = model.latestRun(for: app)
+        return Button { model.runWindowsApp(app) } label: {
+            Label(run?.isActive == true ? (run?.state == "running" ? "Running" : "Opening") : app.category == .games ? "Play" : "Run", systemImage: "play.fill")
+                .lineLimit(1).fixedSize()
+        }.buttonStyle(PrimaryButton()).disabled(model.busy || run?.isActive == true).accessibilityLabel("Run " + app.name)
+    }
+    private func windowsAppMenu(_ app: WindowsApp) -> some View {
+        Group {
+            if renderingSnapshot { managementLabel(compact: true) }
+            else {
+                Menu {
+                    Button("Edit app / choose executable…") { beginImport(app) }.disabled(model.latestRun(for: app)?.isActive == true)
+                    Button("Show app files") { model.showWindowsAppFiles(app) }
+                    Button("Show launch log") { model.showWindowsAppLog(app) }
+                    Button(app.category == .games ? "Move to Apps" : "Move to Games") { model.moveWindowsApp(app, to: app.category == .games ? .apps : .games) }
+                    Divider()
+                    Button("Remove from library…", role: .destructive) { removingApp = app }.disabled(model.latestRun(for: app)?.isActive == true)
+                } label: { managementLabel(compact: true) }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().accessibilityLabel("Manage " + app.name)
+            }
+        }.disabled(model.busy)
     }
 
     private var libraryToolbar: some View {
@@ -220,11 +329,11 @@ struct ContentView: View {
             HStack(spacing: 9) {
                 Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Palette.muted)
                 if renderingSnapshot {
-                    Text(query.isEmpty ? "Search games" : query).foregroundStyle(query.isEmpty ? Palette.muted : Palette.ink)
+                    Text(query.isEmpty ? appsPage ? "Search apps" : "Search games" : query).foregroundStyle(query.isEmpty ? Palette.muted : Palette.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    TextField("Search games", text: $searchText).textFieldStyle(.plain)
-                        .focused($searchFocused).accessibilityLabel("Search games")
+                    TextField(appsPage ? "Search apps" : "Search games", text: $searchText).textFieldStyle(.plain)
+                        .focused($searchFocused).accessibilityLabel(appsPage ? "Search apps" : "Search games")
                         .onExitCommand { if searchText.isEmpty { searchFocused = false } else { searchText = "" } }
                 }
                 if !query.isEmpty {
@@ -439,9 +548,9 @@ struct ContentView: View {
     private var settings: some View {
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .leading, spacing: 12) {
-                sectionLabel("GAME EXPERIENCE")
+                sectionLabel("WINDOWS ENVIRONMENT")
                 VStack(alignment: .leading, spacing: 0) {
-                settingRow("Graphics", detail: "Quit Steam before changing the graphics profile.") {
+                settingRow("Graphics", detail: "Quit Steam and Windows apps before changing graphics.") {
                     Group {
                         if renderingSnapshot { menuLabel(model.environment?.profile.title ?? "Not set up") }
                         else {
@@ -463,6 +572,13 @@ struct ContentView: View {
                         }
                     }
                 }.padding(22)
+                }.panel()
+            }
+            if model.environment != nil {
+                VStack(spacing: 0) {
+                    settingRow("Windows C: drive", detail: "Installed apps, imported files, and Windows user folders.") {
+                        Button("Open in Finder") { model.showWindowsDrive() }.buttonStyle(SecondaryButton())
+                    }
                 }.panel()
             }
             VStack(alignment: .leading, spacing: 12) {
@@ -503,11 +619,11 @@ struct ContentView: View {
                 if advancedExpanded || previewAdvanced { Rule(); advanced.padding(22) }
             }.panel()
             VStack(alignment: .leading, spacing: 0) {
-                settingRow("Backups", detail: "Manual only. Full backups include every installed game.") {
+                settingRow("Backups", detail: "Manual only. Full backups include every installed game and app.") {
                     Button("Clear backups…") { clearBackupsConfirmation = true }.buttonStyle(SecondaryButton())
                 }
                 Rule().padding(.horizontal, 22)
-                settingRow("Uninstall crossedover", detail: "Remove the app, managed games, local saves, and app data.") {
+                settingRow("Uninstall crossedover", detail: "Remove crossedover, Windows apps, games, saves, and app data.") {
                     Button("Uninstall…") { uninstallConfirmation = true }.buttonStyle(SecondaryButton())
                 }
             }.panel().disabled(model.busy)
@@ -520,7 +636,7 @@ struct ContentView: View {
             if let environment = model.environment {
                 VStack(alignment: .leading, spacing: 12) {
                     detailHeading("Recovery")
-                    Text("Quit Steam and all games before backing up or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text("Quit Steam, games, and Windows apps before backing up or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { recoveryActions(environment) }
                         VStack(alignment: .leading, spacing: 8) { recoveryActions(environment) }
@@ -774,5 +890,102 @@ private struct TextButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 11)).foregroundStyle(Palette.ink.opacity(configuration.isPressed ? 0.5 : 0.75))
             .padding(.vertical, 5).contentShape(Rectangle()).opacity(enabled ? 1 : 0.35)
+    }
+}
+
+private struct WindowsAppDraft: Identifiable {
+    let id = UUID()
+    var url: URL
+    var category: LibraryCategory
+    var app: WindowsApp? = nil
+}
+
+private struct WindowsAppEditor: View {
+    @Bindable var model: AppModel
+    let draft: WindowsAppDraft
+    var renderingSnapshot = false
+    let dismiss: () -> Void
+    @State private var url: URL
+    @State private var name: String
+    @State private var category: LibraryCategory
+    @State private var includeFolder = false
+
+    init(model: AppModel, draft: WindowsAppDraft, renderingSnapshot: Bool = false, dismiss: @escaping () -> Void) {
+        self.model = model; self.draft = draft; self.renderingSnapshot = renderingSnapshot; self.dismiss = dismiss
+        _url = State(initialValue: draft.url)
+        _name = State(initialValue: draft.app?.name ?? draft.url.deletingPathExtension().lastPathComponent)
+        _category = State(initialValue: draft.category)
+    }
+    private var alreadyInWindows: Bool {
+        guard let environment = model.environment else { return false }
+        return url.standardizedFileURL.path.hasPrefix(model.paths.prefix(environment).appendingPathComponent("drive_c").standardizedFileURL.path + "/")
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text(draft.app == nil ? "Add to your library" : "Edit Windows app").font(.system(size: 22, weight: .medium))
+                Text("A local Windows app, with a place on your Mac.").font(.system(size: 12)).foregroundStyle(Palette.muted)
+            }
+            Rule()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Name").font(.system(size: 12, weight: .medium))
+                if renderingSnapshot {
+                    Text(name).font(.system(size: 12)).padding(7).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 5))
+                        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Palette.line))
+                } else { TextField("App name", text: $name).textFieldStyle(.roundedBorder) }
+            }
+            if renderingSnapshot {
+                HStack {
+                    Text("Library").font(.system(size: 12))
+                    Spacer()
+                    ForEach(LibraryCategory.allCases) { item in
+                        Text(item.title).font(.system(size: 12)).padding(.horizontal, 24).padding(.vertical, 6)
+                            .background(category == item ? Palette.line : Palette.surface, in: RoundedRectangle(cornerRadius: 5))
+                    }
+                }
+            } else {
+                Picker("Library", selection: $category) {
+                    ForEach(LibraryCategory.allCases) { category in Text(category.title).tag(category) }
+                }.pickerStyle(.segmented)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Executable").font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Button("Choose…") {
+                        if let selected = model.chooseWindowsExecutable(for: draft.app) { url = selected; includeFolder = false }
+                    }.buttonStyle(SecondaryButton())
+                }
+                Text(url.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted).lineLimit(3).textSelection(.enabled)
+                if !alreadyInWindows {
+                    if renderingSnapshot {
+                        Label("Include files from the containing folder", systemImage: "square").font(.system(size: 12))
+                    } else {
+                        Toggle("Include files from the containing folder", isOn: $includeFolder).toggleStyle(.checkbox).font(.system(size: 12))
+                    }
+                    Text(includeFolder ? "Copies everything in “\(url.deletingLastPathComponent().lastPathComponent)”, including subfolders. Choose a folder containing only this app." : "Copies this .exe only. Enable the folder option for portable apps or installers that need nearby DLLs, assets, or data files.")
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Already inside the Windows C: drive. Its files are used in place.")
+                        .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                }
+            }
+            Rule()
+            Text("Nothing is uploaded. Files already in the Windows C: drive are used in place. Apps run with your Mac user permissions; add software you trust. Compatibility varies.")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+            Text("Using an installer? Run it first, then choose Edit app / choose executable on the card and select the installed program in C:.")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Cancel", action: dismiss).buttonStyle(SecondaryButton()).keyboardShortcut(.cancelAction)
+                Spacer()
+                Button(draft.app == nil ? "Add to library" : "Save") {
+                    model.addWindowsApp(url, name: name, category: category, includeFolder: includeFolder, replacing: draft.app)
+                    dismiss()
+                }.buttonStyle(PrimaryButton()).keyboardShortcut(.defaultAction)
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.busy)
+            }
+        }.padding(30).frame(width: 520).foregroundStyle(Palette.ink).background(Palette.canvas).preferredColorScheme(.dark)
     }
 }

@@ -6,12 +6,15 @@ public struct SupervisorRequest: Codable, Sendable {
     public var environmentID: UUID
     public var command: Command
     public var appID: String?
+    public var windowsAppID: UUID?
+    public var runID: UUID?
     public enum Command: String, Codable, Sendable {
-        case openSteam, installGame, launchGame, uninstallGame, gameProperties, verifyGame, openDownloads, shutdown, forceStop, observe
+        case launchWindowsApp, openSteam, installGame, launchGame, uninstallGame, gameProperties, verifyGame, openDownloads, shutdown, forceStop, observe
         var requiresGameID: Bool { [.installGame, .launchGame, .uninstallGame, .gameProperties, .verifyGame].contains(self) }
     }
-    public init(root: URL, environmentID: UUID, command: Command, appID: String? = nil) {
+    public init(root: URL, environmentID: UUID, command: Command, appID: String? = nil, windowsAppID: UUID? = nil, runID: UUID? = nil) {
         self.root = root; self.environmentID = environmentID; self.command = command; self.appID = appID
+        self.windowsAppID = windowsAppID; self.runID = runID
     }
 }
 
@@ -65,9 +68,19 @@ public enum SupervisorEngine {
             return SupervisorReply(success: true, message: "Observed Windows processes.", processes: processes)
         }
         guard environment.state == "ready" || request.command == .shutdown else {
-            throw CrossedOverError.message("Repair the Windows environment in Settings → Advanced before opening Steam.")
+            throw CrossedOverError.message("Repair the Windows environment in Settings → Advanced before launching Windows software.")
         }
-        _ = try SteamService.steamExecutable(prefix: prefix)
+        if request.command == .launchWindowsApp {
+            let app = try windowsApp(request, store: store)
+            _ = try WindowsApps.executable(for: app, prefix: prefix)
+            guard let runID = request.runID else { throw CrossedOverError.message("Missing Windows app launch identifier.") }
+            let runs = try store.all(WindowsAppRun.self, kind: "windowsRun")
+            guard !runs.contains(where: { $0.appID == app.id && $0.isActive && !$0.workerIsMissing }) else {
+                throw CrossedOverError.message("This Windows app is already opening or running.")
+            }
+            guard !runs.contains(where: { $0.id == runID }) else { throw CrossedOverError.message("This launch identifier has already been used.") }
+            try store.put(WindowsAppRun(id: runID, app: app), kind: "windowsRun", id: runID.uuidString)
+        } else { _ = try SteamService.steamExecutable(prefix: prefix) }
         if request.command.requiresGameID {
             guard let appID = request.appID, SteamDiscovery.validAppID(appID) else { throw CrossedOverError.message("Invalid Steam App ID.") }
         }
@@ -119,9 +132,14 @@ public enum SupervisorEngine {
         let worker = Process(); worker.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
         worker.arguments = ["--launch-worker", file.path]
         worker.standardInput = FileHandle.nullDevice; worker.standardOutput = FileHandle.nullDevice; worker.standardError = FileHandle.nullDevice
-        do { try worker.run() } catch { try? FileManager.default.removeItem(at: file); throw error }
+        do { try worker.run() } catch {
+            try? FileManager.default.removeItem(at: file)
+            if let id = request.runID { try? store.remove(kind: "windowsRun", id: id.uuidString) }
+            throw error
+        }
         let message: String
         switch request.command {
+        case .launchWindowsApp: message = "Windows app launch requested."
         case .launchGame: message = "Launch requested. Waiting for the game process."
         case .installGame: message = "Installation requested. Confirm the download in Windows Steam."
         case .uninstallGame: message = "Uninstall requested. Confirm removal in Windows Steam."
@@ -132,7 +150,76 @@ public enum SupervisorEngine {
         }
         return SupervisorReply(success: true, message: message)
     }
+    private static func windowsApp(_ request: SupervisorRequest, store: Store) throws -> WindowsApp {
+        guard let id = request.windowsAppID,
+              let app = try store.all(WindowsApp.self, kind: "windowsApp").first(where: { $0.id == id && $0.environmentID == request.environmentID }) else {
+            throw CrossedOverError.message("This Windows app is no longer in the library.")
+        }
+        return app
+    }
+    private static func runWindowsAppWorker(_ request: SupervisorRequest, paths: AppPaths, store: Store,
+                                            environment: ManagedEnvironment, runtime: InstalledRuntime) throws {
+        let app = try windowsApp(request, store: store), prefix = paths.prefix(environment)
+        guard let id = request.runID,
+              var run = try store.all(WindowsAppRun.self, kind: "windowsRun").first(where: { $0.id == id && $0.appID == app.id && $0.environmentID == environment.id && $0.state == "requested" }) else {
+            throw CrossedOverError.message("Missing or already handled Windows app launch.")
+        }
+        run.workerPID = ProcessInfo.processInfo.processIdentifier
+        try store.put(run, kind: "windowsRun", id: id.uuidString)
+        var acquired: EnvironmentLock?
+        for _ in 0..<100 {
+            if let lock = try? EnvironmentLock(prefix: prefix) { acquired = lock; break }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        guard acquired != nil else { throw CrossedOverError.message("The environment remained locked during launch.") }
+        let executable = try WindowsApps.executable(for: app, prefix: prefix)
+        let pipe = Pipe(), process = Process()
+        process.executableURL = runtime.wine; process.arguments = [executable.path]
+        process.currentDirectoryURL = executable.deletingLastPathComponent()
+        var variables = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile)
+        // Arbitrary apps must not inherit Steam's macOS identity.
+        variables.removeValue(forKey: "CROSSEDOVER_STEAM_BRANDING")
+        variables.removeValue(forKey: "WINEPRELOADERAPPNAME")
+        process.environment = variables
+        process.standardInput = FileHandle.nullDevice; process.standardOutput = pipe; process.standardError = pipe
+        try withExtendedLifetime(acquired) { try process.run() }; acquired = nil
+        run.state = "running"; run.detail = "Windows process started."
+        try store.put(run, kind: "windowsRun", id: id.uuidString)
+        try pipe.fileHandleForWriting.close()
+        defer { try? pipe.fileHandleForReading.close() }
+        let log = paths.logs.appendingPathComponent("windows-app-" + app.id.uuidString + ".log")
+        var bounded = Data(), lastWrite = Date.distantPast
+        try bounded.write(to: log, options: .atomic)
+        while let chunk = try pipe.fileHandleForReading.read(upToCount: 65_536), !chunk.isEmpty {
+            bounded.append(chunk)
+            if bounded.count > 1_048_576 { bounded.removeFirst(bounded.count - 1_048_576) }
+            if Date().timeIntervalSince(lastWrite) >= 0.25 {
+                try bounded.write(to: log, options: .atomic); lastWrite = Date()
+            }
+        }
+        try bounded.write(to: log, options: .atomic)
+        process.waitUntilExit()
+        run.exitCode = process.terminationStatus; run.endedAt = Date()
+        run.state = process.terminationStatus == 0 ? "exited" : "failed"
+        run.detail = process.terminationStatus == 0 ? "Windows process exited." : "Windows app exited with code \(process.terminationStatus). Open its launch log for details."
+        try store.put(run, kind: "windowsRun", id: id.uuidString)
+    }
     public static func runLaunchWorker(requestFile: URL) throws {
+        var validatedRequest: SupervisorRequest?
+        do { try launchWorker(requestFile: requestFile, validatedRequest: &validatedRequest) }
+        catch {
+            // The request is removed after validation, so preserve its identity separately.
+            if let request = validatedRequest, request.command == .launchWindowsApp,
+               let id = request.runID,
+               let store = try? Store(url: request.root.appendingPathComponent("crossedover.sqlite")),
+               var run = try? store.all(WindowsAppRun.self, kind: "windowsRun").first(where: { $0.id == id && $0.appID == request.windowsAppID && $0.environmentID == request.environmentID && $0.isActive }) {
+                run.state = "failed"; run.endedAt = Date(); run.detail = Redaction.apply(error.localizedDescription)
+                try? store.put(run, kind: "windowsRun", id: run.id.uuidString)
+            }
+            throw error
+        }
+    }
+    private static func launchWorker(requestFile: URL, validatedRequest: inout SupervisorRequest?) throws {
         let data = try Data(contentsOf: requestFile)
         guard data.count <= 65_536 else { throw CrossedOverError.message("Launch worker request is too large.") }
         let request = try JSONDecoder().decode(SupervisorRequest.self, from: data)
@@ -143,16 +230,21 @@ public enum SupervisorEngine {
         let paths = AppPaths(root: request.root)
         guard requestFile.deletingLastPathComponent().standardizedFileURL == paths.logs.standardizedFileURL,
               requestFile.lastPathComponent.hasPrefix(".launch-") else { throw CrossedOverError.message("Launch request must be in the managed logs directory.") }
+        validatedRequest = request
         try FileManager.default.removeItem(at: requestFile)
         let store = try Store(url: paths.root.appendingPathComponent("crossedover.sqlite"))
         guard let environment = try store.all(ManagedEnvironment.self, kind: "environment").first(where: { $0.id == request.environmentID }) else { throw CrossedOverError.message("Unknown environment.") }
         guard environment.state == "ready" || request.command == .shutdown else {
-            throw CrossedOverError.message("Repair the Windows environment before opening Steam.")
+            throw CrossedOverError.message("Repair the Windows environment before launching Windows software.")
         }
         let root = try FileSafety.containedURL(environment.runtimeID, in: paths.runtimes)
         let manifest = try JSONDecoder().decode(RuntimeManifest.self, from: Data(contentsOf: root.appendingPathComponent("runtime.json")))
         try RuntimeManager.validate(manifest, root: root, verifyHashes: false)
         let runtime = InstalledRuntime(manifest: manifest, root: root), prefix = paths.prefix(environment)
+        if request.command == .launchWindowsApp {
+            try runWindowsAppWorker(request, paths: paths, store: store, environment: environment, runtime: runtime)
+            return
+        }
         var arguments = [try SteamService.steamExecutable(prefix: prefix).path]
         if request.command != .shutdown { arguments.append("-cef-disable-gpu") }
         if request.command == .shutdown { arguments += ["-shutdown"] }

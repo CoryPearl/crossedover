@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 import Observation
 import CrossedOverCore
 
@@ -14,6 +15,8 @@ import CrossedOverCore
     var runtimes: [InstalledRuntime] = []
     var environment: ManagedEnvironment?
     var games: [GameInstallation] = []
+    var windowsApps: [WindowsApp] = []
+    var windowsRuns: [WindowsAppRun] = []
     var recipes: [GameRecipe] = []
     var operations: [OperationRecord] = []
     var sessions: [LaunchSession] = []
@@ -119,7 +122,16 @@ import CrossedOverCore
                 let sessions = try store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
                 let steam = environment.flatMap { try? SteamService.steamExecutable(prefix: paths.prefix($0)) }
                 let logo = steam.flatMap { try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: $0.deletingLastPathComponent()).path }
-                return (environment, games, operations, sessions, steam, logo)
+                let apps = try store.all(WindowsApp.self, kind: "windowsApp")
+                    .filter { $0.environmentID == environment?.id }
+                    .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                var runs = try store.all(WindowsAppRun.self, kind: "windowsRun").sorted { $0.startedAt > $1.startedAt }
+                for index in runs.indices where runs[index].isActive && runs[index].workerIsMissing {
+                    runs[index].state = "interrupted"; runs[index].endedAt = Date()
+                    runs[index].detail = "The launch worker stopped. You can try opening the app again."
+                    try store.put(runs[index], kind: "windowsRun", id: runs[index].id.uuidString)
+                }
+                return (environment, games, operations, sessions, steam, logo, apps, runs)
             }.value
             guard !Task.isCancelled else { return }
             if runtimes != installed { runtimes = installed }
@@ -129,6 +141,8 @@ import CrossedOverCore
             if sessions != snapshot.3 { sessions = snapshot.3 }
             if steamPath != snapshot.4 { steamPath = snapshot.4 }
             if logoPath != snapshot.5 { logoPath = snapshot.5 }
+            if windowsApps != snapshot.6 { windowsApps = snapshot.6 }
+            if windowsRuns != snapshot.7 { windowsRuns = snapshot.7 }
             missingArtwork.removeAll()
         } catch { self.error = error.localizedDescription }
     }
@@ -182,11 +196,92 @@ import CrossedOverCore
         }
     }
     func openSteam() {
-        guard let environment else { setup(); return }
+        guard let environment, steamInstalled else { setup(); return }
         perform("Open Windows Steam") {
             _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openSteam))
             self.notice = "Steam is opening."
         }
+    }
+    /// App imports need Wine, but never require downloading or signing into Steam.
+    private func prepareWindowsEnvironment() async throws -> ManagedEnvironment {
+        if let environment {
+            guard environment.state == "ready", runtime != nil else { throw CrossedOverError.message("Repair the Windows environment or import its missing runtime in Settings → Advanced.") }
+            return environment
+        }
+        guard host?.supported == true else { throw CrossedOverError.message(host?.blockers.joined(separator: "\n") ?? "Wait for the Mac compatibility check to finish.") }
+        var selected = runtime
+        if selected == nil, let bundledRuntime {
+            progress = "Preparing the included Windows runtime…"
+            selected = try await runtimeManager.importLocal(bundledRuntime)
+        }
+        guard let selected else { throw CrossedOverError.message("Import a runtime in Settings or use the packaged app with its included runtime.") }
+        progress = "Creating your Windows environment…"
+        return try await environmentManager.create(runtime: selected)
+    }
+    func chooseWindowsExecutable(for app: WindowsApp? = nil) -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false; panel.canChooseFiles = true; panel.allowsMultipleSelection = false
+        panel.title = app == nil ? "Add a Windows app or game" : "Choose the program to launch"
+        panel.message = app == nil ? "Choose a local .exe. It will be added as a library card." : "After an installer finishes, choose the installed program’s .exe inside the Windows C: drive."
+        if app != nil, let environment { panel.directoryURL = paths.prefix(environment).appendingPathComponent("drive_c") }
+        panel.allowedContentTypes = [UTType(filenameExtension: "exe") ?? .data]
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+    func addWindowsApp(_ url: URL, name: String, category: LibraryCategory, includeFolder: Bool, replacing: WindowsApp? = nil) {
+        perform(replacing == nil ? "Add \(name)" : "Update \(name)") {
+            try await Task.detached(priority: .utility) { try WindowsApps.validateExecutable(url) }.value
+            let environment = try await self.prepareWindowsEnvironment()
+            self.progress = "Adding \(name) to your library…"
+            let paths = self.paths, store = self.store
+            let task = Task.detached(priority: .utility) {
+                try WindowsApps.add(executable: url, name: name, category: category, includeFolder: includeFolder,
+                                    environment: environment, paths: paths, store: store, replacing: replacing)
+            }
+            _ = try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+            self.selectedPage = category == .games ? "library" : "apps"
+            self.notice = "Added to \(category.title). Use \(category == .games ? "Play" : "Run") on its card to open it."
+        }
+    }
+    func latestRun(for app: WindowsApp) -> WindowsAppRun? { windowsRuns.first { $0.appID == app.id } }
+    func runWindowsApp(_ app: WindowsApp) {
+        guard latestRun(for: app)?.isActive != true else { return }
+        perform("Open \(app.name)") {
+            let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: app.environmentID,
+                command: .launchWindowsApp, windowsAppID: app.id, runID: UUID()))
+            self.notice = reply.message
+        }
+    }
+    func moveWindowsApp(_ app: WindowsApp, to category: LibraryCategory) {
+        perform("Move \(app.name) to \(category.title)") {
+            var updated = app; updated.category = category
+            let store = self.store
+            try await Task.detached { try store.put(updated, kind: "windowsApp", id: updated.id.uuidString) }.value
+        }
+    }
+    func removeWindowsApp(_ app: WindowsApp) {
+        perform("Remove \(app.name) from library") {
+            let store = self.store
+            try await Task.detached { try store.remove(kind: "windowsApp", id: app.id.uuidString) }.value
+            self.notice = "Card removed. Its files stay in the Windows environment."
+        }
+    }
+    func showWindowsAppFiles(_ app: WindowsApp) {
+        guard let environment, environment.id == app.environmentID else { return }
+        do {
+            // Allow opening the containing folder even when the executable was moved or deleted.
+            let folder = try FileSafety.containedURL((app.executablePath as NSString).deletingLastPathComponent, in: paths.prefix(environment))
+            guard NSWorkspace.shared.open(folder) else { throw CrossedOverError.message("Finder couldn't open this app’s files.") }
+        } catch { self.error = error.localizedDescription }
+    }
+    func showWindowsDrive() {
+        guard let environment else { return }
+        NSWorkspace.shared.open(paths.prefix(environment).appendingPathComponent("drive_c"))
+    }
+    func showWindowsAppLog(_ app: WindowsApp) {
+        let log = paths.logs.appendingPathComponent("windows-app-" + app.id.uuidString + ".log")
+        guard FileManager.default.fileExists(atPath: log.path) else { notice = "No launch log yet. Run the app first."; return }
+        NSWorkspace.shared.open(log)
     }
     func install(_ recipe: GameRecipe) {
         guard let environment, steamInstalled else { setup(); return }
@@ -350,7 +445,7 @@ import CrossedOverCore
     }
     func repair() {
         guard let environment, let runtime else { return }
-        perform("Repair environment") { _ = try await self.environmentManager.repair(environment, runtime: runtime); self.notice = "Environment repaired. You can retry Steam setup." }
+        perform("Repair environment") { _ = try await self.environmentManager.repair(environment, runtime: runtime); self.notice = "Environment repaired. You can retry setup or launch an app." }
     }
     func changeProfile(_ profile: GraphicsProfile) {
         guard let environment, let runtime else { return }
@@ -380,7 +475,7 @@ import CrossedOverCore
             if let existing = installed.first(where: { $0.id == manifest.id }) { replacement = existing }
             else { replacement = try await self.runtimeManager.importLocal(bundledRuntime) }
             _ = try await self.environmentManager.migrate(environment, from: current, to: replacement)
-            self.notice = "Included runtime is ready. Reopen Steam to apply its updates."
+            self.notice = "Included runtime is ready. Reopen Windows apps or Steam to apply its updates."
         }
     }
     func clearBackups() {
@@ -439,7 +534,7 @@ import CrossedOverCore
         guard let environment else { return }
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.directoryURL = paths.backups
-        panel.message = "Restore a managed backup. This replaces game files and saves inside the environment with their backed-up versions."
+        panel.message = "Restore a managed backup. This replaces apps, games, saves, and executable cards with their backed-up versions."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         perform("Restore environment backup") {
             _ = try await self.environmentManager.restore(url, current: environment, runtimeManager: self.runtimeManager)

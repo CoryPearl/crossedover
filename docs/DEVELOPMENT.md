@@ -1,6 +1,6 @@
 # Developer reference
 
-For installation, see [the v1.0.0 quickstart](../QUICKSTART.md). The notes below describe implementation and runtime limitations.
+For installation, see [the v1.1.0 quickstart](../QUICKSTART.md). The notes below describe implementation and runtime limitations.
 
 ## Build
 
@@ -33,7 +33,7 @@ dist/bin/crossedover runtime-import runtime/output/source-wine
 
 See [runtime build notes](docs/RUNTIME.md) first. The source build currently uses pinned community x86-64 dependency libraries as a development shortcut; it is not ready for public redistribution. Optional DXMT 0.80 is an experimental builtin overlay. Merely installing a backend does not certify games.
 
-Imported runtimes appear under Settings → Advanced. **Use runtime** changes an existing environment only after Steam and games close. It updates the prefix in place without creating a full backup. On failure, the environment is marked as needing repair and launches are blocked; files stay in place. Make a manual backup first if you need a complete restore point.
+Imported runtimes appear under Settings → Advanced. **Use runtime** changes an existing environment only after Steam, games, and Windows apps close. It updates the prefix in place without creating a full backup. On failure, the environment is marked as needing repair and launches are blocked; files stay in place. Make a manual backup first if you need a complete restore point.
 
 Counter-Strike 2 uses the **Metal** graphics profile (DXMT Direct3D 11). Its launch recipe requests a Steam restart when the environment is using a different profile. First-run Steam prerequisite installation can delay the game process. CS2 starts in windowed mode for native Mac window controls with a 60 FPS cap; this is a limit, not a verified achieved frame rate. A backed-up conversion of its existing video configuration restores a framed window. Each launch requests a 1280 × 720 desktop window so a saved fullscreen-sized viewport cannot hide its title bar; use the native green button to expand it. Other graphics-quality preferences are preserved. The bundled patched Wine Mac Driver opts CS2 into native fullscreen on fixed-size windows while retaining mouse capture for aiming. A separate backed-up clarity migration disables the game’s internal FSR upscaler once, without changing later user choices or the prefix’s Retina coordinate policy. Green-button behavior and the sharper image still need visual confirmation. Actual match performance and long-session stability remain unverified.
 
@@ -83,3 +83,8 @@ The per-game **Mods & files** sheet opens the game's discovered install folder o
 The optional runtime `steamLoaderRelativePath` points to a copy of Wine's native loader named `crossedover Steam`, beside its ordinary Wine modules. Steam launch and installation requests use it; older manifests fall back to the ordinary loader. The opt-in macOS naming patch covers direct Steam startup, child Steam/web-helper processes, the application menu, and generic Steam/Wine captions, while preserving game and descriptive dialog titles.
 
 `runtime/modding-smoke.c` verifies a Windows file round trip and can exercise shell folder opening with `--browse`. It uses a temporary test folder under `C:\crossedover\modding-smoke`; compile it for Windows with MinGW and run only in an isolated managed prefix.
+
+
+## Windows app and game cards (v1.1.0)
+
+crossedover now runs local x86/x64 Windows .exe files alongside its Steam integration, with separate Games and Apps libraries. Use Add .exe in the GUI. For development, `crossedover app-add /path/to/app.exe --folder` creates a persistent Apps card (use `--game` for Games), `apps` lists the cards, `app-run UUID` requests a detached launch, and `app-runs` reports persisted results. These commands use the managed runtime and environment; Steam installation is optional. Cards can be retargeted after an installer finishes. Additional dependencies and compatibility remain app-specific.

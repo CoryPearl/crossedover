@@ -59,6 +59,18 @@ import CrossedOverCore
             let operation: SupervisorRequest.Command = ["steam": .openSteam, "install": .installGame, "launch": .launchGame, "uninstall": .uninstallGame, "properties": .gameProperties, "verify": .verifyGame, "downloads": .openDownloads, "stop": .shutdown, "force-stop": .forceStop, "observe": .observe][command]!
             let appID = arguments.count > 1 ? arguments[1] : nil
             try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: operation, appID: appID)))
+        case "apps": try printJSON(store.all(WindowsApp.self, kind: "windowsApp"))
+        case "app-runs": try printJSON(store.all(WindowsAppRun.self, kind: "windowsRun"))
+        case "app-add":
+            guard arguments.count >= 2 else { throw CrossedOverError.message("app-add requires a local .exe path; optionally --folder and --game.") }
+            let source = URL(fileURLWithPath: arguments[1]), environment = try current()
+            let app = try WindowsApps.add(executable: source, name: source.deletingPathExtension().lastPathComponent,
+                category: arguments.contains("--game") ? .games : .apps, includeFolder: arguments.contains("--folder"), environment: environment, paths: paths, store: store)
+            try printJSON(app)
+        case "app-run":
+            guard arguments.count == 2, let id = UUID(uuidString: arguments[1]) else { throw CrossedOverError.message("app-run requires a Windows app card UUID.") }
+            let environment = try current()
+            try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchWindowsApp, windowsAppID: id, runID: UUID())))
         case "games":
             let environment = try current()
             try printJSON(SteamDiscovery().discover(environment: environment, prefix: paths.prefix(environment)))
@@ -126,11 +138,15 @@ import CrossedOverCore
               runtime-install [ID] [ARCHIVE]  Install a pinned experimental runtime
               runtime-import DIRECTORY  Import an explicitly trusted development runtime
               runtime-use ID            Change runtime without an automatic backup
-              create                    Create the managed Steam environment
+              create                    Create the managed Windows environment
               environments              Inspect environment metadata
               steam-install             Download and install official Windows Steam
               steam                     Open Windows Steam
-              games                     Discover installed games
+              apps                      List imported Windows app/game cards
+              app-add FILE [--folder] [--game]  Add a local .exe to the library
+              app-run UUID              Run a saved Windows app card
+              app-runs                  Inspect Windows app launch results
+              games                     Discover installed Steam games
               smoke [--graphics]        Check 32/64-bit execution and optional GPU readback
               benchmark                 Run a synthetic D3D9 workload (not game FPS)
               install APPID             Open the game's Windows Steam install dialog
