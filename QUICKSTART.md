@@ -1,4 +1,6 @@
-# crossedover v1.3.1 quickstart
+# crossedover v1.4.0 quickstart
+
+**v1.4.0 is the Minecraft release in development.** The existing v1.3.1 download below does not include its Bedrock backend. Build the [Minecraft preview](runtime/bedrock/README.md) for local testing; download and gameplay validation remain incomplete.
 
 ## Before you start
 
@@ -139,13 +141,13 @@ The launcher uses DXMT / Metal for DirectX 10–11, with DXVK / Metal for Direct
 
 Experimental [Bedrock for Mac](https://github.com/1JRobertson/bedrock-mac) work uses a separate WineGDK/DXMT runtime and Microsoft account helper. It establishes a possible future Bedrock-specific route, not support in crossedover or the Windows Xbox app. See [the technical assessment](docs/XBOX_AND_BEDROCK.md). Minecraft Java already has a separate native Mac version. No Microsoft credentials or games are included or collected by crossedover.
 
-In **v1.4 development previews**, **Game Launchers → Minecraft Bedrock…** opens
+In **v1.4.0 development previews**, **Game Launchers → Minecraft Bedrock…** opens
 a dedicated launcher. A separately built and verified backend is required;
 without it the install button explains what is missing. With it, choose
 **Install & Play**, complete Microsoft sign-in/Keychain prompts, and keep the
 setup session open. The backend downloads only over verified HTTPS and may
 stop if a secure package is unavailable. **Stop Minecraft** affects this
-separate session. The launcher’s options allow account sign-out and uninstall
+separate session. Once installation completes, Minecraft appears as a card in **Games**, in grid or list mode. Search for Minecraft or use its library filter; **⌘R** refreshes installation status without signing in. The launcher’s options allow account sign-out and uninstall
 that keeps worlds. [Local preview build and file paths](runtime/bedrock/README.md).
 This flow is not part of the public v1.3.1 package and is awaiting live gameplay
 validation; it does not add the Windows Xbox app or general Game Pass support.

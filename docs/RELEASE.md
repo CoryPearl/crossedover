@@ -1,6 +1,6 @@
 # Public release gates
 
-v1.3.1 is being packaged for private evaluation. It is locally signed and is not a certified game-compatibility or notarized public release. The following public-release gates remain open.
+v1.4.0 is the Minecraft release in development, not yet published. Microsoft sign-in succeeded; secure package download and actual gameplay remain blocked/unverified. It is locally signed and is not a certified game-compatibility or notarized public release. The following public-release gates remain open.
 
 - [ ] Independent source-complete runtime and dependency builds.
 - [ ] Every runtime component's license, source, notices, and SBOM delivered.

@@ -1,8 +1,8 @@
 # crossedover — Technical README
 
-This document explains how the **v1.3.1 source implementation** works, from the macOS interface to Windows process execution. It is intended for contributors and readers who want to understand the whole app. For installation, use the [quickstart](QUICKSTART.md); for system requirements, see the [hardware guidelines](docs/HARDWARE.md).
+This document explains how the **v1.4.0 source implementation** works, from the macOS interface to Windows process execution. It is intended for contributors and readers who want to understand the whole app. For installation, use the [quickstart](QUICKSTART.md); for system requirements, see the [hardware guidelines](docs/HARDWARE.md).
 
-v1.3.1 is a development candidate. Describing a launch path or runtime patch here does not mean every affected game has passed interactive validation. The [validation record](docs/VALIDATION.md) distinguishes automated checks, user observations, and pending work.
+v1.4.0 is the Minecraft development release. Describing a launch path or runtime patch here does not mean every affected game has passed interactive validation. The [validation record](docs/VALIDATION.md) distinguishes automated checks, user observations, and pending work.
 
 ## Contents
 
@@ -557,7 +557,7 @@ The implementation has a local library, not a universal Windows compatibility gu
 - Current Brawlhalla card routing/window-controls and other experimental changes still need the live confirmations described in the validation record.
 - Current testing centers on an M4/16 GB Mac. The short TrackMania 55–60 FPS result is not a guaranteed minimum or a benchmark for other games or Macs.
 
-Adding another launcher requires more than a sidebar button: official setup/authentication, bounded installation discovery, validated launch/manage routes, process tracking, file access, appropriate runtime behavior, uninstall discovery, and real account/game testing. The v1.4 Bedrock development backend adds separate runtime/account/licensing integration and preserves worlds on game uninstall; live account/game validation remains required. See [the assessment](docs/XBOX_AND_BEDROCK.md).
+Adding another launcher requires more than a sidebar button: official setup/authentication, bounded installation discovery, validated launch/manage routes, process tracking, file access, appropriate runtime behavior, uninstall discovery, and real account/game testing. The v1.4.0 Bedrock development backend adds separate runtime/account/licensing integration and preserves worlds on game uninstall; live account/game validation remains required. See [the assessment](docs/XBOX_AND_BEDROCK.md).
 
 For source changes, keep parsing and lifecycle logic in `CrossedOverCore`, orchestration in `AppModel`, and presentation in the GUI views. Never turn store metadata into an arbitrary shell command. Add tests for meaningful parsing/lifecycle boundaries, use owned integration programs, and record actual game observations separately from the implementation's intended behavior.
 
@@ -577,7 +577,7 @@ preserving a newer external request, and handles Windows CRLF output from
 `reg.exe`. A request acknowledgement still means Requested; process observation
 is required for Running.
 
-## Minecraft backend in v1.4 development
+## Minecraft backend in v1.4.0 development
 
 `BedrockService.swift` implements an independent backend boundary, outside the Steam/Epic supervisor. `BedrockBackend.load` validates a pinned schema/revision, HTTPS-only policy, required components, every file digest and the exact file/symlink inventory. Verification runs off the UI actor. The worker receives a minimal environment with `BEDROCK_HOME=<CrossedOver root>/Bedrock` and `BEDROCK_BUNDLE=<verified backend>`, without inherited Wine/DYLD/Python overrides. A bounded JSON stream maps only known states and progress to reviewed UI text; arbitrary account strings never become status or activity entries. Unknown states, oversized lines, malformed progress, or a worker exit without a terminal state fail the session.
 
@@ -586,3 +586,5 @@ is required for Running.
 `runtime/bedrock/prepare.py` builds from pinned Bedrock for Mac/WineGDK/Xodus sources, applies the tracked compatibility patch, tests the helper, freezes Python, and stages only allowed components. `scripts/package.py --bedrock-backend` verifies the staged inventory, signs nested code, and records the signed hashes. `--output` creates a separate local preview app. No account, game or Microsoft DLL enters the backend. Account data uses the `crossedover Minecraft` Keychain service. The local preview requires macOS 26, Apple silicon, Rosetta and an owned Windows Bedrock edition.
 
 The upstream HTTP package fallback is removed. Foreground and background catalog origins are accepted only over certificate-verified HTTPS, without hostname rewrites. Live sign-in succeeded, but the licensed package download did not. Attempted HTTPS mirror routes returned 404/503 and were removed; no HTTP request or certificate exception is used. Some upstream package sections lack complete integrity authentication; without a secure HTTPS origin, setup must stop instead of installing those bytes. This restriction can prevent installation and is not presented as verified Bedrock support. Full download/gameplay, saves, controls, window behavior and clean-machine tests remain separate release checks. See [the backend guide](runtime/bedrock/README.md) and [current assessment](docs/XBOX_AND_BEDROCK.md).
+
+The Games library checks Minecraft’s offline installation status on startup, library refresh (including ⌘R), and after a setup/play session ends. A ready installation adds a Minecraft card or list row with Play and launcher options, and participates in search, counts and the Minecraft filter. Routine refreshes reuse the verified backend rather than hashing the entire runtime again; Play verifies runtime bytes again. Failed downloads do not add an installed card.

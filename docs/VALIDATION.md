@@ -1,5 +1,27 @@
 # Validation record
 
+## v1.4.0 version and installed Minecraft library entry — October 19, 2026
+
+Development metadata now uses **1.4.0/build 26**, the Minecraft release. Existing
+public download URLs and historical screenshot labels retain their actual
+v1.3.1 version; no v1.4.0 artifact has been published.
+
+Minecraft's grid card/list row, Play and launcher options, search, store filter
+and library counts are wired to verified installation status. Library refresh
+and session completion now repeat the offline status check, reusing the
+verified backend to avoid hashing the full runtime on every refresh. Failed
+downloads do not create an installed card. Real package installation/gameplay
+remain blocked as recorded below; presentation fixtures are not game tests.
+
+All **84 Swift tests in 15 suites** passed, as did the optimized build and
+offline release checks. App-owned renders with an isolated data root verified
+the installed Minecraft card and list row, search result/count, Play/options,
+and v1.4.0 sidebar label. The packaged preview reports **1.4.0/build 26**, passes
+strict deep signature verification, and returns `new` from its offline worker
+against the actual data root (Minecraft remains uninstalled). Evidence:
+`.cache/v1.4/`. No account prompt or game installation was triggered by these
+presentation/status checks.
+
 ## Minecraft Bedrock preview and Epic partner queue — October 19, 2026
 
 **Development work for v1.4; not released or gameplay-verified.** The local

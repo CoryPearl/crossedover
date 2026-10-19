@@ -2,7 +2,7 @@
 
 ## v1.4.0 investigation — October 19, 2026
 
-The requested v1.4.0 feature is local **Minecraft for Windows (Bedrock)** support, with a Minecraft entry in Game Launchers. A native launcher panel, separate backend/session service, verified build pipeline and cancellation controls are now implemented in development. Owned-account download and gameplay are not verified or released. The existing Steam/Epic environment is independent. Public version numbers/downloads remain v1.3.1 until the new flow has been tested.
+The requested v1.4.0 feature is local **Minecraft for Windows (Bedrock)** support, with a Minecraft entry in Game Launchers. A native launcher panel, separate backend/session service, verified build pipeline and cancellation controls are now implemented in development. Owned-account download and gameplay are not verified or released. The existing Steam/Epic environment is independent. Development builds use v1.4.0/build 26. Public download links still point to the existing v1.3.1 artifact; the Minecraft release will not be published until its flow has been tested.
 
 ### Current implementation
 
@@ -32,7 +32,7 @@ The user selected this Bedrock-specific route and a Minecraft launcher entry. It
 
 The alternative for the real Xbox client is a Windows environment rather than the current Wine runtime. Microsoft now supports its client on Windows 11 Arm, but this does not establish VM compatibility for every title, driver, or anti-cheat system. [Microsoft's Windows Arm announcement](https://blogs.windows.com/windowsexperience/2026/01/21/play-more-xbox-app-is-now-available-on-arm-based-windows-11-pcs/).
 
-Runtime source and build output stay in ignored development directories. Version numbers and public download links have not been changed to advertise unfinished v1.4.0 support. The initial feasibility checks did not acquire a game or account; any later live test is recorded separately in the validation log.
+Runtime source and build output stay in ignored development directories. The development version is v1.4.0. Existing public download links have been preserved while Minecraft support remains incomplete. The initial feasibility checks did not acquire a game or account; any later live test is recorded separately in the validation log.
 
 ## Included runtime and existing cloud shortcut
 

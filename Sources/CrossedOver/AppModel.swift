@@ -41,6 +41,7 @@ import CrossedOverCore
     var bedrockStopping = false
     var bedrockError: String?
     private var bedrockChecking = false
+    @ObservationIgnored private var verifiedBedrockBackend: BedrockBackend?
     private let bedrockService = BedrockService()
     private var bedrockTask: Task<Void, Never>?
     private var work: Task<Void, Never>?
@@ -191,6 +192,7 @@ import CrossedOverCore
             if windowsRuns != snapshot.7 { windowsRuns = snapshot.7 }
             if epicPath != snapshot.8 { epicPath = snapshot.8 }
             if ubisoftPath != snapshot.9 { ubisoftPath = snapshot.9 }
+            await refreshMinecraftInstallation()
         } catch { self.error = error.localizedDescription }
     }
     func perform(_ title: String, id: UUID = UUID(), completionState: String = "completed", allowsStopping: Bool = false, action: @escaping @MainActor () async throws -> Void) {
@@ -234,9 +236,19 @@ import CrossedOverCore
         do {
             let backend = try await Task.detached(priority: .utility) { try BedrockBackend.load(at: directory) }.value
             let status = try await backend.status(dataRoot: paths.root)
+            verifiedBedrockBackend = backend
             bedrockStatus = status; bedrockInstalled = status.phase == .ready; bedrockAvailable = true
         } catch { bedrockError = "Minecraft's preview backend could not be verified. Rebuild or reinstall the matching backend." }
         bedrockChecked = true
+    }
+
+    private func refreshMinecraftInstallation() async {
+        guard !bedrockActive, !bedrockChecking, let backend = verifiedBedrockBackend else { return }
+        bedrockChecking = true; defer { bedrockChecking = false }
+        // Offline status checks never sign in. Reuse the verified backend so
+        // ordinary library refreshes do not hash its entire runtime again.
+        guard let status = try? await backend.status(dataRoot: paths.root), !bedrockActive else { return }
+        bedrockInstalled = status.phase == .ready
     }
 
     func startMinecraft(signOut: Bool = false) {
@@ -270,6 +282,7 @@ import CrossedOverCore
             let service = bedrockService
             await Task.detached { await service.waitUntilStopped() }.value
             bedrockActive = false; bedrockStopping = false
+            await refreshMinecraftInstallation()
             // Preserve the session's failure/cancellation message. A subsequent
             // status check must not erase why installation stopped.
         }

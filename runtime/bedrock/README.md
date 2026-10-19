@@ -1,4 +1,4 @@
-# Minecraft Bedrock backend · v1.4 development
+# Minecraft Bedrock backend · v1.4.0 development
 
 This is the **local Windows Bedrock** backend, separate from crossedover's
 Steam/Epic runtime. The Game Launchers menu opens a Minecraft panel; its install
@@ -104,10 +104,10 @@ crossedover requires finishing or stopping that session first.
 ## Release boundary
 
 Core tests, source builds, a valid package, and a real game session are separate
-checks. Do not publish v1.4 as playable Bedrock support until owned-account
+checks. Do not publish v1.4.0 as playable Bedrock support until owned-account
 download, gameplay, controls/audio, world save/reopen, normal quit, cancellation,
-window/fullscreen behavior and a repeat launch have been checked. The current
-public version/download links remain unchanged while this work is in progress.
+window/fullscreen behavior and a repeat launch have been checked. The development app is v1.4.0/build 26. Existing public download links still
+point to the previous artifact while this work is in progress.
 
 The upstream portable-library notice/source inventory and clean-Mac validation
 also remain binary-release work. This backend is for local preview testing.

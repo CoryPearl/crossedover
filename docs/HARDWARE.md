@@ -1,4 +1,4 @@
-# Hardware guidelines — crossedover v1.3.1
+# Hardware guidelines — crossedover v1.4.0
 
 These guidelines cover the included Windows runtime. Meeting them lets you try compatible software; each game still has its own requirements. Recommendations are planning guidance, not certified minimums or a promise of 60 FPS.
 
@@ -42,7 +42,7 @@ Full backups are manual only and can need space for the entire Windows environme
 Windows CPU, GPU, and VRAM specifications do not translate into a guaranteed Mac equivalent. More powerful hardware cannot supply unsupported Windows features, DRM, or anti-cheat. Local Xbox app games and Minecraft Bedrock remain unsupported by the included runtime. [Quickstart](https://corypearl.github.io/crossedover/quickstart.html#hardware)
 # Minecraft Bedrock development preview
 
-The separate v1.4 Bedrock preview currently requires **Apple silicon, macOS 26
+The separate v1.4.0 Bedrock preview currently requires **Apple silicon, macOS 26
 or later, Rosetta, a Minecraft for Windows license, an internet connection and
 at least 8 GiB free for setup**. This is separate from the included Steam/Epic
 runtime requirements. The local build has reached sign-in on an M4/16 GiB Mac;

@@ -18,7 +18,7 @@
   <a href="TECHNICAL_README.md">Technical README</a>
 </p>
 
-<p align="center"><sub>v1.3.1 &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
+<p align="center"><sub>v1.4.0 · In development &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
 
 <br>
 
@@ -58,7 +58,7 @@ If an existing Epic installation opens its client but no game, quit Windows game
 
 The Windows Xbox app and Minecraft Bedrock are **not supported by the included runtime**. Settings can open Xbox Cloud Gaming for supported streaming titles; this does not install Xbox games. [Xbox and Bedrock status](QUICKSTART.md#xbox-and-minecraft-bedrock).
 
-**v1.4 development:** a dedicated Minecraft Bedrock launcher and separate WineGDK backend are being tested locally. They are not part of the published v1.3.1 download. See [the local preview build](runtime/bedrock/README.md) for its requirements and outstanding gameplay checks.
+**v1.4.0 — Minecraft release (in development):** a dedicated Minecraft Bedrock launcher and separate WineGDK backend are being tested locally. They are not part of the published v1.3.1 download. Once installation completes, Minecraft appears as a card in Games, with grid/list views, search, Play, and launcher options. Microsoft sign-in works; the package-download blocker remains unresolved. See [the local preview build](runtime/bedrock/README.md) and [v1.4.0 notes](docs/RELEASE_NOTES_1.4.0.md).
 
 ## Build
 

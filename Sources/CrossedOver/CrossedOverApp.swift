@@ -58,14 +58,17 @@ import CrossedOverCore
                 let height = min(1800, max(620, Double(previewArgument("--preview-height") ?? "") ?? (tall ? 1400 : compact ? 620 : 760)))
                 await model.preparePreviewArtwork()
                 let preview: AnyView
-                if CommandLine.arguments.contains("--preview-minecraft") {
+                if let state = previewArgument("--preview-minecraft-state") {
                     model.bedrockChecked = true
-                    if let state = previewArgument("--preview-minecraft-state"), state != "unavailable" {
+                    if state != "unavailable" {
                         model.bedrockAvailable = true
                         model.bedrockInstalled = state == "ready" || state == "playing"
                         model.bedrockActive = ["busy", "starting", "playing"].contains(state)
                         model.bedrockStatus = try BedrockEvent.decode(JSONSerialization.data(withJSONObject: ["state": state, "title": "Downloading Minecraft"]))
                     }
+                }
+                if CommandLine.arguments.contains("--preview-minecraft") {
+                    model.bedrockChecked = true
                     preview = AnyView(MinecraftLauncherView(model: model, renderingSnapshot: true).environment(\.colorScheme, .dark))
                 } else {
                     preview = AnyView(ContentView(model: model, renderingSnapshot: true, previewAdvanced: advanced,
