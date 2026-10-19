@@ -32,9 +32,15 @@ Completed installs appear automatically. Press **⌘R** to refresh and **⌘F** 
 
 Press **Play** to launch. If a known game's graphics profile needs to change, close your current game and accept the Steam restart.
 
-Use **⋯** for properties, game files, verification, or uninstall. Steam handles the uninstall confirmation. **Settings → Windows Steam → Downloads** opens download progress.
+Use **⋯** for properties, game files, verification, or uninstall. Steam handles the uninstall confirmation. **Settings → Windows Steam → Open download folder** opens the installed games folder in Finder. The separate **Steam Downloads** button opens download progress and updates in Steam.
 
-TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
+Graphics profiles are explained in Settings:
+
+- **Legacy:** OpenGL for older DirectX 9 games; a compatibility fallback.
+- **Performance:** DXVK and Metal for DirectX 9; recommended for TrackMania Nations Forever.
+- **Metal:** DXMT for DirectX 10–11; used by CS2. Compatibility varies by game.
+
+Quit Steam and all games before changing profiles. TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
 
 ## Your files
 
@@ -44,7 +50,17 @@ The app is in **/Applications/crossedover.app**. Games, Windows Steam, runtimes,
 ~/Library/Application Support/CrossedOver/
 ~~~
 
-Use **⋯ → Show game files** to find a game. Removing the app does not remove its data. Uninstall games through Steam; review backups before deleting anything manually.
+Use **Open download folder** to browse installed games, or **⋯ → Show game files** for one game. Full environment backups are **manual only** and include all installed games. Small copies of settings changed by crossedover are kept for recovery. Use **Settings → Clear backups** to move old full backups to Trash; your current games and saves stay in place. Empty Trash in Finder to reclaim space (APFS clones can share blocks).
+
+### Uninstall everything
+
+Quit Steam and all games, then choose **Settings → Uninstall crossedover → Uninstall app and data**. This moves the app, its Windows Steam client, runtimes, managed games, local saves, and backups to Trash, clears app preferences, and quits. Empty Trash to reclaim storage. Export any local saves you want to keep first. Your separate Mac Steam installation is unaffected.
+
+Dragging just crossedover.app to Trash does **not** remove `~/Library/Application Support/CrossedOver/`. Use the in-app uninstaller for complete removal. Custom data locations and apps opened from a read-only DMG must be managed in Finder.
+
+## Coming soon
+
+More than Steam games is coming soon: other games, launchers, and platforms are planned. v1.0.0 focuses on Windows Steam.
 
 ## Need a hand?
 

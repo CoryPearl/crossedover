@@ -16,6 +16,7 @@ public final class Store: Sendable {
         }
         try migrator.migrate(database)
     }
+    public func close() throws { try database.close() }
     public func put<T: Encodable & Sendable>(_ value: T, kind: String, id: String) throws {
         let data = try JSONEncoder().encode(value)
         try database.write { db in

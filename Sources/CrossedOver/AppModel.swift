@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 import Observation
 import CrossedOverCore
 
@@ -28,6 +29,10 @@ import CrossedOverCore
     private var refreshTask: Task<Void, Never>?
     private var monitorTask: Task<Void, Never>?
     private var observationCount = 0
+    private var refreshing = false
+    private var steamPath: URL?
+    private var logoPath: String?
+    @ObservationIgnored private var missingArtwork = Set<String>()
     var runtime: InstalledRuntime? {
         if let environment { return runtimes.first { $0.id == environment.runtimeID } }
         return runtimes.first { $0.id.hasPrefix("wine-11.0-cx") } ?? runtimes.first
@@ -37,22 +42,28 @@ import CrossedOverCore
               FileManager.default.fileExists(atPath: url.appendingPathComponent("runtime.json").path) else { return nil }
         return url
     }
-    var steamInstalled: Bool { guard let environment else { return false }; return (try? SteamService.steamExecutable(prefix: paths.prefix(environment))) != nil }
-    var trackManiaLogo: NSImage? {
-        guard let environment,
-              let steam = try? SteamService.steamExecutable(prefix: paths.prefix(environment)),
-              let logo = try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: steam.deletingLastPathComponent()) else { return nil }
-        return NSImage(contentsOf: logo)
-    }
+    var steamInstalled: Bool { environment != nil && steamPath != nil }
+    var trackManiaLogo: NSImage? { logoPath.flatMap { cachedImage(at: $0) } }
     @ObservationIgnored private let artworkCache: NSCache<NSString, NSImage> = {
-        let cache = NSCache<NSString, NSImage>(); cache.countLimit = 64; return cache
+        let cache = NSCache<NSString, NSImage>(); cache.countLimit = 64; cache.totalCostLimit = 64 * 1024 * 1024; return cache
     }()
-    func artwork(for game: GameInstallation) -> NSImage? {
-        guard let path = game.artworkPath else { return nil }
+    func artwork(for game: GameInstallation) -> NSImage? { game.artworkPath.flatMap { cachedImage(at: $0) } }
+    private func cachedImage(at path: String) -> NSImage? {
         if let cached = artworkCache.object(forKey: path as NSString) { return cached }
-        guard let image = NSImage(contentsOfFile: path) else { return nil }
-        artworkCache.setObject(image, forKey: path as NSString)
+        guard !missingArtwork.contains(path) else { return nil }
+        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: 640
+              ] as CFDictionary) else { missingArtwork.insert(path); return nil }
+        let image = NSImage(cgImage: thumbnail, size: .zero)
+        artworkCache.setObject(image, forKey: path as NSString, cost: thumbnail.bytesPerRow * thumbnail.height)
         return image
+    }
+    func updateSteamLocation() {
+        steamPath = environment.flatMap { try? SteamService.steamExecutable(prefix: paths.prefix($0)) }
+        logoPath = steamPath.flatMap { try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: $0.deletingLastPathComponent()).path }
     }
     var setupStep: Int { runtimes.isEmpty ? 0 : environment == nil ? 1 : !steamInstalled ? 2 : 3 }
     var supervisor: SupervisorClient {
@@ -72,6 +83,7 @@ import CrossedOverCore
         }
     }
     func start() async {
+        guard refreshTask == nil else { return }
         host = await HostInspector.inspect(at: paths.root)
         await refresh()
         if let previous = sessions.first(where: { ["requested", "running", "unknown"].contains($0.state) && $0.endedAt == nil }),
@@ -80,32 +92,44 @@ import CrossedOverCore
         }
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(4))
+                try? await Task.sleep(for: .seconds(8))
                 guard !Task.isCancelled, let self else { return }
-                if !self.busy { await self.refresh() }
+                if !self.busy && NSApp.isActive { await self.refresh() }
             }
         }
     }
     func refresh() async {
+        guard !refreshing && !busy else { return }
+        refreshing = true; defer { refreshing = false }
         do {
-            runtimes = try await runtimeManager.installed()
-            environment = try store.all(ManagedEnvironment.self, kind: "environment").first
-            if let environment {
-                do {
-                    let prefix = paths.prefix(environment)
-                    let discovered = try await Task.detached(priority: .utility) {
-                        try SteamDiscovery().discover(environment: environment, prefix: prefix)
-                    }.value
-                    try store.replaceGames(discovered, environmentID: environment.id); games = discovered
-                } catch {
-                    if games.isEmpty {
-                        games = try store.all(GameInstallation.self, kind: "game").filter { $0.environmentID == environment.id }
-                            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                    }
+            let installed = try await runtimeManager.installed()
+            // Discovery and SQLite writes can touch thousands of filesystem paths.
+            // Keep them off the UI actor and leave unchanged observable values alone.
+            let paths = paths, store = store
+            let snapshot = try await Task.detached(priority: .utility) {
+                let environment = try store.all(ManagedEnvironment.self, kind: "environment").first
+                var games: [GameInstallation] = []
+                if let environment {
+                    let saved = try store.all(GameInstallation.self, kind: "game").filter { $0.environmentID == environment.id }
+                        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                    games = (try? SteamDiscovery().discover(environment: environment, prefix: paths.prefix(environment))) ?? saved
+                    if games != saved { try store.replaceGames(games, environmentID: environment.id) }
                 }
-            } else { games = [] }
-            operations = try store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
-            sessions = try store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
+                let operations = try store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
+                let sessions = try store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
+                let steam = environment.flatMap { try? SteamService.steamExecutable(prefix: paths.prefix($0)) }
+                let logo = steam.flatMap { try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: $0.deletingLastPathComponent()).path }
+                return (environment, games, operations, sessions, steam, logo)
+            }.value
+            guard !Task.isCancelled else { return }
+            if runtimes != installed { runtimes = installed }
+            if environment != snapshot.0 { environment = snapshot.0 }
+            if games != snapshot.1 { games = snapshot.1 }
+            if operations != snapshot.2 { operations = snapshot.2 }
+            if sessions != snapshot.3 { sessions = snapshot.3 }
+            if steamPath != snapshot.4 { steamPath = snapshot.4 }
+            if logoPath != snapshot.5 { logoPath = snapshot.5 }
+            missingArtwork.removeAll()
         } catch { self.error = error.localizedDescription }
     }
     func perform(_ title: String, action: @escaping @MainActor () async throws -> Void) {
@@ -114,11 +138,14 @@ import CrossedOverCore
         work = Task {
             var record = OperationRecord(kind: title, state: "running", detail: title)
             do {
-                try store.put(record, kind: "operation", id: record.id.uuidString)
+                let initial = record, store = store
+                try await Task.detached(priority: .utility) { try store.put(initial, kind: "operation", id: initial.id.uuidString) }.value
                 try await action(); try Task.checkCancellation(); record.state = "completed"; record.detail = "Completed"
             } catch is CancellationError { record.state = "cancelled"; record.detail = "Cancelled. You can retry this operation." }
             catch { record.state = "failed"; record.detail = Redaction.apply(error.localizedDescription); self.error = error.localizedDescription }
-            record.updatedAt = Date(); try? store.put(record, kind: "operation", id: record.id.uuidString)
+            record.updatedAt = Date()
+            let finished = record, store = store
+            try? await Task.detached(priority: .utility) { try store.put(finished, kind: "operation", id: finished.id.uuidString) }.value
             busy = false; progress = ""; await refresh()
         }
     }
@@ -184,12 +211,20 @@ import CrossedOverCore
             self.notice = reply.message
         }
     }
-    func openDownloads() {
+    func openSteamDownloads() {
         guard let environment else { return }
         perform("Open Steam downloads") {
             let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openDownloads))
             self.notice = reply.message
         }
+    }
+    func openDownloadsFolder() {
+        guard let environment else { error = "Set up Windows Steam first."; return }
+        do {
+            let folder = try SteamService.gamesFolder(prefix: paths.prefix(environment))
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            guard NSWorkspace.shared.open(folder) else { throw CrossedOverError.message("Finder couldn't open the games folder.") }
+        } catch { self.error = error.localizedDescription }
     }
     func showGameFiles(_ game: GameInstallation) {
         guard let environment else { return }
@@ -261,7 +296,11 @@ import CrossedOverCore
                         session.state = "failed"; session.endedAt = Date(); session.detail = "No matching game process appeared within 90 seconds. Check Steam for prompts."
                         try store.put(session, kind: "session", id: session.id.uuidString); currentSession = nil; error = session.detail; return
                     }
-                    currentSession = session; try store.put(session, kind: "session", id: session.id.uuidString)
+                    if currentSession != session {
+                        currentSession = session
+                        let saved = session, store = store
+                        try await Task.detached(priority: .utility) { try store.put(saved, kind: "session", id: saved.id.uuidString) }.value
+                    }
                 } catch {
                     observationCount += 1
                     if observationCount >= 3 {
@@ -307,9 +346,61 @@ import CrossedOverCore
     }
     func useRuntime(_ replacement: InstalledRuntime) {
         guard let environment, let runtime else { return }
-        perform("Back up and change runtime") {
+        perform("Change runtime") {
             _ = try await self.environmentManager.migrate(environment, from: runtime, to: replacement)
-            self.notice = "Runtime changed. The previous environment is preserved in Backups."
+            self.notice = "Runtime changed. No automatic backup was created."
+        }
+    }
+    func clearBackups() {
+        perform("Move backups to Trash") {
+            let root = self.paths.root, store = self.store, paths = self.paths
+            try await Task.detached(priority: .utility) {
+                let locks = try store.all(ManagedEnvironment.self, kind: "environment").map { try EnvironmentLock(prefix: paths.prefix($0)) }
+                defer { withExtendedLifetime(locks) {} }
+                let backups = try ManagedStorage.backups(in: root, expected: AppPaths().root)
+                if FileManager.default.fileExists(atPath: backups.path) {
+                    try FileManager.default.trashItem(at: backups, resultingItemURL: nil)
+                    try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+                }
+            }.value
+            self.notice = "Backups moved to Trash. Empty Trash in Finder to reclaim their disk space."
+        }
+    }
+    func uninstallApplication() {
+        guard !busy else { return }
+        guard currentSession == nil else { error = "Quit your game before uninstalling crossedover."; return }
+        busy = true; progress = "Checking before uninstall…"; error = nil
+        work = Task {
+            do {
+                let root = try ManagedStorage.dataRoot(paths.root, expected: AppPaths().root)
+                let app = try ManagedStorage.application(Bundle.main.bundleURL, identifier: Bundle.main.bundleIdentifier)
+                let store = store, paths = paths
+                let environments = try await Task.detached {
+                    try store.all(ManagedEnvironment.self, kind: "environment")
+                }.value
+                var locks: [EnvironmentLock] = []
+                for environment in environments {
+                    locks.append(try EnvironmentLock(prefix: paths.prefix(environment)))
+                    let runtime = try await runtimeManager.resolve(environment.runtimeID)
+                    try await environmentManager.requireStopped(environment, runtime: runtime)
+                }
+                // Nothing is removed until every managed Windows environment is stopped.
+                while refreshing { try await Task.sleep(for: .milliseconds(50)) }
+                try Task.checkCancellation()
+                try FileManager.default.trashItem(at: root, resultingItemURL: nil)
+                refreshTask?.cancel(); monitorTask?.cancel()
+                try? store.close()
+                UserDefaults.standard.removePersistentDomain(forName: "org.crossedover.CrossedOver")
+                do { try FileManager.default.trashItem(at: app, resultingItemURL: nil) }
+                catch {
+                    let alert = NSAlert()
+                    alert.messageText = "Games and app data moved to Trash"
+                    alert.informativeText = "The app itself couldn't be moved. Quit crossedover and move it to Trash in Finder. Empty Trash to reclaim space."
+                    alert.runModal()
+                }
+                withExtendedLifetime(locks) {}
+                NSApp.terminate(nil)
+            } catch { self.error = error.localizedDescription; busy = false; progress = "" }
         }
     }
     func restoreBackup() {

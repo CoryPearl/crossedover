@@ -2,6 +2,10 @@
 
 A native Mac home for Windows Steam games. This first release includes a searchable library, compact grid and list views, Steam installation, per-game Play and management controls, and the independently built game runtime.
 
+Settings includes descriptions for all graphics profiles, separate Finder games-folder and Steam Downloads actions, manual-only full backups with cleanup, and a complete app/data uninstaller. Library refresh work runs away from the interface thread and skips unchanged results and background polling.
+
+**More than Steam games is coming soon:** other games, launchers, and platforms are planned.
+
 ## Install
 
 Download **crossedover-1.0.0.dmg**, open it, and drag crossedover into Applications. **Start Here.html** in the disk image walks through Steam setup. SHA-256 checksums are included in **SHA256SUMS.txt**.

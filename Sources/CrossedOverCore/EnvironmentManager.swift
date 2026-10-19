@@ -176,9 +176,11 @@ public actor EnvironmentManager {
         let prefix = paths.prefix(environment), lock = try EnvironmentLock(prefix: paths.prefix(environment))
         defer { withExtendedLifetime(lock) {} }
         try await requireStopped(environment, runtime: current)
-        let backup = try await makeBackup(environment)
+        // Full environment backups are opt-in through backup(), never an upgrade side effect.
         var updated = environment; updated.runtimeID = replacement.id
         if !replacement.manifest.profiles.contains(updated.profile) { updated.profile = .legacy }
+        var interrupted = environment; interrupted.state = "needsRepair"
+        try store.put(interrupted, kind: "environment", id: interrupted.id.uuidString)
         do {
             // Update the prefix without running Steam's Windows startup entry.
             let result = try await ProcessRunner.run(replacement.wine, arguments: ["wineboot", "-u", "-r"], workingDirectory: prefix.appendingPathComponent("drive_c"), environment: WineConfiguration.environment(runtime: replacement, prefix: prefix, profile: updated.profile), timeout: 180)
@@ -191,17 +193,9 @@ public actor EnvironmentManager {
             return updated
         } catch {
             _ = try? await ProcessRunner.run(replacement.wineserver, arguments: ["-k"], environment: WineConfiguration.environment(runtime: replacement, prefix: prefix, profile: updated.profile), timeout: 15)
-            let failed = paths.environments.appendingPathComponent(".failed-upgrade-" + UUID().uuidString)
-            do {
-                try FileManager.default.moveItem(at: prefix, to: failed)
-                let result = try await ProcessRunner.run(URL(fileURLWithPath: "/bin/cp"), arguments: ["-cR", backup.appendingPathComponent("prefix").path, prefix.path], timeout: 1800)
-                guard result.status == 0 else { throw CrossedOverError.message("Rollback copy failed.") }
-                try store.put(environment, kind: "environment", id: environment.id.uuidString)
-                try? FileManager.default.removeItem(at: failed)
-            } catch {
-                throw CrossedOverError.message("Upgrade failed and automatic recovery could not finish. Your backup is preserved at \(backup.path). Restore it before launching Steam.")
-            }
-            throw CrossedOverError.message("Runtime upgrade failed. The previous prefix and runtime selection were restored. Backup: \(backup.path)")
+            // An in-place Wine update may have changed registry files. Preserve the
+            // prefix and block launches until repair or an explicit manual restore.
+            throw CrossedOverError.message("Runtime upgrade failed. Your files are still in the environment, but it needs repair before Steam can launch. Restore a manual backup if you have one, or use Repair. No automatic backup was created.")
         }
     }
     public func restore(_ backup: URL, current: ManagedEnvironment, runtimeManager: RuntimeManager) async throws -> ManagedEnvironment {

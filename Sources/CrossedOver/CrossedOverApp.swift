@@ -15,6 +15,7 @@ import CrossedOverCore
                 if let environment = model.environment {
                     model.games = try SteamDiscovery().discover(environment: environment, prefix: model.paths.prefix(environment))
                 }
+                model.updateSteamLocation()
                 model.operations = try model.store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
                 model.sessions = try model.store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
                 if let fixture = CommandLine.arguments.firstIndex(of: "--preview-games"), fixture + 1 < CommandLine.arguments.count {

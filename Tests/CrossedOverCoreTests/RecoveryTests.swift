@@ -38,7 +38,7 @@ import Testing
         #expect(restored.runtimeID == runtime.id)
         #expect(try String(contentsOf: save, encoding: .utf8) == "original save")
     }
-    @Test func failedUpgradeRestoresThePreviousPrefixAndMetadata() async throws {
+    @Test func failedUpgradePreservesFilesRequiresRepairAndDoesNotBackUp() async throws {
         let (paths, store, environment, runtime) = try fixture()
         defer { try? FileManager.default.removeItem(at: paths.root) }
         let replacement = try makeRuntime(id: "broken", exitStatus: 1, paths: paths)
@@ -46,7 +46,30 @@ import Testing
         await #expect(throws: (any Error).self) { try await manager.migrate(environment, from: runtime, to: replacement) }
         #expect(try store.all(ManagedEnvironment.self, kind: "environment").first?.runtimeID == "original")
         #expect(try String(contentsOf: paths.prefix(environment).appendingPathComponent("save.dat"), encoding: .utf8) == "original save")
-        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.backups.path).count == 1)
+        #expect(try store.all(ManagedEnvironment.self, kind: "environment").first?.state == "needsRepair")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.backups.path).isEmpty)
+    }
+    @Test func successfulUpgradeDoesNotBackUpAndRepairRecoversFailedUpgrade() async throws {
+        let (paths, store, environment, original) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        let manager = EnvironmentManager(paths: paths, store: store)
+        let replacement = try makeRuntime(id: "replacement", exitStatus: 0, paths: paths)
+        let upgraded = try await manager.migrate(environment, from: original, to: replacement)
+        #expect(upgraded.runtimeID == replacement.id)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.backups.path).isEmpty)
+        let broken = try makeRuntime(id: "broken", exitStatus: 1, paths: paths)
+        await #expect(throws: (any Error).self) { try await manager.migrate(upgraded, from: replacement, to: broken) }
+        let interrupted = try #require(store.all(ManagedEnvironment.self, kind: "environment").first)
+        await #expect(throws: (any Error).self) {
+            try await SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: interrupted.id, command: .openSteam))
+        }
+        for file in ["system.reg", "user.reg"] {
+            try Data("WINE REGISTRY Version 2".utf8).write(to: paths.prefix(environment).appendingPathComponent(file))
+        }
+        let repaired = try await manager.repair(interrupted, runtime: replacement)
+        #expect(repaired.state == "ready")
+        #expect(try String(contentsOf: paths.prefix(environment).appendingPathComponent("save.dat"), encoding: .utf8) == "original save")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.backups.path).isEmpty)
     }
     @Test func restoreRejectsAnUnmanagedBackup() async throws {
         let (paths, store, environment, _) = try fixture()

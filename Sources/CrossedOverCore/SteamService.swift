@@ -10,6 +10,11 @@ public actor SteamService {
         }
         throw CrossedOverError.message("Install Windows Steam in this environment first.")
     }
+    public static func gamesFolder(prefix: URL) throws -> URL {
+        let steam = try steamExecutable(prefix: prefix).deletingLastPathComponent()
+        let relative = String(steam.path.dropFirst(prefix.resolvingSymlinksInPath().path.count + 1))
+        return try FileSafety.containedURL(relative + "/steamapps/common", in: prefix)
+    }
     public func install(environment: ManagedEnvironment, runtime: InstalledRuntime) async throws {
         let prefix = paths.prefix(environment)
         let lock = try EnvironmentLock(prefix: prefix); defer { withExtendedLifetime(lock) {} }

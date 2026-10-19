@@ -22,6 +22,10 @@ struct ContentView: View {
     @FocusState private var searchFocused: Bool
     @State private var advancedExpanded = false
     @State private var forceStopConfirmation = false
+    @State private var clearBackupsConfirmation = false
+    @State private var uninstallConfirmation = false
+    @State private var manualBackupConfirmation = false
+    @State private var pendingRuntime: InstalledRuntime?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -57,6 +61,22 @@ struct ContentView: View {
             Button("Force quit", role: .destructive) { model.stop(force: true) }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Unsaved game progress may be lost.") }
+        .confirmationDialog("Move all environment backups to Trash?", isPresented: $clearBackupsConfirmation, titleVisibility: .visible) {
+            Button("Move backups to Trash", role: .destructive) { model.clearBackups() }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Your installed games and current saves stay in place. Backups remain in Trash until you empty it in Finder.") }
+        .confirmationDialog("Uninstall crossedover and all its games?", isPresented: $uninstallConfirmation, titleVisibility: .visible) {
+            Button("Uninstall app and data", role: .destructive) { model.uninstallApplication() }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Quit Steam and all games first. This moves crossedover, its Windows Steam client, every managed game, local saves, runtimes, and backups to Trash, then quits. Empty Trash to reclaim space. Your separate Mac Steam library stays in place.") }
+        .confirmationDialog("Create a full manual backup?", isPresented: $manualBackupConfirmation, titleVisibility: .visible) {
+            Button("Create backup") { model.backup() }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("This copies the entire Windows environment, including all games and local saves, and can take substantial disk space. No backups are created automatically.") }
+        .confirmationDialog("Change the Windows runtime?", isPresented: Binding(get: { pendingRuntime != nil }, set: { if !$0 { pendingRuntime = nil } }), titleVisibility: .visible) {
+            if let runtime = pendingRuntime { Button("Change runtime") { pendingRuntime = nil; model.useRuntime(runtime) } }
+            Button("Cancel", role: .cancel) { pendingRuntime = nil }
+        } message: { Text("Quit Steam and all games first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Advanced before continuing.") }
         .sheet(isPresented: Binding(get: { model.diagnostics != nil }, set: { if !$0 { model.diagnostics = nil } })) { diagnostics }
     }
 
@@ -209,7 +229,9 @@ struct ContentView: View {
             }.font(.system(size: 12)).padding(.horizontal, 11).frame(height: 34).frame(maxWidth: 340)
                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(searchFocused ? Palette.muted : Palette.line))
-                .background(SearchFocusDismissal(isFocused: searchFocused) { searchFocused = false })
+                .background {
+                    if !renderingSnapshot { SearchFocusDismissal(isFocused: searchFocused) { searchFocused = false } }
+                }
             Spacer(minLength: 0)
             HStack(spacing: 2) {
                 presentationButton("grid", title: "Grid view", symbol: "square.grid.2x2")
@@ -379,18 +401,29 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .leading, spacing: 12) {
                 sectionLabel("GAME EXPERIENCE")
+                VStack(alignment: .leading, spacing: 0) {
                 settingRow("Graphics", detail: "Quit Steam before changing the graphics profile.") {
                     Group {
                         if renderingSnapshot { menuLabel(model.environment?.profile.title ?? "Not set up") }
                         else {
                             Menu {
-                                ForEach((model.runtime?.manifest.profiles ?? []).filter { $0 != .metal }) { profile in
+                                ForEach(model.runtime?.manifest.profiles ?? []) { profile in
                                     Button(profile.title) { model.changeProfile(profile) }
                                 }
                             } label: { menuLabel(model.environment?.profile.title ?? "Not set up") }
                                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                         }
                     }.disabled(model.busy || model.environment == nil)
+                }
+                Rule().padding(.horizontal, 22)
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(GraphicsProfile.allCases) { profile in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(profile.title) · \(profile.subtitle)").font(.system(size: 11, weight: .medium))
+                            Text(profile.explanation).font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }.padding(22)
                 }.panel()
             }
             VStack(alignment: .leading, spacing: 12) {
@@ -406,8 +439,12 @@ struct ContentView: View {
                     }
                     if model.steamInstalled {
                         Rule().padding(.horizontal, 22)
-                        settingRow("Downloads", detail: "Manage installs and updates in Steam.") {
-                            Button { model.openDownloads() } label: { Label("Open", systemImage: "arrow.up.right") }.buttonStyle(SecondaryButton())
+                        settingRow("Downloaded games", detail: "Open the installed games folder in Finder.") {
+                            Button { model.openDownloadsFolder() } label: { Label("Open download folder", systemImage: "folder") }.buttonStyle(SecondaryButton())
+                        }
+                        Rule().padding(.horizontal, 22)
+                        settingRow("Steam Downloads", detail: "Manage download progress and updates in Steam.") {
+                            Button { model.openSteamDownloads() } label: { Label("Steam Downloads", systemImage: "arrow.up.right") }.buttonStyle(SecondaryButton())
                         }
                     }
                 }.panel().disabled(model.busy)
@@ -426,6 +463,15 @@ struct ContentView: View {
                 }.buttonStyle(.plain).accessibilityValue(advancedExpanded || previewAdvanced ? "Expanded" : "Collapsed")
                 if advancedExpanded || previewAdvanced { Rule(); advanced.padding(22) }
             }.panel()
+            VStack(alignment: .leading, spacing: 0) {
+                settingRow("Backups", detail: "Manual only. Full backups include every installed game.") {
+                    Button("Clear backups…") { clearBackupsConfirmation = true }.buttonStyle(SecondaryButton())
+                }
+                Rule().padding(.horizontal, 22)
+                settingRow("Uninstall crossedover", detail: "Remove the app, managed games, local saves, and app data.") {
+                    Button("Uninstall…") { uninstallConfirmation = true }.buttonStyle(SecondaryButton())
+                }
+            }.panel().disabled(model.busy)
             Text("crossedover \(AppVersion.current)").font(.system(size: 10)).foregroundStyle(Palette.muted)
         }
     }
@@ -435,7 +481,7 @@ struct ContentView: View {
             if let environment = model.environment {
                 VStack(alignment: .leading, spacing: 12) {
                     detailHeading("Recovery")
-                    Text("Quit Steam and all games before backing up or repairing.").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text("Quit Steam and all games before backing up or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { recoveryActions(environment) }
                         VStack(alignment: .leading, spacing: 8) { recoveryActions(environment) }
@@ -455,7 +501,7 @@ struct ContentView: View {
                         else {
                             Menu {
                                 ForEach(alternatives) { runtime in
-                                    Button("Back up and use \(runtime.manifest.name)") { model.useRuntime(runtime) }
+                                    Button("Use \(runtime.manifest.name)") { pendingRuntime = runtime }
                                 }
                             } label: { menuLabel("Switch runtime…") }
                                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
@@ -479,7 +525,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder private func recoveryActions(_ environment: ManagedEnvironment) -> some View {
-        Button("Back up") { model.backup() }.buttonStyle(SecondaryButton())
+        Button("Back up…") { manualBackupConfirmation = true }.buttonStyle(SecondaryButton())
         Button("Restore…") { model.restoreBackup() }.buttonStyle(SecondaryButton())
         Button("Repair") { model.repair() }.buttonStyle(SecondaryButton())
         Button("Show files") { NSWorkspace.shared.open(model.paths.prefix(environment)) }.buttonStyle(SecondaryButton())

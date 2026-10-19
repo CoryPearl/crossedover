@@ -11,6 +11,13 @@ public enum GraphicsProfile: String, Codable, CaseIterable, Sendable, Identifiab
     public var title: String {
         switch self { case .legacy: "Legacy"; case .performance: "Performance"; case .metal: "Metal" }
     }
+    public var explanation: String {
+        switch self {
+        case .legacy: "Uses OpenGL for older DirectX 9 games. Try this compatibility fallback if Performance has rendering problems."
+        case .performance: "Translates DirectX 9 through DXVK and Metal. Recommended for TrackMania Nations Forever and other compatible older games."
+        case .metal: "Translates DirectX 10 and 11 directly to Metal with DXMT. Used by CS2; support and performance vary by game."
+        }
+    }
     public var subtitle: String {
         switch self {
         case .legacy: "Direct3D 9 · OpenGL"
@@ -91,7 +98,7 @@ public struct GameRecipe: Codable, Sendable, Identifiable {
     public var id: String { appID }
 }
 
-public struct LaunchSession: Codable, Sendable, Identifiable {
+public struct LaunchSession: Codable, Sendable, Identifiable, Equatable {
     public var id: UUID
     public var appID: String
     public var environmentID: UUID
@@ -105,7 +112,7 @@ public struct LaunchSession: Codable, Sendable, Identifiable {
     }
 }
 
-public struct OperationRecord: Codable, Sendable, Identifiable {
+public struct OperationRecord: Codable, Sendable, Identifiable, Equatable {
     public var id: UUID
     public var kind: String
     public var state: String

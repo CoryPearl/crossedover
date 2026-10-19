@@ -64,6 +64,9 @@ public enum SupervisorEngine {
             guard result.status == 0, let processes = decodeObservation(result.output) else { throw CrossedOverError.message("Windows process observation failed.") }
             return SupervisorReply(success: true, message: "Observed Windows processes.", processes: processes)
         }
+        guard environment.state == "ready" || request.command == .shutdown else {
+            throw CrossedOverError.message("Repair the Windows environment in Settings → Advanced before opening Steam.")
+        }
         _ = try SteamService.steamExecutable(prefix: prefix)
         if request.command.requiresGameID {
             guard let appID = request.appID, SteamDiscovery.validAppID(appID) else { throw CrossedOverError.message("Invalid Steam App ID.") }
@@ -143,6 +146,9 @@ public enum SupervisorEngine {
         try FileManager.default.removeItem(at: requestFile)
         let store = try Store(url: paths.root.appendingPathComponent("crossedover.sqlite"))
         guard let environment = try store.all(ManagedEnvironment.self, kind: "environment").first(where: { $0.id == request.environmentID }) else { throw CrossedOverError.message("Unknown environment.") }
+        guard environment.state == "ready" || request.command == .shutdown else {
+            throw CrossedOverError.message("Repair the Windows environment before opening Steam.")
+        }
         let root = try FileSafety.containedURL(environment.runtimeID, in: paths.runtimes)
         let manifest = try JSONDecoder().decode(RuntimeManifest.self, from: Data(contentsOf: root.appendingPathComponent("runtime.json")))
         try RuntimeManager.validate(manifest, root: root, verifyHashes: false)
