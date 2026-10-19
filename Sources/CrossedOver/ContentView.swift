@@ -497,9 +497,8 @@ struct ContentView: View {
 
     private func gameDetails(_ game: GameInstallation?) -> some View {
         let isDemo = game == nil || (game?.store == .steam && game?.appID == "11020")
-        let experimental = game.flatMap { model.recipe(for: $0) }?.status == "experimental"
         return VStack(alignment: .leading, spacing: 0) {
-            Text((game?.store.title.uppercased() ?? "STEAM") + " · " + (isDemo ? "DEMO" : experimental ? "EXPERIMENTAL" : "UNTESTED")).font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
+            Text((game?.store.title.uppercased() ?? "STEAM") + (isDemo ? " · DEMO" : "")).font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
                 .padding(.bottom, 10)
             Text(isDemo ? "TrackMania" : game?.name ?? "Windows game")
                 .font(.system(size: 17, weight: .medium)).tracking(-0.3).lineLimit(2)
