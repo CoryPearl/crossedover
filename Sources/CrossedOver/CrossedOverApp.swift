@@ -57,9 +57,22 @@ import CrossedOverCore
                 let width = min(2560, max(840, Double(previewArgument("--preview-width") ?? "") ?? (compact ? 840 : 1100)))
                 let height = min(1800, max(620, Double(previewArgument("--preview-height") ?? "") ?? (tall ? 1400 : compact ? 620 : 760)))
                 await model.preparePreviewArtwork()
-                let renderer = ImageRenderer(content: ContentView(model: model, renderingSnapshot: true, previewAdvanced: advanced,
+                let preview: AnyView
+                if CommandLine.arguments.contains("--preview-minecraft") {
+                    model.bedrockChecked = true
+                    if let state = previewArgument("--preview-minecraft-state"), state != "unavailable" {
+                        model.bedrockAvailable = true
+                        model.bedrockInstalled = state == "ready" || state == "playing"
+                        model.bedrockActive = ["busy", "starting", "playing"].contains(state)
+                        model.bedrockStatus = try BedrockEvent.decode(JSONSerialization.data(withJSONObject: ["state": state, "title": "Downloading Minecraft"]))
+                    }
+                    preview = AnyView(MinecraftLauncherView(model: model, renderingSnapshot: true).environment(\.colorScheme, .dark))
+                } else {
+                    preview = AnyView(ContentView(model: model, renderingSnapshot: true, previewAdvanced: advanced,
                     previewLibraryMode: previewArgument("--preview-layout") ?? "grid", previewSearch: previewArgument("--preview-search"))
-                    .environment(\.colorScheme, .dark).frame(width: width, height: height))
+                    .environment(\.colorScheme, .dark))
+                }
+                let renderer = ImageRenderer(content: preview.frame(width: width, height: height))
                 renderer.scale = 2
                 guard let image = renderer.cgImage, let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { throw CrossedOverError.message("Could not render the SwiftUI preview.") }
                 try data.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
@@ -84,7 +97,7 @@ struct CrossedOverApp: App {
             if let model { ContentView(model: model)
                 .frame(minWidth: 840, minHeight: 620)
                 .preferredColorScheme(.dark)
-                .task { await model.start() }
+                .task { delegate.model = model; await model.start() }
             } else {
                 ContentUnavailableView("Couldn't open your library", systemImage: "externaldrive.badge.exclamationmark", description: Text(startupError ?? "The local data directory could not be opened. Your existing files have not been removed."))
                     .frame(width: 700, height: 420).preferredColorScheme(.dark)
@@ -114,6 +127,7 @@ struct CrossedOverApp: App {
 }
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var model: AppModel?
     private var updater: SPUStandardUpdaterController?
     var updatesConfigured: Bool { Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil && Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") != nil }
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -121,5 +135,17 @@ struct CrossedOverApp: App {
         if updatesConfigured { updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil) }
     }
     func checkForUpdates() { updater?.checkForUpdates(nil) }
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { model?.bedrockActive != true }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model, model.bedrockActive else { return .terminateNow }
+        model.bedrockError = "Finish your game or use Stop Minecraft before quitting crossedover. The account helper needs to stay open during this session."
+        model.showingMinecraft = true
+        sender.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
+        sender.activate(ignoringOtherApps: true)
+        return .terminateCancel
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { sender.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil) }
+        return true
+    }
 }

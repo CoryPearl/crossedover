@@ -193,6 +193,10 @@ Steam setup downloads the installer from Valve's configured HTTPS URL, checks it
 
 Epic and imported executables can prepare an environment without installing Steam. Ubisoft discovery uses an existing installed client; there is no separate automatic Ubisoft installer in the app. Epic can install that partner client as part of its own game setup.
 
+Epic's external launch route also needs its EOSH component. `EpicLaunchSupport` checks the installed host and queries the live 32-bit `HKLM\Software\Epic Games\EOS\MainService` version before accepting an Epic game request. The current minimum is 5.3.0. Missing support produces an actionable error instead of a request receipt followed by a 90-second wait. Library Play and protocol activation follow different paths inside Epic; a working manual launch does not establish external-handler readiness.
+
+Fresh Epic setup and **Repair launch support** use Epic's bundled `Portal/Extras/EOS/EpicOnlineServicesInstaller.exe /install productid=EpicGamesLauncher /quiet`. Repair requires a stopped prefix and holds its operation lock. If neither native .NET 4 nor Wine Mono is installed, it downloads Wine Mono 10.4.1 from its official release and checks the exact size and SHA-256 pinned by the bundled Wine source. Installer-only DLL overrides permit native .NET with a Mono fallback; ordinary launcher/game and Steam overrides remain unchanged. The staged MSI is removed, and vendor installer logs remain local. No account caches are inspected or changed by crossedover. Registration/version checks prove prerequisite setup, not game authorization or visible gameplay.
+
 ## 6. How installed games become cards
 
 The library describes **local completed installations**, not every purchase in a user's online store account. crossedover does not need an account API token to list those installations.
@@ -553,6 +557,32 @@ The implementation has a local library, not a universal Windows compatibility gu
 - Current Brawlhalla card routing/window-controls and other experimental changes still need the live confirmations described in the validation record.
 - Current testing centers on an M4/16 GB Mac. The short TrackMania 55–60 FPS result is not a guaranteed minimum or a benchmark for other games or Macs.
 
-Adding another launcher requires more than a sidebar button: official setup/authentication, bounded installation discovery, validated launch/manage routes, process tracking, file access, appropriate runtime behavior, uninstall discovery, and real account/game testing. A Bedrock-specific WineGDK route would additionally need a separate runtime/account/licensing integration and careful world-save handling; see [the assessment](docs/XBOX_AND_BEDROCK.md).
+Adding another launcher requires more than a sidebar button: official setup/authentication, bounded installation discovery, validated launch/manage routes, process tracking, file access, appropriate runtime behavior, uninstall discovery, and real account/game testing. The v1.4 Bedrock development backend adds separate runtime/account/licensing integration and preserves worlds on game uninstall; live account/game validation remains required. See [the assessment](docs/XBOX_AND_BEDROCK.md).
 
 For source changes, keep parsing and lifecycle logic in `CrossedOverCore`, orchestration in `AppModel`, and presentation in the GUI views. Never turn store metadata into an arbitrary shell command. Add tests for meaningful parsing/lifecycle boundaries, use owned integration programs, and record actual game observations separately from the implementation's intended behavior.
+
+
+## Epic partner launch handoff
+
+Epic partner games use a separate compatibility queue in `EpicLaunchQueue.swift`:
+the public validated launch URI is serialized as Unix seconds plus `|` plus URI
+in the `PendingUri` REG_SZ value under `HKCU\Software\Epic Games\EpicGamesLauncher`. This is a compatibility interface observed in the installed client, rather than a general Xbox or Ubisoft API. The supervisor holds
+the environment lock, checks prerequisites and the game’s stopped state, writes
+an app-owned receipt, and starts Epic with `-SkipBuildPatchPrereq -forwarduri`.
+The detached worker checks its generation and receipt again before startup.
+Epic retains ownership and generates any partner authentication itself. This
+route never reads or replays an exchange code. Generic Epic games retain the
+Windows shell route. Stop removes only a value matching the app’s receipt,
+preserving a newer external request, and handles Windows CRLF output from
+`reg.exe`. A request acknowledgement still means Requested; process observation
+is required for Running.
+
+## Minecraft backend in v1.4 development
+
+`BedrockService.swift` implements an independent backend boundary, outside the Steam/Epic supervisor. `BedrockBackend.load` validates a pinned schema/revision, HTTPS-only policy, required components, every file digest and the exact file/symlink inventory. Verification runs off the UI actor. The worker receives a minimal environment with `BEDROCK_HOME=<CrossedOver root>/Bedrock` and `BEDROCK_BUNDLE=<verified backend>`, without inherited Wine/DYLD/Python overrides. A bounded JSON stream maps only known states and progress to reviewed UI text; arbitrary account strings never become status or activity entries. Unknown states, oversized lines, malformed progress, or a worker exit without a terminal state fail the session.
+
+`MinecraftLauncherView` is opened from the shared Game Launchers menu or Settings. Play owns one worker through account checks, download, preparation and observed gameplay. Stop terminates that worker; the worker unwinds its own subprocess groups/helper/prefix, and the native app waits for its exit before clearing the active state. Steam/Epic sessions are independent. The app stays alive after its window closes during Minecraft and prevents quit/uninstall while its own session is active; uninstall also checks the backend onboarding lock. Microsoft sign-out preserves worlds.
+
+`runtime/bedrock/prepare.py` builds from pinned Bedrock for Mac/WineGDK/Xodus sources, applies the tracked compatibility patch, tests the helper, freezes Python, and stages only allowed components. `scripts/package.py --bedrock-backend` verifies the staged inventory, signs nested code, and records the signed hashes. `--output` creates a separate local preview app. No account, game or Microsoft DLL enters the backend. Account data uses the `crossedover Minecraft` Keychain service. The local preview requires macOS 26, Apple silicon, Rosetta and an owned Windows Bedrock edition.
+
+The upstream HTTP package fallback is removed. Foreground and background catalog origins are accepted only over certificate-verified HTTPS, without hostname rewrites. Live sign-in succeeded, but the licensed package download did not. Attempted HTTPS mirror routes returned 404/503 and were removed; no HTTP request or certificate exception is used. Some upstream package sections lack complete integrity authentication; without a secure HTTPS origin, setup must stop instead of installing those bytes. This restriction can prevent installation and is not presented as verified Bedrock support. Full download/gameplay, saves, controls, window behavior and clean-machine tests remain separate release checks. See [the backend guide](runtime/bedrock/README.md) and [current assessment](docs/XBOX_AND_BEDROCK.md).

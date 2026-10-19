@@ -54,7 +54,11 @@ Full environment backups are **manual only**. **Settings → Uninstall crossedov
 
 **Settings → Graphics renderer** offers DirectX 9–11, DirectX 10–11, DirectX 9, and an OpenGL fallback, with guidance for each. The combined mode appears when both backends are installed. Epic’s launcher manages DXMT for DirectX 10–11 and DXVK for DirectX 9 when available. Steam and imported apps keep their selected graphics profile. See the [Epic quickstart](QUICKSTART.md#epic-games) for setup and management.
 
+If an existing Epic installation opens its client but no game, quit Windows games and launchers, then use **Settings → Windows Epic Games → Repair launch support** to install missing Epic components.
+
 The Windows Xbox app and Minecraft Bedrock are **not supported by the included runtime**. Settings can open Xbox Cloud Gaming for supported streaming titles; this does not install Xbox games. [Xbox and Bedrock status](QUICKSTART.md#xbox-and-minecraft-bedrock).
+
+**v1.4 development:** a dedicated Minecraft Bedrock launcher and separate WineGDK backend are being tested locally. They are not part of the published v1.3.1 download. See [the local preview build](runtime/bedrock/README.md) for its requirements and outstanding gameplay checks.
 
 ## Build
 

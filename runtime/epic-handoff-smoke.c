@@ -2,8 +2,22 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 int main(int argc, char **argv) {
     const char *uri = NULL;
+    char pending[8192] = {0};
+    for (int i = 1; i < argc; ++i) if (!strcmp(argv[i], "-forwarduri")) {
+        HKEY key; DWORD type = 0, bytes = sizeof(pending);
+        if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Epic Games\\EpicGamesLauncher", 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &key) != ERROR_SUCCESS) return 27;
+        LONG result = RegQueryValueExA(key, "PendingUri", NULL, &type, (BYTE *)pending, &bytes);
+        if (result != ERROR_SUCCESS || type != REG_SZ || !bytes || bytes >= sizeof(pending)) { RegCloseKey(key); return 28; }
+        char *separator = strchr(pending, '|'), *end = NULL;
+        if (!separator) { RegCloseKey(key); return 29; }
+        strtoull(pending, &end, 10);
+        if (end != separator) { RegCloseKey(key); return 30; }
+        uri = separator + 1;
+        RegDeleteValueA(key, "PendingUri"); RegCloseKey(key);
+    }
     for (int i = 1; i < argc; ++i) if (!strncmp(argv[i], "com.epicgames.launcher://", strlen("com.epicgames.launcher://")) || !strncmp(argv[i], "uplay://", strlen("uplay://"))) uri = argv[i];
     if (!uri) uri = "com.epicgames.launcher://store/library";
     FILE *request = fopen("C:\\crossedover\\epic-handoff-request.txt", "wb");

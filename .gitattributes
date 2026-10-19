@@ -2,3 +2,4 @@
 licenses/* -whitespace
 runtime/patches/*.patch -whitespace
 runtime/patches/d9vk/*.patch -whitespace
+runtime/bedrock/patches/*.patch -whitespace

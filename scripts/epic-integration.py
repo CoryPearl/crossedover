@@ -5,10 +5,11 @@ import argparse,json,os,shutil,sqlite3,subprocess,time,uuid
 PROJECT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--app',type=Path)
+parser.add_argument('--configuration',choices=['debug','release'],default='release')
 options=parser.parse_args()
 source=options.app.resolve()/'Contents/Resources/BundledRuntime' if options.app else PROJECT/'runtime/output/source-wine'
-supervisor=options.app.resolve()/'Contents/MacOS/CrossedOverSupervisor' if options.app else PROJECT/'.build/release/CrossedOverSupervisor'
-cli=PROJECT/'.build/release/CrossedOverCLI'
+supervisor=options.app.resolve()/'Contents/MacOS/CrossedOverSupervisor' if options.app else PROJECT/'.build'/options.configuration/'CrossedOverSupervisor'
+cli=PROJECT/'.build'/options.configuration/'CrossedOverCLI'
 manifest=json.loads((source/'runtime.json').read_text())
 root=PROJECT/'.cache'/('epic-handoff-'+str(uuid.uuid4()))
 (root/'Runtimes').mkdir(parents=True)
@@ -37,6 +38,10 @@ try:
  with (prefix/'system.reg').open('a') as registry:
   registry.write('\n'+r'[Software\\Classes\\com.epicgames.launcher]'+'\n@="Owned Epic protocol"\n"URL Protocol"=""\n')
   registry.write('\n'+r'[Software\\Classes\\com.epicgames.launcher\\shell\\open\\command]'+'\n@='+json.dumps('"'+r'C:\Program Files\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe'+'" "%1"')+'\n')
+  # Public helper metadata for the owned stand-in, not the real Epic service.
+  registry.write('\n'+r'[Software\\WOW6432Node\\Epic Games\\EOS\\MainService]'+'\n"Version"="5.8.1"\n')
+ helper=prefix/'drive_c/Program Files (x86)/Epic Games/Epic Online Services/service/EpicOnlineServicesHost.exe'
+ helper.parent.mkdir(parents=True); shutil.copy2(runtime/'share/crossedover/smoke-64.exe',helper)
  game=prefix/'drive_c/Program Files/Epic Games/OwnedProbe'; game.mkdir(parents=True)
  shutil.copy2(runtime/'share/crossedover/d3d11-smoke-64.exe',game/'Brawlhalla.exe')
  manifests=prefix/'drive_c/ProgramData/Epic/EpicGamesLauncher/Data/Manifests'; manifests.mkdir(parents=True)
@@ -50,7 +55,7 @@ try:
  result=prefix/'drive_c/crossedover/epic-handoff-result.txt'
  request('launchEpicGame')
  for _ in range(300):
-  if result.exists(): break
+  if result.exists() and result.stat().st_size > 0: break
   time.sleep(.1)
  launch_log=root/'Logs/epic-session.log'
  assert result.exists() and result.read_text()=='0', {'log':launch_log.read_text(errors='replace')[-1000:] if launch_log.exists() else 'no worker log', 'handoff':handoff.read_text() if handoff.exists() else 'no handoff'}
@@ -67,7 +72,7 @@ try:
  result.unlink(); handoff.unlink()
  request('launchEpicGame')
  for _ in range(300):
-  if result.exists(): break
+  if result.exists() and result.stat().st_size > 0: break
   time.sleep(.1)
  assert result.exists() and result.read_text()=='0'
  readback=(prefix/'drive_c/crossedover/epic-readback.txt').read_text(errors='replace')
@@ -76,9 +81,9 @@ try:
   handoff.unlink(missing_ok=True)
   request(operation)
   for _ in range(100):
-   if handoff.exists(): break
+   if handoff.exists() and handoff.stat().st_size > 0: break
    time.sleep(.1)
-  assert handoff.exists() and handoff.read_text()=='com.epicgames.launcher://store/library',operation
+  assert handoff.exists() and handoff.read_text()=='com.epicgames.launcher://store/library', {'operation':operation,'handoff':handoff.read_text() if handoff.exists() else 'missing','workerLog':launch_log.read_text(errors='replace')[-1500:] if launch_log.exists() else 'missing'}
  # Epic's Ubisoft-managed installs have partner records rather than .items.
  # Epic retains launch ownership even when Ubisoft manages installation.
  item.unlink()
@@ -96,16 +101,26 @@ try:
  count=len((prefix/'drive_c/crossedover/epic-handoff-order.txt').read_text().splitlines())
  request('launchEpicGame','OwnedPartner')
  for _ in range(300):
-  if result.exists(): break
+  if result.exists() and result.stat().st_size > 0: break
   time.sleep(.1)
  assert result.exists() and result.read_text()=='0'
  assert handoff.read_text()=='com.epicgames.launcher://apps/probe-ns%3Apartner-item%3AOwnedPartner?action=launch&silent=false'
- assert len((prefix/'drive_c/crossedover/epic-handoff-order.txt').read_text().splitlines())==count+2
+ assert len((prefix/'drive_c/crossedover/epic-handoff-order.txt').read_text().splitlines())==count+1
+ # Stop clears only our unconsumed queue before Wine exits. This prevents the
+ # next normal Open Epic from replaying a launch the user cancelled.
+ queued=str(int(time.time()))+'|'+handoff.read_text()
+ (prefix/'.crossedover-epic-pending.json').write_text(json.dumps({'payload':queued,'generation':(prefix/'.crossedover-launch-generation').read_text().strip()}))
+ variables=dict(os.environ,WINEPREFIX=str(prefix),WINESERVER=str(runtime/'bin/wineserver'),WINEDEBUG='-all',WINEMSYNC='1' if manifest.get('supportsMSync') else '0')
+ subprocess.run([str(runtime/'bin/wine'),'reg.exe','add',r'HKCU\Software\Epic Games\EpicGamesLauncher','/v','PendingUri','/t','REG_SZ','/d',queued,'/f'],env=variables,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True,timeout=15)
+ command('force-stop')
+ assert not (prefix/'.crossedover-epic-pending.json').exists()
+ absent=subprocess.run([str(runtime/'bin/wine'),'reg.exe','query',r'HKCU\Software\Epic Games\EpicGamesLauncher','/v','PendingUri'],env=variables,capture_output=True,timeout=15)
+ assert absent.returncode!=0, {'queueAfterStop':repr(absent.stdout[:4096]), 'receiptStillPresent':(prefix/'.crossedover-epic-pending.json').exists()}
  # Simulate a completed uninstall and remove only its card.
  partner.unlink(); shutil.rmtree(game)
  assert json.loads(command('games'))==[]
  assert not list((root/'Backups').iterdir())
- output={'ownedFixture':True,'officialEpicAuthenticationTested':False,'runtime':manifest['id'],'completeInstallDiscovery':True,'launchURIHandoff':True,'coldClientPrimed':True,'d3d11MetalReadback':True,'d3d9ScopedReadback':True,'partnerThroughEpic':True,'managementLibraryRoutes':True,'uninstallDiscovery':True,'automaticBackups':False}
+ output={'ownedFixture':True,'helperReadinessFixtureOnly':True,'officialEpicAuthenticationTested':False,'runtime':manifest['id'],'completeInstallDiscovery':True,'launchURIHandoff':True,'coldClientPrimed':True,'d3d11MetalReadback':True,'d3d9ScopedReadback':True,'partnerThroughEpic':True,'partnerTimestampedQueue':True,'managementLibraryRoutes':True,'uninstallDiscovery':True,'automaticBackups':False}
  output_file=PROJECT/'.cache/release-preview/epic-results.json'
  output_file.parent.mkdir(parents=True,exist_ok=True)
  output_file.write_text(json.dumps(output,indent=2))

@@ -31,6 +31,38 @@ import CrossedOverCore
             return environment
         }
         switch command {
+        case "minecraft-status", "minecraft":
+            guard let location = ProcessInfo.processInfo.environment["CROSSEDOVER_BEDROCK_BACKEND"] else {
+                throw CrossedOverError.message("Set CROSSEDOVER_BEDROCK_BACKEND to a verified local preview backend.")
+            }
+            let backend = try await Task.detached(priority: .utility) {
+                try BedrockBackend.load(at: URL(fileURLWithPath: location, isDirectory: true))
+            }.value
+            func emit(_ event: BedrockEvent) throws {
+                let object: [String: Any] = ["state": event.phase.rawValue, "title": event.title, "detail": event.detail,
+                                             "progress": event.progress.map { $0 as Any } ?? NSNull()]
+                let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+                FileHandle.standardOutput.write(data + Data([10]))
+            }
+            if command == "minecraft-status" { try emit(await backend.status(dataRoot: paths.root)); return }
+            guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 else {
+                throw CrossedOverError.message("The Minecraft preview requires Apple silicon and macOS 26 or later.")
+            }
+            let service = BedrockService()
+            // Keep terminal interruption on the same owned cleanup path as the
+            // native Stop action; do not orphan the account/game worker.
+            signal(SIGINT, SIG_IGN); signal(SIGTERM, SIG_IGN)
+            let signals = [SIGINT, SIGTERM].map { number in
+                let source = DispatchSource.makeSignalSource(signal: number, queue: .global())
+                source.setEventHandler { Task { await service.cancel() } }
+                source.resume(); return source
+            }
+            defer { for source in signals { source.cancel() } }
+            let events = try await service.events(backend: backend, dataRoot: paths.root)
+            var failed = false
+            for try await event in events { try emit(event); if event.phase == .error { failed = true } }
+            await service.waitUntilStopped()
+            if failed { throw CrossedOverError.message("Minecraft's session stopped; see the reviewed status above.") }
         case "host": try await printJSON(HostInspector.inspect(at: paths.root))
         case "runtime-list": try await printJSON(runtimes.installed().map(\.manifest))
         case "runtime-install":
@@ -54,6 +86,10 @@ import CrossedOverCore
             let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
             try await EpicService(paths: paths).install(environment: environment, runtime: runtime)
             print("Windows Epic Games Launcher installed.")
+        case "epic-repair":
+            let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
+            try await EpicService(paths: paths).repairLaunchSupport(environment: environment, runtime: runtime)
+            print("Epic launch support is ready.")
         case "epic", "epic-launch", "epic-manage", "epic-verify", "epic-uninstall", "epic-downloads":
             let environment = try current()
             let operation: SupervisorRequest.Command = ["epic": .openEpic, "epic-launch": .launchEpicGame, "epic-manage": .epicProperties, "epic-verify": .verifyEpicGame, "epic-uninstall": .uninstallEpicGame, "epic-downloads": .epicDownloads][command]!
@@ -162,12 +198,15 @@ import CrossedOverCore
               app-run UUID              Run a saved Windows app card
               app-runs                  Inspect Windows app launch results
               epic-install              Download and install Windows Epic Games Launcher
+              epic-repair               Install Epic launch prerequisites after closing Windows apps
               epic                      Open the managed Windows Epic library
               epic-launch APPNAME       Request launch through Epic
               epic-manage APPNAME       Open Epic Library for game management
               epic-verify APPNAME       Open Epic for Manage → Verify
               epic-uninstall APPNAME    Open Epic for Manage → Uninstall
               epic-downloads            Open Epic for downloads and updates
+              minecraft-status          Check a separate local Bedrock preview backend (offline)
+              minecraft                 Start that preview; Control-C cancels its owned session
               ubisoft                   Open an existing managed Ubisoft Connect
               ubisoft-launch ID         Request a Ubisoft-only installation launch
               ubisoft-manage ID         Open Ubisoft for game management

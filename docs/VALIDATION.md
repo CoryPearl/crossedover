@@ -1,5 +1,82 @@
 # Validation record
 
+## Minecraft Bedrock preview and Epic partner queue — October 19, 2026
+
+**Development work for v1.4; not released or gameplay-verified.** The local
+Minecraft launcher panel, Games grid/list entry after verified installation,
+independent session service, account sign-out, cancellation, game-files access
+and world-preserving uninstall are implemented. Bedrock uses its own data root
+and WineGDK server, separate from Steam/Epic. Uninstall holds the onboarding
+lock; an active worker keeps the native app alive when its window closes.
+
+- All **84 Swift tests in 15 suites** passed, followed by a release build.
+  Bedrock coverage includes exact backend file/symlink inventory and digest
+  validation, root containment, offline status, reviewed status text, invalid
+  messages, progress arriving before process exit, duplicate-session rejection,
+  cancellation, terminal-state failures, and held uninstall locks.
+- Built the pinned Bedrock for Mac integration, WineGDK and Xodus helper locally
+  with two compiler jobs. The account-free helper suite passed **13 tests**
+  (two live tests remained ignored). The patched onboarding suite passed
+  **16 tests**, including the one-helper setup/play lifecycle and preserved reviewed account error codes.
+- The helper rejects HTTP transport and insecure redirects. The explicit
+  account-free Rust test successfully fetched the public HTTPS routing file.
+  Actual licensed package requests to that server returned **404**; a bounded
+  original-virtual-host experiment returned **503**. Those hostname-rewriting
+  experiments were removed. The helper now requires a catalog-supplied HTTPS
+  origin and considers both foreground and background candidates. Public asset
+  origin checks failed TLS verification; no certificate exception was added.
+- Staged a 375 MiB backend with 1,048 original regular files and 16 symlinks.
+  Packaging preserves third-party notices, signs nested Python/runtime code,
+  inventories newly generated signing metadata, and signs the outer app. A
+  separate preview app passed `codesign --verify --deep --strict`. The signed
+  Wine/DXMT overlay hashes still match; the signed worker returned a valid
+  account-free `new` installation status through Core.
+- App-owned SwiftUI launcher renders were checked for layout. These are static
+  renders, not protected-window inspection or interaction tests.
+- A live setup used the same Core service and signed worker with the user's
+  normal data root. The owner confirmed **successful Microsoft sign-in** and
+  approved the retry's Keychain prompt. The saved account reached the Minecraft
+  purchase/package lookup. Installation then failed with reviewed
+  `package_connection` status; only allowlisted error/status categories were
+  inspected. The sign-in is preserved. **No game installed or launched.**
+  Gameplay, audio/input, worlds, fullscreen/window controls, repeat launch and
+  clean-Mac validation remain pending.
+
+The included v1.3.1 download/version links remain unchanged. No public Minecraft
+runtime or v1.4 release has been pushed. Build/readiness details are in
+[the backend guide](../runtime/bedrock/README.md). Local evidence is in
+`.cache/v1.3/bedrock-*`; runtime/source output stays ignored.
+
+Epic's bundled online-services installer initially failed because the ordinary
+game environment disabled its required .NET bridge. The isolated integration
+installed verified Wine Mono 10.4.1 and Epic's real bundled helper 5.8.1, checked
+the live 32-bit registry version, and repeated repair without replacing Mono or
+creating full-environment backups. The owner quit Windows clients normally;
+the same repair then completed in the user's environment. Epic subsequently
+reported its minimum helper version satisfied and its previous startup
+assertion disappeared. This prerequisite repair alone did not start Brawlhalla.
+
+Static inspection then identified Epic's public pending-link serialization:
+Unix seconds, `|`, and the validated game URI in HKCU's `PendingUri` value. A
+normal `-forwarduri` launch consumed this value in an owned account-free client.
+A corresponding user-environment request subsequently started Ubisoft's
+launcher and **Brawlhalla.exe** without reusing or inspecting exchange codes.
+The owner subsequently confirmed **Brawlhalla’s game window opened** from this request. Native red/yellow/green buttons and a short match/audio check remain unconfirmed.
+
+Partner cards now queue the validated public link before acknowledging Play,
+start Epic through that queued-link mode, and preserve Epic's normal entitlement
+and Ubisoft authentication flow. Stop compares the app's receipt and clears
+only its unconsumed value before Wine exits. A real Wine fixture caught CRLF
+parsing that initially left cancelled values behind; the parser now handles
+Windows line endings and has regression coverage. Other sources' newer links
+are preserved. The owned integration passed discovery, generic shell handoff,
+partner queue, D3D9/D3D11 readback, management routes, uninstall discovery, and
+cancelled-queue cleanup. Its stand-in does **not** test official account auth.
+Evidence: `.cache/v1.3/epic-queued-handoff.log`,
+`.cache/release-preview/epic-results.json`, and the filtered prerequisite/queue
+results in `.cache/v1.3/`. The unused 4.1 GiB account-free Epic environment was
+stopped and removed; the user's clients and games were preserved.
+
 ## Installed-size reporting — October 19, 2026
 
 All 70 tests in 12 suites passed after adding the installed-size fallback. Regression coverage includes Epic/Ubisoft partner discovery, nested and hidden files, symbolic links and loops, cached refreshes, explicit recount, and expiry. The installed Brawlhalla folder measured **1,601,448,683 bytes** across **7,794 regular files**, matching an independent Python metadata walk. An app-owned SwiftUI preview showed **1.6 GB** on its card during the Opening state. This verifies size reporting, not the still-pending Brawlhalla card-launch or native-window-controls behavior. Evidence is local in `.cache/brawlhalla-size-*`.

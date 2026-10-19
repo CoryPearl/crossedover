@@ -96,6 +96,7 @@ struct ContentView: View {
         }
         .sheet(item: $propertiesGame) { game in gameProperties(game) }
         .sheet(item: $moddingGame) { game in modding(game) }
+        .sheet(isPresented: $model.showingMinecraft) { MinecraftLauncherView(model: model) }
         .sheet(isPresented: Binding(get: { model.diagnostics != nil }, set: { if !$0 { model.diagnostics = nil } })) { diagnostics }
     }
 
@@ -119,7 +120,7 @@ struct ContentView: View {
                     Menu { GameLauncherActions(model: model) } label: { launcherMenuLabel }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden)
                         .disabled(model.busy)
-                        .help("Open a Windows game launcher, or set up Steam or Epic Games")
+                        .help("Open Steam, Epic Games, Ubisoft Connect, or Minecraft")
                 }
                 Text("Windows launchers").font(.system(size: 10)).foregroundStyle(Palette.muted)
             }.padding(.horizontal, 20)
@@ -199,15 +200,19 @@ struct ContentView: View {
     }
     private var query: String { (previewSearch ?? searchText).trimmingCharacters(in: .whitespacesAndNewlines) }
     private var showingList: Bool { (previewLibraryMode ?? libraryPresentation) == "list" }
+    private var showingMinecraft: Bool {
+        !appsPage && model.bedrockInstalled && ["all", "minecraft"].contains(gameStoreFilter)
+            && (query.isEmpty || "Minecraft Bedrock Edition".localizedStandardContains(query))
+    }
     private var filteredGames: [GameInstallation] {
         guard !appsPage else { return [] }
         return model.games.filter { game in
             (gameStoreFilter == "all" || gameStoreFilter == game.store.rawValue) && (query.isEmpty || game.name.localizedStandardContains(query))
         }
     }
-    private var totalCount: Int { importedApps.count + (appsPage ? 0 : model.games.count) }
+    private var totalCount: Int { importedApps.count + (appsPage ? 0 : model.games.count + (model.bedrockInstalled ? 1 : 0)) }
     private var libraryCount: String {
-        let count = filteredGames.count + filteredApps.count, noun = appsPage ? "APPS" : "GAMES"
+        let count = filteredGames.count + filteredApps.count + (showingMinecraft ? 1 : 0), noun = appsPage ? "APPS" : "GAMES"
         return query.isEmpty ? "\(count) \(noun)" : "\(count) OF \(totalCount) \(noun)"
     }
     private var library: some View {
@@ -238,7 +243,7 @@ struct ContentView: View {
                         }
                     }.padding(28).frame(maxWidth: 510, alignment: .leading).panel()
                 }
-            } else if games.isEmpty && apps.isEmpty {
+            } else if games.isEmpty && apps.isEmpty && !showingMinecraft {
                 VStack(spacing: 12) {
                     Image(systemName: "magnifyingglass").font(.system(size: 24, weight: .light)).foregroundStyle(Palette.muted)
                     Text(appsPage ? "No apps found" : "No games found").font(.system(size: 15, weight: .medium))
@@ -249,13 +254,15 @@ struct ContentView: View {
                 }.padding(.vertical, 64).padding(.horizontal, 24).frame(maxWidth: .infinity)
             } else if showingList {
                 LazyVStack(spacing: 0) {
-                    ForEach(games) { game in gameRow(game); if game.id != games.last?.id || !apps.isEmpty { Rule().padding(.horizontal, 16) } }
-                    ForEach(apps) { app in windowsAppRow(app); if app.id != apps.last?.id { Rule().padding(.horizontal, 16) } }
+                    ForEach(games) { game in gameRow(game); if game.id != games.last?.id || !apps.isEmpty || showingMinecraft { Rule().padding(.horizontal, 16) } }
+                    ForEach(apps) { app in windowsAppRow(app); if app.id != apps.last?.id || showingMinecraft { Rule().padding(.horizontal, 16) } }
+                    if showingMinecraft { minecraftRow }
                 }.panel()
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 320), spacing: 16, alignment: .top)], alignment: .leading, spacing: 16) {
                     ForEach(games) { game in gameCard(game) }
                     ForEach(apps) { app in windowsAppCard(app) }
+                    if showingMinecraft { minecraftCard }
                 }
             }
             if !appsPage, let tracked = model.currentSession,
@@ -270,6 +277,44 @@ struct ContentView: View {
                 Label(blocker, systemImage: "info.circle").font(.system(size: 12)).foregroundStyle(Palette.muted).padding(.top, 10)
             }
         }
+    }
+
+    private var minecraftState: String {
+        model.bedrockActive ? (model.bedrockStatus?.phase == .playing ? "Running" : "Opening…") : "Installed"
+    }
+    private var minecraftActions: some View {
+        HStack(spacing: 10) {
+            Button { model.showingMinecraft = true } label: { Image(systemName: "ellipsis") }
+                .buttonStyle(.plain).help("Minecraft launcher, files, and account options").accessibilityLabel("Minecraft options")
+            Button { model.startMinecraft() } label: { Label(model.bedrockActive ? (model.bedrockStatus?.phase == .playing ? "Running" : "Opening") : "Play", systemImage: "play.fill") }
+                .buttonStyle(PrimaryButton()).disabled(model.bedrockActive || !model.bedrockAvailable || model.busy)
+                .accessibilityLabel("Play Minecraft Bedrock")
+        }
+    }
+    private var minecraftCard: some View {
+        VStack(spacing: 0) {
+            Image(systemName: "cube").font(.system(size: 34, weight: .ultraLight)).foregroundStyle(Palette.muted)
+                .frame(height: 112).frame(maxWidth: .infinity).background(Palette.sidebar)
+            Rule()
+            VStack(alignment: .leading, spacing: 10) {
+                Text("MINECRAFT · WINDOWS").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
+                Text("Minecraft Bedrock").font(.system(size: 17, weight: .medium)).tracking(-0.3)
+            }.frame(height: 66, alignment: .topLeading).frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            Rule()
+            HStack { Text(minecraftState).font(.system(size: 11)).foregroundStyle(Palette.muted); Spacer(); minecraftActions }
+                .padding(.horizontal, 16).padding(.vertical, 14)
+        }.panel()
+    }
+    private var minecraftRow: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "cube").font(.system(size: 22, weight: .ultraLight)).foregroundStyle(Palette.muted)
+                .frame(width: 88, height: 56).background(Palette.sidebar).clipShape(RoundedRectangle(cornerRadius: 4))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Minecraft Bedrock").font(.system(size: 13, weight: .medium))
+                Text("Minecraft · " + minecraftState).font(.system(size: 10)).foregroundStyle(Palette.muted)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            minecraftActions
+        }.padding(16)
     }
     private func beginImport(_ app: WindowsApp? = nil) {
         if let app, let environment = model.environment {
@@ -389,6 +434,7 @@ struct ContentView: View {
                         Button("Steam") { gameStoreFilter = "steam" }
                         Button("Epic Games") { gameStoreFilter = "epic" }
                         Button("Ubisoft Connect") { gameStoreFilter = "ubisoft" }
+                        if model.bedrockInstalled { Button("Minecraft") { gameStoreFilter = "minecraft" } }
                         Button("Added .exe") { gameStoreFilter = "added" }
                     } label: { menuLabel(storeFilterTitle) }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().accessibilityLabel("Filter games by store")
@@ -403,7 +449,7 @@ struct ContentView: View {
     }
 
     private var storeFilterTitle: String {
-        switch gameStoreFilter { case "steam": "Steam"; case "epic": "Epic Games"; case "ubisoft": "Ubisoft Connect"; case "added": "Added .exe"; default: "All games" }
+        switch gameStoreFilter { case "steam": "Steam"; case "epic": "Epic Games"; case "ubisoft": "Ubisoft Connect"; case "minecraft": "Minecraft"; case "added": "Added .exe"; default: "All games" }
     }
     private func presentationButton(_ mode: String, title: String, symbol: String) -> some View {
         let selected = (showingList ? "list" : "grid") == mode
@@ -700,6 +746,10 @@ struct ContentView: View {
                     }
                     if model.epicInstalled {
                         Rule().padding(.horizontal, 22)
+                        settingRow("Launch support", detail: "Installs Epic components needed by Play. Quit Windows games and launchers before repairing.") {
+                            Button("Repair launch support") { model.repairEpicLaunchSupport() }.buttonStyle(SecondaryButton())
+                        }
+                        Rule().padding(.horizontal, 22)
                         settingRow("Graphics", detail: "DXMT handles DirectX 10–11; DXVK handles DirectX 9 when available. The launcher manages this combination.") {
                             Text("Managed").font(.system(size: 11)).foregroundStyle(Palette.muted)
                         }
@@ -721,8 +771,8 @@ struct ContentView: View {
                         Link("Open Xbox Cloud", destination: URL(string: "https://www.xbox.com/play")!).buttonStyle(SecondaryButton())
                     }
                     Rule().padding(.horizontal, 22)
-                    settingRow("Xbox app & Minecraft Bedrock", detail: "Local installation is not supported by this runtime. Experimental Bedrock ports need a separate WineGDK runtime and Microsoft account integration; this does not enable the entire Xbox catalog.") {
-                        Link("Compatibility notes", destination: URL(string: "https://corypearl.github.io/crossedover/quickstart.html#xbox")!).buttonStyle(SecondaryButton())
+                    settingRow("Minecraft Bedrock", detail: "A local preview using its own WineGDK runtime and Microsoft sign-in. Requires an owned Windows edition; availability depends on the included backend.") {
+                        Button("Open Minecraft…") { model.showingMinecraft = true }.buttonStyle(SecondaryButton())
                     }
                 }.panel()
             }
@@ -874,9 +924,11 @@ struct ContentView: View {
                     Text(launch.detail).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(2)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)
-                Button("Stop & close Windows") { model.stopLaunchAndCloseWindows() }
-                    .buttonStyle(SecondaryButton()).disabled(model.stoppingWindows)
-                    .help("Stops this launch and closes all crossedover Windows games, apps, and launchers. Unsaved progress may be lost.")
+                Button(model.bedrockActive ? "Stop Minecraft" : "Stop & close Windows") {
+                    if model.bedrockActive { model.stopMinecraft() } else { model.stopLaunchAndCloseWindows() }
+                }
+                    .buttonStyle(SecondaryButton()).disabled(model.stoppingWindows || model.bedrockStopping)
+                    .help(model.bedrockActive ? "Stops only the separate Minecraft session. Unsaved progress may be lost." : "Stops this launch and closes all crossedover Windows games, apps, and launchers. Unsaved progress may be lost.")
             }.padding(.horizontal, 26).padding(.vertical, 14)
         }.background(Palette.surface)
     }
@@ -968,6 +1020,9 @@ struct GameLauncherActions: View {
         Button(model.ubisoftInstalled ? "Open Ubisoft Connect" : "Ubisoft Connect (not installed)") { model.openUbisoft() }
             .disabled(model.busy || !model.ubisoftInstalled)
             .help("Supported Epic games install Ubisoft Connect during their initial setup in Epic.")
+        Divider()
+        Button("Minecraft Bedrock…") { model.showingMinecraft = true }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
     }
 }
 

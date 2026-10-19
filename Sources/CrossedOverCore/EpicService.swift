@@ -99,10 +99,15 @@ public actor EpicService {
         }
     }
     public func install(environment: ManagedEnvironment, runtime: InstalledRuntime) async throws {
+        try await installClient(environment: environment, runtime: runtime)
+        try await repairLaunchSupport(environment: environment, runtime: runtime)
+    }
+    private func installClient(environment: ManagedEnvironment, runtime: InstalledRuntime) async throws {
         try Self.requireSupportedRuntime(runtime)
         guard environment.state == "ready" else { throw CrossedOverError.message("Repair the Windows environment before setting up Epic.") }
         let prefix = paths.prefix(environment), lock = try EnvironmentLock(prefix: paths.prefix(environment))
         defer { withExtendedLifetime(lock) {} }
+        try await EpicLaunchSupport.requireStopped(runtime: runtime, prefix: prefix, profile: environment.profile)
         let (temporary, response) = try await URLSession.shared.download(from: Self.installerURL)
         defer { try? FileManager.default.removeItem(at: temporary) }
         guard (response as? HTTPURLResponse)?.statusCode == 200, let finalURL = response.url else { throw CrossedOverError.message("Could not download Epic's Windows installer.") }

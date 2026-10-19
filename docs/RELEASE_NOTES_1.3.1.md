@@ -2,6 +2,8 @@
 
 A local validation candidate for Brawlhalla launch and native window controls. Publication is pending user confirmation.
 
+- Epic launch prerequisites are now installed during setup and repairable in **Settings → Windows Epic Games → Repair launch support**. Investigation found an unknown EOSH version below Epic's 5.3.0 requirement and a managed MSI custom-action failure. In an isolated prefix, Wine Mono allowed Epic's bundled helper 5.8.1 to install, and the launcher no longer logged that startup assertion. This is prerequisite evidence; the real Brawlhalla card launch still needs confirmation.
+
 - Epic-installed Brawlhalla requests launch through Windows ShellExecute and Epic’s registered composite game URI handler, preserving the owning client’s authorization and Ubisoft handoff. Previously the card sent a bare Ubisoft URL, which opened the launcher without starting the game.
 - Activity tracks the game session instead of marking the launch completed at request acknowledgement. A missing game becomes Failed; a delivered request alone is Request sent.
 - The cold Epic startup path now also applies to partner games. Windows launchers start from their own executable directory.

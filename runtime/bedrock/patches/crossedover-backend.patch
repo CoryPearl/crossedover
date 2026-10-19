@@ -1,0 +1,326 @@
+diff --git a/build-standalone-wine.sh b/build-standalone-wine.sh
+index 101fda3..77c6b27 100755
+--- a/build-standalone-wine.sh
++++ b/build-standalone-wine.sh
+@@ -76,7 +76,7 @@ for PATCH in "$ROOT"/patches/standalone-wine-*.patch; do
+     git -C "$SOURCE" apply "$PATCH"
+   fi
+ done
+-RUST_TOOLCHAIN=$(rustup run 1.98.0 rustc --print sysroot)
++RUST_TOOLCHAIN=$(rustup run "${CROSSEDOVER_RUST_TOOLCHAIN:-1.98.0}" rustc --print sysroot)
+ SDK=$(xcrun --show-sdk-path)
+ cat > "$BUILD/toolbin/lld-link" <<EOF
+ #!/bin/sh
+@@ -84,7 +84,7 @@ export DYLD_LIBRARY_PATH='$RUST_TOOLCHAIN/lib'
+ exec '$RUST_TOOLCHAIN/lib/rustlib/aarch64-apple-darwin/bin/rust-lld' -flavor link "\$@"
+ EOF
+ chmod +x "$BUILD/toolbin/lld-link"
+-export PATH="$BUILD/toolbin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/bison/bin:/usr/bin:/bin:/opt/homebrew/bin:$PATH"
++export PATH="$BUILD/toolbin:${CROSSEDOVER_LLVM:-/opt/homebrew/opt/llvm}/bin:/opt/homebrew/opt/bison/bin:/usr/bin:/bin:/opt/homebrew/bin:$PATH"
+ export CC="$(xcrun --find clang) -arch x86_64 -isysroot $SDK"
+ export CXX="$(xcrun --find clang++) -arch x86_64 -isysroot $SDK"
+ export OBJC="$CC"
+@@ -106,7 +106,7 @@ export ac_cv_lib_soname_freetype='@loader_path/../../libfreetype.6.dylib'
+ cd "$BUILD"
+ "$SOURCE/configure" --host=x86_64-apple-darwin24 \
+   --prefix="$PREFIX" --enable-win64 \
+-  --with-mingw=/opt/homebrew/opt/llvm/bin/clang --disable-tests \
++  --with-mingw=${CROSSEDOVER_LLVM:-/opt/homebrew/opt/llvm}/bin/clang --disable-tests \
+   --without-x --with-freetype --with-gnutls --without-vulkan \
+   --without-gstreamer --without-ffmpeg > "$BUILD/configure.log" 2>&1
+ make -j"$JOBS" > "$BUILD/build.log" 2>&1
+diff --git a/launcher/setup.py b/launcher/setup.py
+index 3135712..b3ae58d 100644
+--- a/launcher/setup.py
++++ b/launcher/setup.py
+@@ -21,7 +21,7 @@ import signal
+ FROZEN = getattr(sys, 'frozen', False)
+ BUNDLE = Path(os.environ['BEDROCK_BUNDLE']) if os.environ.get('BEDROCK_BUNDLE') else None
+ if BUNDLE:
+-    os.environ['BEDROCK_HOME'] = str(Path.home() / 'Library/Application Support/Bedrock for Mac')
++    os.environ.setdefault('BEDROCK_HOME', str(Path.home() / 'Library/Application Support/CrossedOver/Bedrock'))
+ 
+ # The frozen executable also runs the shipped Python scripts. No system Python
+ # or developer tools are required on the user's Mac.
+@@ -48,6 +48,7 @@ ACCOUNT_ERRORS = {
+     'catalog_lookup': 'Could not find Minecraft in Microsoft’s Windows catalog. Try again shortly.',
+     'account_package': 'Microsoft could not provide the game download for this account. Try again shortly.',
+     'package_selection': 'Microsoft returned an unexpected set of game packages. The launcher needs an update.',
++    'package_transport': 'Microsoft supplied no secure download for this package. Installation was stopped; no game files were installed.',
+     'package_connection': 'Could not connect to Microsoft’s game download. Check your connection and retry.',
+     'package_size': 'Microsoft’s download size differs from its catalog. Try again shortly.',
+     'package_cache': 'Could not save the download metadata. Check available disk space and retry.',
+@@ -131,6 +132,12 @@ def account_update(line):
+                 event('busy', 'Downloading Minecraft', f'{done * 100 // total}%', 0.35 + 0.5 * done / total)
+ 
+ 
++class ReviewedAccountError(RuntimeError):
++    def __init__(self, code):
++        self.code = code if code in ACCOUNT_ERRORS else 'setup_failed'
++        super().__init__(ACCOUNT_ERRORS.get(self.code, 'Minecraft setup stopped.'))
++
++
+ class Cancelled(BaseException):
+     """User cancellation unwinds owned processes without reporting a failure."""
+ 
+@@ -148,7 +155,7 @@ def stop_command(process):
+             process.wait()
+ 
+ 
+-def run(command, log, failure, account_progress=False):
++def run(command, log, failure, account_progress=False, game_progress=False):
+     log.write(('\n$ ' + ' '.join(map(str, command)) + '\n').encode())
+     log.flush()
+     helper_error = None
+@@ -164,7 +171,18 @@ def run(command, log, failure, account_progress=False):
+                 if line.startswith(b'BEDROCK_ERROR:'):
+                     helper_error = ACCOUNT_ERRORS.get(line.strip().split(b':', 1)[1].decode('ascii', errors='replace'))
+                 account_update(line)
++        observed = False
++        if game_progress:
++            import time
++            runtime = load('game_observer', 'standalone.py')
++            while process.poll() is None:
++                if not observed and runtime.game_running():
++                    observed = True
++                    event('playing', 'Minecraft is running')
++                time.sleep(0.5)
+         code = process.wait()
++        if game_progress and code == 0 and not observed:
++            raise RuntimeError('Minecraft exited before startup could be confirmed.')
+     finally:
+         stop_command(process)
+         if account_progress and process.stdout:
+@@ -174,10 +192,7 @@ def run(command, log, failure, account_progress=False):
+ 
+ 
+ def validate_install():
+-    minimum = '15.0'
+-    if BUNDLE:
+-        with (BUNDLE.parent / 'Info.plist').open('rb') as file:
+-            minimum = plistlib.load(file).get('LSMinimumSystemVersion', minimum)
++    minimum = '26.0'
+     version = lambda text: tuple(int(part) for part in text.split('.'))
+     if platform.machine() != 'arm64' or version(platform.mac_ver()[0] or '0') < version(minimum):
+         raise RuntimeError(f'This build requires an Apple Silicon Mac with macOS {minimum} or later.')
+@@ -236,11 +251,11 @@ def main():
+                 with runtime.account(ROOT / 'game', download=not (ROOT / 'game').exists(), progress=account_update):
+                     if not ready:
+                         install(log)
+-                    event('playing', 'Minecraft is running', 'You can close this window. Quit Minecraft to end your session.')
++                    event('starting', 'Opening Minecraft')
+                     run([sys.executable, ROOT / 'standalone.py', 'launch'], log,
+-                        'Minecraft stopped unexpectedly. Open the setup log for details, then try again.')
++                        'Minecraft stopped unexpectedly. Open the setup log for details, then try again.', game_progress=True)
+             except runtime.AccountError as error:
+-                raise RuntimeError(ACCOUNT_ERRORS.get(error.code, str(error))) from error
++                raise ReviewedAccountError(error.code) from error
+             event('ready', 'Ready to play')
+ 
+ 
+@@ -256,5 +271,6 @@ if __name__ == '__main__':
+     except Cancelled:
+         event('cancelled', 'Setup paused', 'Continue when you’re ready.')
+     except (OSError, RuntimeError) as error:
+-        event('error', 'Setup needs attention', str(error))
++        code = error.code if isinstance(error, ReviewedAccountError) else 'setup_failed'
++        event('error', code)
+         sys.exit(1)
+diff --git a/standalone-helper.rs b/standalone-helper.rs
+index 09be15e..b7d1f63 100644
+--- a/standalone-helper.rs
++++ b/standalone-helper.rs
+@@ -32,19 +32,25 @@ fn package_url_allowed(url: &reqwest::Url) -> bool {
+     }
+     match url.scheme() {
+         "https" => true,
+-        // Microsoft's package catalog returns these HTTP origins. They do not
+-        // serve certificates for these names; changing the scheme breaks TLS.
+-        "http" => matches!(url.host_str(), Some("assets1.xboxlive.com" | "assets2.xboxlive.com"))
+-            && url.port_or_known_default() == Some(80),
++        // The upstream package integrity gap makes HTTP unsafe for installation.
++        // Accept only authenticated transport, including every redirect.
++        "http" => false,
+         _ => false,
+     }
+ }
+ 
++// The authenticated catalog must supply HTTPS. Rewriting a CDN hostname is
++// not proof that the mirror serves the licensed package; never fall back to
++// HTTP while upstream's unencrypted package sections lack authentication.
++fn secure_package_url(input: &str) -> Option<reqwest::Url> {
++    let url = reqwest::Url::parse(input).ok()?;
++    package_url_allowed(&url).then_some(url)
++}
++
+ fn package_client() -> Outcome<reqwest::Client> {
+-    // This client carries no sign-in headers or cookies. Authentication and
+-    // licensing continue to use the separate HTTPS-only account client.
++    // No account headers or cookies are carried by this download client.
+     Ok(reqwest::Client::builder().user_agent("bedrock-mac-standalone/0.1")
+-        .connect_timeout(std::time::Duration::from_secs(30))
++        .https_only(true).connect_timeout(std::time::Duration::from_secs(30))
+         .redirect(reqwest::redirect::Policy::custom(|attempt| {
+             if attempt.previous().len() >= 5 || !package_url_allowed(attempt.url()) {
+                 attempt.error("Unsupported package redirect")
+@@ -68,7 +74,7 @@ impl TokenBackend for AccountKeychain {
+             // the secret again before every update. SecItemAdd/Update writes
+             // directly, without that extra authorization-triggering read.
+             security_framework::passwords::set_generic_password(
+-                "Minecraft Bedrock Standalone", key, value)
++                "crossedover Minecraft", key, value)
+                 .map_err(|error| std::io::Error::other(format!("Keychain write failed ({})", error.code())))?;
+             Ok(())
+         }
+@@ -250,13 +256,16 @@ async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &P
+     let packages: Vec<_> = details.package_files.iter().filter(|p| p.file_name.ends_with(".msixvc")).collect();
+     if packages.len() != 1 { return Err(failure("package_selection")); }
+     let package = packages[0];
+-    let download_client = package_client()?;
+     let mut connected = None;
+-    for cdn in &package.cdn_root_paths {
+-        let url = format!("{}{}", cdn, package.relative_url);
+-        if !reqwest::Url::parse(&url).is_ok_and(|url| package_url_allowed(&url)) { continue; }
++    let mut secure_candidate = false;
++    for cdn in package.cdn_root_paths.iter().chain(&package.background_cdn_root_paths) {
++        let catalog_url = format!("{}{}", cdn, package.relative_url);
++        let Some(secure_url) = secure_package_url(&catalog_url) else { continue; };
++        let url = secure_url.to_string();
++        let download_client = package_client()?;
++        secure_candidate = true;
+         match streaming::HttpRead::open(download_client.clone(), &url, None::<fn(u64, u64)>).await {
+-            Ok(http) => { connected = Some((url, http)); break; },
++            Ok(http) => { connected = Some((url, http, download_client)); break; },
+             Err(error) => {
+                 // Record only transport categories, never signed URLs or responses.
+                 eprintln!("Package transport: {:?}", error.kind());
+@@ -275,7 +284,8 @@ async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &P
+             },
+         }
+     }
+-    let (url, http) = connected.ok_or_else(|| failure("package_connection"))?;
++    if !secure_candidate { return Err(failure("package_transport")); }
++    let (url, http, download_client) = connected.ok_or_else(|| failure("package_connection"))?;
+     if package.file_size <= 0 || http.len() != package.file_size as u64 {
+         return Err(failure("package_size"));
+     }
+@@ -417,7 +427,7 @@ async fn run() -> Outcome<()> {
+     let mut args = std::env::args().skip(1);
+     let mode = args.next().ok_or("Use --download GAME_DIR or --serve GAME_DIR [--market CA].")?;
+     if mode == "--help" {
+-        println!("standalone_helper --download GAME_DIR [--market CA] [--serve-after]\nstandalone_helper --check-download GAME_DIR [--market CA]\nstandalone_helper --serve GAME_DIR [--market CA]\nstandalone_helper --sign-out GAME_DIR\nCredentials: macOS Keychain, Minecraft Bedrock Standalone. Stop any existing Xbox helper first.");
++        println!("standalone_helper --download GAME_DIR [--market CA] [--serve-after]\nstandalone_helper --check-download GAME_DIR [--market CA]\nstandalone_helper --serve GAME_DIR [--market CA]\nstandalone_helper --sign-out GAME_DIR\nCredentials: macOS Keychain, crossedover Minecraft. Stop any existing Xbox helper first.");
+         return Ok(());
+     }
+     if mode != "--download" && mode != "--check-download" && mode != "--serve" && mode != "--sign-out" { return Err("Unknown helper mode.".into()); }
+@@ -438,7 +448,7 @@ async fn run() -> Outcome<()> {
+     else if mode != "--sign-out" && directory.symlink_metadata().is_ok() { return Err("Download destination already exists; choose a new directory.".into()); }
+     // A download does not create the IPC socket yet, so also serialize account access.
+     let support = PathBuf::from(std::env::var_os("HOME").ok_or("Home directory is unavailable.")?)
+-        .join("Library/Application Support/Minecraft Bedrock Standalone");
++        .join("Library/Application Support/crossedover Minecraft");
+     if support.is_symlink() { return Err("The standalone helper state directory must not be a symbolic link.".into()); }
+     std::fs::create_dir_all(&support)?;
+     std::fs::set_permissions(&support, std::fs::Permissions::from_mode(0o700))?;
+@@ -446,7 +456,7 @@ async fn run() -> Outcome<()> {
+     if lock_path.is_symlink() { return Err("The account lock must not be a symbolic link.".into()); }
+     let account_lock = std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false).mode(0o600).open(lock_path)?;
+     fs2::FileExt::try_lock_exclusive(&account_lock).map_err(|_| "Another standalone account helper is already running.")?;
+-    xodus::secrets::init_named_secrets("Minecraft Bedrock Standalone")
++    xodus::secrets::init_named_secrets("crossedover Minecraft")
+         .map_err(|_| "Could not initialize macOS Keychain.")?;
+     let account = Arc::new(AccountBackend::new(AccountKeychain));
+     if mode == "--sign-out" {
+@@ -534,7 +544,7 @@ mod tests {
+         impl Drop for Cleanup {
+             fn drop(&mut self) {
+                 let _ = security_framework::passwords::delete_generic_password(
+-                    "Minecraft Bedrock Standalone", &self.0);
++                    "crossedover Minecraft", &self.0);
+             }
+         }
+         let _cleanup = Cleanup(key.clone());
+@@ -542,29 +552,41 @@ mod tests {
+             AccountKeychain.set(&key, value).unwrap();
+         }
+         let value = security_framework::passwords::get_generic_password(
+-            "Minecraft Bedrock Standalone", &key).unwrap();
++            "crossedover Minecraft", &key).unwrap();
+         assert_eq!(value, b"fixture-three");
+     }
+ 
+     #[test]
+     fn package_transport_accepts_catalog_origins_without_rewriting_them() {
+-        for url in ["http://assets1.xboxlive.com/game.msixvc", "http://assets2.xboxlive.com/game.msixvc", "https://example.com/game.msixvc"] {
++        for url in ["https://example.com/game.msixvc"] {
+             let parsed = reqwest::Url::parse(url).unwrap();
+             assert!(package_url_allowed(&parsed));
+             assert_eq!(parsed.as_str(), url);
+         }
+-        for url in ["http://example.com/game", "http://assets1.xboxlive.com.evil.test/game",
++        for url in ["http://assets1.xboxlive.com/game.msixvc", "http://assets2.xboxlive.com/game.msixvc", "http://example.com/game", "http://assets1.xboxlive.com.evil.test/game",
+             "http://assets1.xboxlive.com:8080/game", "http://user:secret@assets1.xboxlive.com/game",
+             "http://127.0.0.1/game", "file:///tmp/game", "https://example.com/game#fragment"] {
+             assert!(!package_url_allowed(&reqwest::Url::parse(url).unwrap()), "{url}");
+         }
+     }
+ 
++    #[test]
++    fn catalog_downloads_require_secure_origins_without_host_rewrites() {
++        for bad in ["http://assets1.xboxlive.com/game", "http://assets2.xboxlive.com/game",
++                    "http://d1.xboxlive.com/game", "http://example.com/game",
++                    "https://user:secret@example.com/game", "https://example.com/game#fragment",
++                    "file:///tmp/game"] {
++            assert!(secure_package_url(bad).is_none());
++        }
++        assert_eq!(secure_package_url("https://example.com/game?public=value").unwrap().as_str(),
++                   "https://example.com/game?public=value");
++    }
++
+     #[tokio::test]
+     #[ignore = "Live Microsoft CDN check; no account or game download"]
+     async fn microsoft_package_transport_connects() {
+         let mut reader = streaming::HttpRead::open(package_client().unwrap(),
+-            "http://assets1.xboxlive.com/Z/routing/up.txt", None::<fn(u64, u64)>).await.unwrap();
++            "https://dlassets-ssl.xboxlive.com/Z/routing/up.txt", None::<fn(u64, u64)>).await.unwrap();
+         assert_eq!(reader.len(), 2);
+         let mut bytes = [0; 2];
+         reader.read_exact(&mut bytes).await.unwrap();
+diff --git a/standalone-setup.py b/standalone-setup.py
+index bf8861a..d0ff9cc 100755
+--- a/standalone-setup.py
++++ b/standalone-setup.py
+@@ -244,7 +244,7 @@ def build_helper(jobs):
+         atomic_write(example, source)
+     # Only this new example is built; the running bedrock_helper binary is untouched.
+     env = dict(os.environ, XODUS_LOG="off", RUST_LOG="off")
+-    subprocess.run(["cargo", "+1.98.0", "build", "--manifest-path", str(XODUS / "Cargo.toml"),
++    subprocess.run(["cargo", "+" + os.environ.get("CROSSEDOVER_RUST_TOOLCHAIN", "1.98.0"), "build", "--manifest-path", str(XODUS / "Cargo.toml"),
+                     "--release", "--locked", "-j", str(jobs), "-p", "xodus-cli", "--example", "standalone_helper"],
+                    cwd=ROOT, env=env, check=True)
+     print("Built standalone account helper: " + str(HELPER))
+diff --git a/tests/test_onboarding.py b/tests/test_onboarding.py
+index 38506d3..249a8f4 100644
+--- a/tests/test_onboarding.py
++++ b/tests/test_onboarding.py
+@@ -118,6 +118,20 @@ class OnboardingTests(unittest.TestCase):
+                            log, 'Generic failure', account_progress=True)
+             self.assertNotIn('private-response', output.getvalue())
+ 
++    def test_account_error_codes_survive_orchestration_without_private_text(self):
++        with tempfile.TemporaryDirectory() as folder, patch.object(worker, 'ROOT', Path(folder)), \
++                patch.object(worker, 'installed', return_value=True), patch.object(worker, 'validate_install'), \
++                patch.object(worker, 'load', return_value=SimpleNamespace(
++                    account=lambda *a, **kw: (_ for _ in ()).throw(runtime.AccountError('package_connection')),
++                    AccountError=runtime.AccountError)), patch('sys.argv', ['setup.py']), \
++                contextlib.redirect_stdout(io.StringIO()):
++            with self.assertRaises(worker.ReviewedAccountError) as error:
++                worker.main()
++        self.assertEqual(error.exception.code, 'package_connection')
++        unknown = worker.ReviewedAccountError('private-response')
++        self.assertEqual(unknown.code, 'setup_failed')
++        self.assertNotIn('private-response', str(unknown))
++
+     def test_bundle_setup_preserves_worlds_and_relinks_after_app_move(self):
+         with tempfile.TemporaryDirectory() as folder:
+             folder = Path(folder)

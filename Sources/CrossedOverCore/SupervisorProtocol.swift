@@ -74,6 +74,11 @@ public enum SupervisorEngine {
         defer { withExtendedLifetime(lock) {} }
         if request.command == .forceStop {
             try LaunchGeneration.invalidate(prefix: prefix)
+            // Cancel the app's queued partner-game link before stopping Wine;
+            // otherwise the next Open Epic could replay a cancelled launch.
+            var queueError: (any Error)?
+            do { try await EpicLaunchQueue.cancelOwned(runtime: runtime, prefix: prefix, profile: environment.profile) }
+            catch { queueError = error }
             _ = try await ProcessRunner.run(runtime.wineserver, arguments: ["-k"], environment: variables, timeout: 15)
             // -k returns nonzero when the server has already exited. A stopped
             // environment is a successful outcome, including repeated requests.
@@ -87,6 +92,7 @@ public enum SupervisorEngine {
                 run.state = "stopped"; run.endedAt = Date(); run.detail = "Stopped by the user with all Windows windows."
                 try store.updateActiveWindowsRun(run)
             }
+            if queueError != nil { throw CrossedOverError.message("Windows is stopped, but Epic's pending launch could not be cleared. Check Epic before launching another game.") }
             return SupervisorReply(success: true, message: "This Windows environment is stopped.")
         }
         if request.command == .observe {
@@ -125,6 +131,9 @@ public enum SupervisorEngine {
                         launchRequest.primeEpic = !processes.contains { $0.executable.lowercased() == "epicgameslauncher.exe" }
                     }
                 }
+            }
+            if request.command == .launchEpicGame {
+                try await EpicLaunchSupport.requireReady(runtime: runtime, prefix: prefix, profile: environment.profile)
             }
             try await EpicService.prepareGraphics(runtime: runtime, prefix: prefix, profile: environment.profile)
         } else if request.command == .launchWindowsApp {
@@ -183,6 +192,12 @@ public enum SupervisorEngine {
         }
         // A detached worker drains output into a bounded log for the whole session.
         launchRequest.launchGeneration = try LaunchGeneration.current(prefix: prefix)
+        if partnerLaunch {
+            let game = try epicGame(request, environment: environment, prefix: prefix)
+            try await EpicLaunchQueue.enqueue(uri: EpicService.launchURI(for: game), generation: launchRequest.launchGeneration!,
+                                               runtime: runtime, prefix: prefix, profile: environment.profile)
+            launchRequest.primeEpic = false
+        }
         let file = paths.logs.appendingPathComponent(".launch-" + UUID().uuidString + ".json")
         try JSONEncoder().encode(launchRequest).write(to: file, options: .atomic)
         // Bundle.main can identify the outer GUI app when this tool lives in
@@ -192,6 +207,7 @@ public enum SupervisorEngine {
         worker.standardInput = FileHandle.nullDevice; worker.standardOutput = FileHandle.nullDevice; worker.standardError = FileHandle.nullDevice
         do { try worker.run() } catch {
             try? FileManager.default.removeItem(at: file)
+            if partnerLaunch { try? await EpicLaunchQueue.cancelOwned(runtime: runtime, prefix: prefix, profile: environment.profile) }
             if let id = request.runID { try? store.remove(kind: "windowsRun", id: id.uuidString) }
             throw error
         }
@@ -340,6 +356,7 @@ public enum SupervisorEngine {
         }
         var arguments: [String]
         var primeEpic = false
+        var queuedPartnerURI: String?
         if request.command.isUbisoft {
             try EpicService.requireSupportedRuntime(runtime)
             arguments = [try UbisoftDiscovery.executable(prefix: prefix).path]
@@ -351,10 +368,13 @@ public enum SupervisorEngine {
             try EpicService.requireSupportedRuntime(runtime)
             let launcher = try EpicService.executable(prefix: prefix)
             var uri = EpicService.libraryURI
+            var queuedPartner = false
             if request.command.requiresEpicGameID {
                 let game = try epicGame(request, environment: environment, prefix: prefix)
                 if request.command == .launchEpicGame {
                     uri = try EpicService.launchURI(for: game)
+                    queuedPartner = game.epicPartnerGameID != nil
+                    if queuedPartner { queuedPartnerURI = uri }
                 }
             }
             // Epic owns the entitlement and partner handoff. Dispatch Epic
@@ -363,8 +383,9 @@ public enum SupervisorEngine {
             // Activate the registered Windows protocol through ShellExecute.
             // Re-running the launcher executable with a URL can open the client
             // without delivering the action to its already-running instance.
-            arguments = request.command == .openEpic ? [launcher.path, "-SkipBuildPatchPrereq"] : ["start.exe", uri]
-            primeEpic = request.command == .launchEpicGame && request.primeEpic == true
+            arguments = queuedPartner ? [launcher.path, "-SkipBuildPatchPrereq", "-forwarduri"]
+                : request.command == .openEpic ? [launcher.path, "-SkipBuildPatchPrereq"] : ["start.exe", uri]
+            primeEpic = !queuedPartner && request.command == .launchEpicGame && request.primeEpic == true
         } else { arguments = [try SteamService.steamExecutable(prefix: prefix).path] }
         if !request.command.isEpic && !request.command.isUbisoft && request.command != .shutdown { arguments.append("-cef-disable-gpu") }
         if request.command == .shutdown { arguments += ["-shutdown"] }
@@ -398,6 +419,12 @@ public enum SupervisorEngine {
         }
         guard acquired != nil else { throw CrossedOverError.message("The environment remained locked during launch.") }
         try LaunchGeneration.check(request.launchGeneration, prefix: prefix)
+        if let queuedPartnerURI {
+            guard let generation = request.launchGeneration, let record = try EpicLaunchQueue.receipt(prefix: prefix),
+                  record.generation == generation, record.payload.hasSuffix("|" + queuedPartnerURI) else {
+                throw CrossedOverError.message("This Epic launch was replaced or cancelled. Choose Play again.")
+            }
+        }
         var primer: Process?
         if primeEpic {
             // Cold URI startup hides Epic's UI before sign-in/linking can finish

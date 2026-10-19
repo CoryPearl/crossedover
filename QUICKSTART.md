@@ -53,6 +53,8 @@ Your native Mac Steam installation stays separate. No Steam account, game files,
 4. Completed installs appear automatically in **Games**, with an **Epic Games** label. Press **⌘R** to refresh, or use the **All games / Steam / Epic Games / Added .exe** filter.
 5. Press **Play** on the game’s card. Launches go through Windows Epic so it can handle account authorization and DRM; crossedover tracks the game process.
 
+Setup also installs Epic's required launch-support components. For an existing installation where Play opens Epic but no game, quit Windows games and launchers, then choose **Settings → Windows Epic Games → Repair launch support**. This preserves games and accounts. First-time setup may download an additional 85 MB managed-runtime prerequisite. A successful repair verifies the installed helper; actual game compatibility still needs a launch test.
+
 **Game Launchers** in the sidebar groups **Open Steam**, **Open Epic Games**, and **Open Ubisoft Connect**. Steam and Epic offer setup when missing; Ubisoft Connect is enabled after a supported Epic game installs it. These open crossedover’s Windows clients; your native Mac launchers stay separate. These clients and their downloads live under crossedover’s existing data folder. The in-app uninstaller removes these clients and all their managed games.
 
 Use an Epic card’s **⋯** menu for **Game properties**, **Show game files**, **Mods & files**, and **Manage in Epic**. **Verify files in Epic** and **Uninstall in Epic** open Epic Library: find the game, choose **⋯ → Manage → Verify / Uninstall**, then confirm in Epic. These buttons open the supported management flow; they do not silently verify or delete files. The card disappears after Epic finishes uninstalling and the library refreshes.
@@ -136,6 +138,17 @@ The launcher uses DXMT / Metal for DirectX 10–11, with DXVK / Metal for Direct
 **Settings → Other platforms → Open Xbox Cloud** opens Microsoft's official site in your default browser. It streams only supported cloud titles; account, subscription, region, network, and controller requirements vary. This does not download games into crossedover or imply Minecraft Bedrock is available in the cloud.
 
 Experimental [Bedrock for Mac](https://github.com/1JRobertson/bedrock-mac) work uses a separate WineGDK/DXMT runtime and Microsoft account helper. It establishes a possible future Bedrock-specific route, not support in crossedover or the Windows Xbox app. See [the technical assessment](docs/XBOX_AND_BEDROCK.md). Minecraft Java already has a separate native Mac version. No Microsoft credentials or games are included or collected by crossedover.
+
+In **v1.4 development previews**, **Game Launchers → Minecraft Bedrock…** opens
+a dedicated launcher. A separately built and verified backend is required;
+without it the install button explains what is missing. With it, choose
+**Install & Play**, complete Microsoft sign-in/Keychain prompts, and keep the
+setup session open. The backend downloads only over verified HTTPS and may
+stop if a secure package is unavailable. **Stop Minecraft** affects this
+separate session. The launcher’s options allow account sign-out and uninstall
+that keeps worlds. [Local preview build and file paths](runtime/bedrock/README.md).
+This flow is not part of the public v1.3.1 package and is awaiting live gameplay
+validation; it does not add the Windows Xbox app or general Game Pass support.
 
 
 ## Hardware guidelines

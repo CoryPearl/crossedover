@@ -52,6 +52,9 @@ import Testing
         var request = SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchEpicGame, appID: epic.appID)
         let requestFile = paths.logs.appendingPathComponent(".launch-partner.json")
         let epicLauncher = try EpicService.executable(prefix: prefix)
+        request.launchGeneration = try LaunchGeneration.current(prefix: prefix)
+        let queue = EpicLaunchQueue.Receipt(payload: try EpicLaunchQueue.payload(uri: EpicService.launchURI(for: epic)), generation: request.launchGeneration!)
+        try JSONEncoder().encode(queue).write(to: prefix.appendingPathComponent(EpicLaunchQueue.receiptName))
         for cold in [false, true] {
             let order = prefix.appendingPathComponent("launch-order.txt")
             try? FileManager.default.removeItem(at: order)
@@ -61,12 +64,11 @@ import Testing
             try JSONEncoder().encode(request).write(to: requestFile)
             try SupervisorEngine.runLaunchWorker(requestFile: requestFile)
             let actual = try String(contentsOf: order, encoding: .utf8).split(separator: "\n").map(String.init)
-            let dispatch = ["start.exe", try EpicService.launchURI(for: epic)]
-            #expect(actual == (cold ? [epicLauncher.path, "-SkipBuildPatchPrereq"] + dispatch : dispatch))
+            #expect(actual == [epicLauncher.path, "-SkipBuildPatchPrereq", "-forwarduri"])
             #expect(!actual.contains(launcher.path))
             #expect(!actual.contains(where: { $0.hasPrefix("uplay:") }))
             let workingDirectories = try String(contentsOf: directories, encoding: .utf8).split(separator: "\n").map(String.init)
-            #expect(workingDirectories.count == (cold ? 2 : 1))
+            #expect(workingDirectories.count == 1)
             // macOS may spell the same temporary directory as /var or /private/var.
             let expectedDirectory = try FileManager.default.attributesOfItem(atPath: epicLauncher.deletingLastPathComponent().path)
             for directory in workingDirectories {

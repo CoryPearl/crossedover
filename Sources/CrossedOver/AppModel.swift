@@ -32,6 +32,17 @@ import CrossedOverCore
     var selectedPage = "library"
     var pendingGame: GameInstallation?
     var diagnostics: String?
+    var showingMinecraft = false
+    var bedrockStatus: BedrockEvent?
+    var bedrockAvailable = false
+    var bedrockChecked = false
+    var bedrockInstalled = false
+    var bedrockActive = false
+    var bedrockStopping = false
+    var bedrockError: String?
+    private var bedrockChecking = false
+    private let bedrockService = BedrockService()
+    private var bedrockTask: Task<Void, Never>?
     private var work: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var monitorTask: Task<Void, Never>?
@@ -54,7 +65,18 @@ import CrossedOverCore
     var epicInstalled: Bool { environment != nil && epicPath != nil }
     var steamInstalled: Bool { environment != nil && steamPath != nil }
     var ubisoftInstalled: Bool { environment != nil && ubisoftPath != nil }
+    var bedrockBackendDirectory: URL? {
+        if let path = ProcessInfo.processInfo.environment["CROSSEDOVER_BEDROCK_BACKEND"] {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+        guard let resources = Bundle.main.resourceURL else { return nil }
+        return resources.appendingPathComponent("BedrockBackend", isDirectory: true)
+    }
     var launchStatus: (title: String, detail: String, waiting: Bool)? {
+        if bedrockActive {
+            return (bedrockStopping ? "Stopping Minecraft…" : bedrockStatus?.title ?? "Checking Minecraft…",
+                    bedrockStatus?.detail ?? "Preparing the separate Bedrock session.", bedrockStatus?.phase != .playing || bedrockStopping)
+        }
         if stoppingWindows { return ("Closing Windows…", "Stopping launches, games, and launchers.", true) }
         if let openingGame { return ("Opening \(openingGame.name)…", progress, true) }
         if let openingApp { return ("Opening \(openingApp.name)…", "Starting the Windows program.", true) }
@@ -110,6 +132,7 @@ import CrossedOverCore
         guard refreshTask == nil else { return }
         host = await HostInspector.inspect(at: paths.root)
         await refresh()
+        Task { await self.checkMinecraft() }
         if let previous = sessions.first(where: { ["requested", "running", "unknown"].contains($0.state) && $0.endedAt == nil }),
            let game = games.first(where: { $0.sessionAppID == previous.appID && $0.environmentID == previous.environmentID }), let environment {
             currentSession = previous; monitor(game: game, environment: environment)
@@ -195,6 +218,99 @@ import CrossedOverCore
         }
     }
     func cancel() { work?.cancel() }
+
+    func checkMinecraft() async {
+        guard !bedrockActive, !bedrockChecked, !bedrockChecking else { return }
+        bedrockChecking = true; defer { bedrockChecking = false }
+        bedrockError = nil
+        guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 else {
+            bedrockError = "This local Bedrock preview requires an Apple silicon Mac with macOS 26 or later."
+            bedrockChecked = true; return
+        }
+        guard let directory = bedrockBackendDirectory,
+              FileManager.default.fileExists(atPath: directory.appendingPathComponent("backend.json").path) else {
+            bedrockChecked = true; return
+        }
+        do {
+            let backend = try await Task.detached(priority: .utility) { try BedrockBackend.load(at: directory) }.value
+            let status = try await backend.status(dataRoot: paths.root)
+            bedrockStatus = status; bedrockInstalled = status.phase == .ready; bedrockAvailable = true
+        } catch { bedrockError = "Minecraft's preview backend could not be verified. Rebuild or reinstall the matching backend." }
+        bedrockChecked = true
+    }
+
+    func startMinecraft(signOut: Bool = false) {
+        guard !bedrockActive, !busy, bedrockAvailable, let directory = bedrockBackendDirectory else { return }
+        bedrockActive = true; bedrockStopping = false; bedrockStatus = nil; bedrockError = nil
+        bedrockTask = Task {
+            do {
+                let backend = try await Task.detached(priority: .utility) { try BedrockBackend.load(at: directory) }.value
+                try Task.checkCancellation()
+                guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 else {
+                    throw CrossedOverError.message("This Minecraft preview requires macOS 26 or later and Apple silicon.")
+                }
+                let events = try await bedrockService.events(backend: backend, dataRoot: paths.root, signOut: signOut)
+                for try await event in events {
+                    bedrockStatus = event
+                    if event.phase == .ready || event.phase == .playing { bedrockInstalled = true }
+                    if event.phase == .new { bedrockInstalled = false }
+                    if event.phase == .error { bedrockError = event.detail }
+                }
+            } catch is CancellationError {
+                bedrockStatus = nil
+            } catch {
+                // A worker can report a reviewed failure before exiting with
+                // nonzero status. Keep that actionable message for the user.
+                if bedrockError == nil {
+                    bedrockError = "Minecraft's session stopped. Your completed installation and worlds were kept. You can try again."
+                }
+            }
+            // Stream cancellation can end iteration before the worker finishes
+            // unwinding its children. Keep Stop/Uninstall fenced until it exits.
+            let service = bedrockService
+            await Task.detached { await service.waitUntilStopped() }.value
+            bedrockActive = false; bedrockStopping = false
+            // Preserve the session's failure/cancellation message. A subsequent
+            // status check must not erase why installation stopped.
+        }
+    }
+
+    func stopMinecraft() {
+        guard bedrockActive, !bedrockStopping else { return }
+        bedrockStopping = true
+        // Cancel before the worker starts, or ask its own lifecycle to unwind.
+        bedrockTask?.cancel()
+        Task { await bedrockService.cancel() }
+    }
+
+    func openMinecraftFiles() {
+        do {
+            let home = try BedrockService.home(in: paths.root)
+            guard FileManager.default.fileExists(atPath: home.path) else { return }
+            NSWorkspace.shared.open(home)
+        } catch { bedrockError = "Minecraft's files could not be opened safely." }
+    }
+
+    func uninstallMinecraft() {
+        guard !bedrockActive, !busy else { return }
+        perform("Uninstall Minecraft") {
+            let paths = self.paths
+            try await Task.detached(priority: .utility) {
+                let lock = try BedrockService.acquireIdleData(dataRoot: paths.root)
+                defer { withExtendedLifetime(lock) {} }
+                let home = try BedrockService.home(in: paths.root)
+                let original = home.appendingPathComponent("game")
+                guard try original.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+                    throw CrossedOverError.message("Minecraft's game folder is a symbolic link. It was preserved.")
+                }
+                let game = try FileSafety.containedURL("game", in: home)
+                try FileManager.default.trashItem(at: game, resultingItemURL: nil)
+            }.value
+            self.bedrockInstalled = false; self.bedrockStatus = nil
+            self.bedrockChecked = false; await self.checkMinecraft()
+            self.notice = "Minecraft moved to Trash. Your worlds were kept in its separate Windows environment."
+        }
+    }
     func setup() {
         guard host?.supported == true else { error = host?.blockers.joined(separator: "\n") ?? "Checking your Mac…"; return }
         perform("Set up Steam") {
@@ -240,10 +356,22 @@ import CrossedOverCore
             if reinstall || (try? EpicService.executable(prefix: self.paths.prefix(environment))) == nil {
                 self.progress = "Downloading and installing Epic's Windows launcher…"
                 try await self.epicService.install(environment: environment, runtime: runtime)
+            } else if try EpicLaunchSupport.installedVersion(prefix: self.paths.prefix(environment)) == nil {
+                self.progress = "Installing Epic’s launch support. Keep Windows apps closed…"
+                try await self.epicService.repairLaunchSupport(environment: environment, runtime: runtime)
             }
             self.progress = "Opening Epic Games…"
             let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .openEpic))
             self.notice = reply.message
+        }
+    }
+    func repairEpicLaunchSupport() {
+        guard let environment else { return }
+        perform("Repair Epic launch support") {
+            let runtime = try await self.runtimeManager.resolve(environment.runtimeID)
+            self.progress = "Installing Epic’s required components. Keep Windows apps closed…"
+            try await self.epicService.repairLaunchSupport(environment: environment, runtime: runtime)
+            self.notice = "Epic launch support is ready. You can try Play again."
         }
     }
     func openUbisoft() {
@@ -608,11 +736,14 @@ import CrossedOverCore
     }
     func uninstallApplication() {
         guard !busy else { return }
+        guard !bedrockActive else { error = "Stop Minecraft's session before uninstalling crossedover."; return }
         guard currentSession == nil else { error = "Quit your game before uninstalling crossedover."; return }
         busy = true; progress = "Checking before uninstall…"; error = nil
         work = Task {
             do {
                 let root = try ManagedStorage.dataRoot(paths.root, expected: AppPaths().root)
+                let bedrockLock = try BedrockService.acquireIdleData(dataRoot: root)
+                defer { withExtendedLifetime(bedrockLock) {} }
                 let app = try ManagedStorage.application(Bundle.main.bundleURL, identifier: Bundle.main.bundleIdentifier)
                 let store = store, paths = paths
                 let environments = try await Task.detached {
