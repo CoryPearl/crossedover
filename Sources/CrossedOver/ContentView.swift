@@ -85,7 +85,7 @@ struct ContentView: View {
             if let runtime = pendingRuntime { Button("Change runtime") { pendingRuntime = nil; model.useRuntime(runtime) } }
             if pendingIncludedRuntime { Button("Use included runtime") { pendingIncludedRuntime = false; model.useIncludedRuntime() } }
             Button("Cancel", role: .cancel) { pendingRuntime = nil; pendingIncludedRuntime = false }
-        } message: { Text("Quit Steam, Epic, games, and Windows apps first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Advanced before continuing.") }
+        } message: { Text("Quit Steam, Epic, games, and Windows apps first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Settings → Backups before continuing.") }
         .confirmationDialog("Remove this card from your library?", isPresented: Binding(get: { removingApp != nil }, set: { if !$0 { removingApp = nil } }), titleVisibility: .visible) {
             if let app = removingApp { Button("Remove card", role: .destructive) { model.removeWindowsApp(app); removingApp = nil } }
             Button("Cancel", role: .cancel) { removingApp = nil }
@@ -735,7 +735,11 @@ struct ContentView: View {
             }.panel()
             VStack(alignment: .leading, spacing: 0) {
                 settingRow("Backups", detail: "Manual only. Full backups include every installed game and app.") {
-                    Button("Clear backups…") { clearBackupsConfirmation = true }.buttonStyle(SecondaryButton())
+                    HStack(spacing: 8) {
+                        Button("Create backup…") { manualBackupConfirmation = true }
+                            .buttonStyle(SecondaryButton()).disabled(model.environment == nil)
+                        Button("Clear backups…") { clearBackupsConfirmation = true }.buttonStyle(SecondaryButton())
+                    }
                 }
                 Rule().padding(.horizontal, 22)
                 settingRow("Uninstall crossedover", detail: "Remove crossedover, Windows apps, games, saves, and app data.") {
@@ -751,7 +755,7 @@ struct ContentView: View {
             if let environment = model.environment {
                 VStack(alignment: .leading, spacing: 12) {
                     detailHeading("Recovery")
-                    Text("Quit Steam, Epic, games, and Windows apps before backing up or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text("Quit Steam, Epic, games, and Windows apps before restoring or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { recoveryActions(environment) }
                         VStack(alignment: .leading, spacing: 8) { recoveryActions(environment) }
@@ -798,7 +802,6 @@ struct ContentView: View {
     }
 
     @ViewBuilder private func recoveryActions(_ environment: ManagedEnvironment) -> some View {
-        Button("Back up…") { manualBackupConfirmation = true }.buttonStyle(SecondaryButton())
         Button("Restore…") { model.restoreBackup() }.buttonStyle(SecondaryButton())
         Button("Repair") { model.repair() }.buttonStyle(SecondaryButton())
         Button("Show files") { NSWorkspace.shared.open(model.paths.prefix(environment)) }.buttonStyle(SecondaryButton())

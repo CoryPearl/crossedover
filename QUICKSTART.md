@@ -97,7 +97,7 @@ The app is in **/Applications/crossedover.app**. Games, imported apps, Windows S
 ~/Library/Application Support/CrossedOver/
 ~~~
 
-Use **Open download folder** to browse installed games, or **⋯ → Show game files** for one game. Full environment backups are **manual only** and include all installed games, apps, and imported cards. Restoring a pre-v1.1.0 backup clears imported cards because that version did not have them. Small copies of settings changed by crossedover are kept for recovery. Use **Settings → Clear backups** to move old full backups to Trash; your current games and saves stay in place. Empty Trash in Finder to reclaim space (APFS clones can share blocks).
+Use **Open download folder** to browse installed games, or **⋯ → Show game files** for one game. Full environment backups are **manual only** and include all installed games, apps, and imported cards. Restoring a pre-v1.1.0 backup clears imported cards because that version did not have them. Small copies of settings changed by crossedover are kept for recovery. Use **Settings → Backups → Create backup** for a manual copy. **Clear backups**, beside it, moves old full backups to Trash; your current games and saves stay in place. Empty Trash in Finder to reclaim space (APFS clones can share blocks).
 
 ### Uninstall everything
 
