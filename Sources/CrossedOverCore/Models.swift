@@ -152,6 +152,11 @@ public struct OperationRecord: Codable, Sendable, Identifiable, Equatable {
     public var state: String
     public var detail: String
     public var updatedAt: Date
+    public var statusTitle: String {
+        if state == "requested" || (state == "completed" && kind.hasPrefix("Launch ")) { return "Request sent" }
+        if state == "started" { return "Running" }
+        return state.capitalized
+    }
     public init(kind: String, state: String, detail: String) {
         id = UUID(); self.kind = kind; self.state = state; self.detail = detail; updatedAt = Date()
     }

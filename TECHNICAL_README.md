@@ -281,15 +281,17 @@ sequenceDiagram
 | Installation | Launch behavior | Management behavior |
 | --- | --- | --- |
 | Steam | Windows `steam.exe -silent -applaunch <id>`, plus any fixed recipe arguments | Steam install/uninstall/properties/validate/download routes |
-| Normal Epic | Composite namespace/catalog/artifact URI passed to Windows Epic | Opens Epic Library; the user chooses Manage → Verify or Uninstall |
-| Epic with Ubisoft partner ID | Epic composite launch URI; Epic handles authorization and the Ubisoft handoff | Ubisoft's own Library controls |
+| Normal Epic | Composite namespace/catalog/artifact URI activated through Windows ShellExecute and Epic’s registered handler | Opens Epic Library; the user chooses Manage → Verify or Uninstall |
+| Epic with Ubisoft partner ID | Epic composite launch URI through Windows ShellExecute; Epic handles authorization and the Ubisoft handoff | Ubisoft's own Library controls |
 | Independent Ubisoft | `UbisoftConnect.exe` with validated `uplay://launch/<id>/0`, using its own store identity | Ubisoft's own Library controls |
 
 Epic partner cards keep their Epic identity and launch through Epic, including Brawlhalla. Ubisoft still supplies their completed install registration and management controls. Sending a bare Ubisoft link failed in real Brawlhalla checks, so crossedover leaves authorization and partner dispatch to the owning Epic client. Initial account linking remains inside Epic's Library. Current real-game launch/window confirmation remains tracked in the validation record.
 
-Normal Open Epic starts its visible client directly. Any cold Epic game launch, including a partner installation, primes that client before submitting the URI. Windows launchers start with their own executable directory as the working directory. The supervisor computes this hint from observed processes. The primer uses separate output handles: sharing the URI process's `Pipe` caused a Foundation file-handle exception and is covered by a regression test.
+Normal Open Epic starts its visible client directly. Game and library URLs activate through Wine’s `start.exe` / Windows ShellExecute, using the client’s registered protocol handler; they are not simply passed as arguments to a second Epic executable. This follows Epic’s [protocol activation guidance](https://assets-unreal2-epic-prod-us2.s3.dualstack.us-east-1.amazonaws.com/original/4X/f/c/4/fc4342c50e1a0abf34943e019ee90bacccc62950.pdf); it does not establish that every partner game accepts a deep link. Any cold Epic game launch, including a partner installation, primes that client before submitting the URI. Windows launchers start with their own executable directory as the working directory. The supervisor computes this hint from observed processes. The primer uses separate output handles: sharing the URI process's `Pipe` caused a Foundation file-handle exception and is covered by a regression test.
 
 ### Session tracking
+
+New game sessions share their UUID with the launch Activity operation. `Store.putSession` commits observation and operation status together: request sent, process running, exited, failed, or stopped. `finishOperation` cannot overwrite a newer observed state with a delayed request receipt. Historical launch operations recorded as completed display as Request sent because they only established handoff. This avoids presenting a finished supervisor request as a successful game startup.
 
 The observer is a small Windows program using `CreateToolhelp32Snapshot`. It returns process IDs and executable basenames, not a screenshot or a gameplay measurement. Known recipes provide expected names; other games use a bounded, non-symlink inventory of installed executables, excluding known helpers. The inventory stops at 50,000 visited entries.
 

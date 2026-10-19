@@ -170,15 +170,18 @@ import CrossedOverCore
             if ubisoftPath != snapshot.9 { ubisoftPath = snapshot.9 }
         } catch { self.error = error.localizedDescription }
     }
-    func perform(_ title: String, allowsStopping: Bool = false, action: @escaping @MainActor () async throws -> Void) {
+    func perform(_ title: String, id: UUID = UUID(), completionState: String = "completed", allowsStopping: Bool = false, action: @escaping @MainActor () async throws -> Void) {
         guard !busy, !stoppingWindows || allowsStopping else { return }
         busy = true; progress = title; error = nil; notice = nil
         work = Task {
             var record = OperationRecord(kind: title, state: "running", detail: title)
+            record.id = id
             do {
                 let initial = record, store = store
                 try await Task.detached(priority: .utility) { try store.put(initial, kind: "operation", id: initial.id.uuidString) }.value
-                try Task.checkCancellation(); try await action(); try Task.checkCancellation(); record.state = "completed"; record.detail = "Completed"
+                try Task.checkCancellation(); try await action(); try Task.checkCancellation()
+                record.state = completionState
+                record.detail = completionState == "requested" ? "Launch request sent. Waiting for the game process." : "Completed"
             } catch is CancellationError { record.state = "cancelled"; record.detail = "Cancelled. You can retry this operation." }
             catch {
                 if Task.isCancelled { record.state = "cancelled"; record.detail = "Cancelled. You can retry this operation." }
@@ -186,7 +189,7 @@ import CrossedOverCore
             }
             record.updatedAt = Date()
             let finished = record, store = store
-            try? await Task.detached(priority: .utility) { try store.put(finished, kind: "operation", id: finished.id.uuidString) }.value
+            try? await Task.detached(priority: .utility) { try store.finishOperation(finished) }.value
             openingGame = nil; openingApp = nil
             busy = false; progress = ""; await refresh()
         }
@@ -438,7 +441,8 @@ import CrossedOverCore
         pendingGame = nil
         guard let environment, let runtime else { return }
         openingGame = game
-        perform("Launch \(game.name)") {
+        let sessionID = UUID()
+        perform("Launch \(game.name)", id: sessionID, completionState: "requested") {
             defer { self.openingGame = nil }
             var updated = environment
             if restart, let recipe = self.recipe(for: game) {
@@ -457,8 +461,8 @@ import CrossedOverCore
             self.progress = "Preparing graphics and contacting \(game.store.title)…"
             _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: updated.id, command: game.store == .epic ? .launchEpicGame : game.store == .ubisoft ? .launchUbisoftGame : .launchGame, appID: game.appID))
             try Task.checkCancellation()
-            let session = LaunchSession(id: UUID(), appID: game.sessionAppID, environmentID: updated.id, startedAt: Date(), state: "requested")
-            try self.store.put(session, kind: "session", id: session.id.uuidString); self.currentSession = session
+            let session = LaunchSession(id: sessionID, appID: game.sessionAppID, environmentID: updated.id, startedAt: Date(), state: "requested")
+            try self.store.putSession(session); self.currentSession = session
             self.monitor(game: game, environment: updated)
         }
     }
@@ -479,28 +483,28 @@ import CrossedOverCore
                     guard !Task.isCancelled, currentSession?.id == session.id else { return }
                     guard let processes = reply.processes, !executableNames.isEmpty else {
                         session.state = "unknown"; session.detail = "Launch requested; this runtime or game has no validated process observer. Check the game's Windows launcher."
-                        currentSession = session; try store.put(session, kind: "session", id: session.id.uuidString); return
+                        currentSession = session; try store.putSession(session); return
                     }
                     let running = processes.contains { executableNames.contains($0.executable.lowercased()) }
                     if running { observedRunning = true; session.state = "running"; session.detail = "Game process observed." }
                     else if observedRunning {
                         session.state = "exited"; session.endedAt = Date(); session.detail = "Game process exited."
-                        try store.put(session, kind: "session", id: session.id.uuidString); currentSession = nil; await refresh(); return
+                        try store.putSession(session); currentSession = nil; await refresh(); return
                     } else if Date().timeIntervalSince(session.startedAt) > 90 {
                         session.state = "failed"; session.endedAt = Date(); session.detail = "No matching game process appeared within 90 seconds. Check the game's Windows launcher for prompts."
-                        try store.put(session, kind: "session", id: session.id.uuidString); currentSession = nil; error = session.detail; return
+                        try store.putSession(session); currentSession = nil; error = session.detail; return
                     }
                     if currentSession != session {
                         currentSession = session
                         let saved = session, store = store
-                        try await Task.detached(priority: .utility) { try store.put(saved, kind: "session", id: saved.id.uuidString) }.value
+                        _ = try await Task.detached(priority: .utility) { try store.putSession(saved) }.value
                     }
                 } catch {
                     guard !Task.isCancelled, currentSession?.id == session.id else { return }
                     observationCount += 1
                     if observationCount >= 3 {
                         session.state = "unknown"; session.detail = "Process observation was interrupted. Check the game's Windows launcher."
-                        currentSession = session; try? store.put(session, kind: "session", id: session.id.uuidString); return
+                        currentSession = session; _ = try? store.putSession(session); return
                     }
                 }
             }
@@ -509,7 +513,7 @@ import CrossedOverCore
     func dismissUnknownSession() {
         if var session = currentSession {
             session.state = "unknown"; session.endedAt = Date(); session.detail = "Tracking dismissed by the user; game exit was not confirmed."
-            try? store.put(session, kind: "session", id: session.id.uuidString)
+            _ = try? store.putSession(session)
         }
         monitorTask?.cancel(); currentSession = nil
     }

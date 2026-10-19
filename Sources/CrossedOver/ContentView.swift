@@ -823,13 +823,13 @@ struct ContentView: View {
                     ForEach(Array(model.operations.prefix(20).enumerated()), id: \.element.id) { index, operation in
                         if index > 0 { Rule().padding(.horizontal, 22) }
                         HStack(alignment: .top, spacing: 14) {
-                            Image(systemName: operation.state == "completed" ? "checkmark.circle" : operation.state == "failed" ? "exclamationmark.circle" : "clock")
+                            Image(systemName: operation.statusTitle == "Completed" ? "checkmark.circle" : operation.state == "failed" ? "exclamationmark.circle" : "clock")
                                 .font(.system(size: 14)).foregroundStyle(Palette.muted).frame(width: 18).padding(.top, 1)
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(operation.kind).font(.system(size: 12, weight: .medium))
                                     Spacer()
-                                    Text(operation.state.capitalized).font(.system(size: 10)).foregroundStyle(Palette.muted)
+                                    Text(operation.statusTitle).font(.system(size: 10)).foregroundStyle(Palette.muted)
                                 }
                                 if operation.detail != "Completed" {
                                     Text(operation.detail).font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled)

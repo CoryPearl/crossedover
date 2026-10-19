@@ -136,7 +136,7 @@ import Testing
             let output = try String(contentsOf: log, encoding: .utf8)
             let uri = command == .launchEpicGame ? "com.epicgames.launcher://apps/example-ns%3Acatalog-item%3AExample?action=launch&silent=false" : EpicService.libraryURI
             let expected = command == .openEpic ? "-SkipBuildPatchPrereq" : uri
-            #expect(output == launcher.path + "\n" + expected + "\n\n" + runtime.root.appendingPathComponent("dxmt").path + "\n")
+            #expect(output == (command == .openEpic ? launcher.path : "start.exe") + "\n" + expected + "\n\n" + runtime.root.appendingPathComponent("dxmt").path + "\n")
         }
         for bad in [nil, "bad?cmd=run", "not-installed"] as [String?] {
             try JSONEncoder().encode(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchEpicGame, appID: bad)).write(to: file)

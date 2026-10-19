@@ -81,7 +81,7 @@ public enum SupervisorEngine {
             guard result.status == 0 else { throw CrossedOverError.message("Could not confirm environment shutdown: \(Redaction.apply(result.output).suffix(800))") }
             for var session in try store.all(LaunchSession.self, kind: "session") where session.environmentID == environment.id && session.endedAt == nil && ["requested", "running", "unknown"].contains(session.state) {
                 session.state = "stopped"; session.endedAt = Date(); session.detail = "Stopped by the user with all Windows windows."
-                try store.put(session, kind: "session", id: session.id.uuidString)
+                try store.putSession(session)
             }
             for var run in try store.all(WindowsAppRun.self, kind: "windowsRun") where run.environmentID == environment.id && run.isActive {
                 run.state = "stopped"; run.endedAt = Date(); run.detail = "Stopped by the user with all Windows windows."
@@ -301,7 +301,7 @@ public enum SupervisorEngine {
                let store = try? Store(url: request.root.appendingPathComponent("crossedover.sqlite")),
                var run = try? store.all(WindowsAppRun.self, kind: "windowsRun").first(where: { $0.id == id && $0.appID == request.windowsAppID && $0.environmentID == request.environmentID && $0.isActive }) {
                 run.state = "failed"; run.endedAt = Date(); run.detail = Redaction.apply(error.localizedDescription)
-                try? store.updateActiveWindowsRun(run)
+                _ = try? store.updateActiveWindowsRun(run)
             }
             throw error
         }
@@ -360,7 +360,10 @@ public enum SupervisorEngine {
             // Epic owns the entitlement and partner handoff. Dispatch Epic
             // cards through Epic, including Ubisoft-managed installations;
             // a bare uplay: link omits the owning launcher's flow.
-            arguments = request.command == .openEpic ? [launcher.path, "-SkipBuildPatchPrereq"] : [launcher.path, uri]
+            // Activate the registered Windows protocol through ShellExecute.
+            // Re-running the launcher executable with a URL can open the client
+            // without delivering the action to its already-running instance.
+            arguments = request.command == .openEpic ? [launcher.path, "-SkipBuildPatchPrereq"] : ["start.exe", uri]
             primeEpic = request.command == .launchEpicGame && request.primeEpic == true
         } else { arguments = [try SteamService.steamExecutable(prefix: prefix).path] }
         if !request.command.isEpic && !request.command.isUbisoft && request.command != .shutdown { arguments.append("-cef-disable-gpu") }
@@ -381,8 +384,8 @@ public enum SupervisorEngine {
         if request.command == .openDownloads { arguments.append("steam://nav/downloads") }
         let pipe = Pipe(), process = Process()
         process.executableURL = (request.command.isEpic || request.command.isUbisoft) ? runtime.wine : runtime.steamLoader; process.arguments = arguments
-        process.currentDirectoryURL = (request.command.isEpic || request.command.isUbisoft)
-            ? URL(fileURLWithPath: arguments[0]).deletingLastPathComponent() : prefix.appendingPathComponent("drive_c")
+        process.currentDirectoryURL = request.command.isEpic ? try EpicService.executable(prefix: prefix).deletingLastPathComponent()
+            : request.command.isUbisoft ? URL(fileURLWithPath: arguments[0]).deletingLastPathComponent() : prefix.appendingPathComponent("drive_c")
         if request.command.isUbisoft { process.environment = UbisoftDiscovery.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }
         else if request.command.isEpic { process.environment = EpicService.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }
         else { process.environment = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile) }

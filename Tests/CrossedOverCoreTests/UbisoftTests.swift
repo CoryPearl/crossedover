@@ -59,7 +59,7 @@ import Testing
             try JSONEncoder().encode(request).write(to: requestFile)
             try SupervisorEngine.runLaunchWorker(requestFile: requestFile)
             let actual = try String(contentsOf: order, encoding: .utf8).split(separator: "\n").map(String.init)
-            let dispatch = [epicLauncher.path, try EpicService.launchURI(for: epic)]
+            let dispatch = ["start.exe", try EpicService.launchURI(for: epic)]
             #expect(actual == (cold ? [epicLauncher.path, "-SkipBuildPatchPrereq"] + dispatch : dispatch))
             #expect(!actual.contains(launcher.path))
             #expect(!actual.contains(where: { $0.hasPrefix("uplay:") }))

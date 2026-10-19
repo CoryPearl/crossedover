@@ -406,6 +406,35 @@ import Testing
         try SupervisorEngine.runLaunchWorker(requestFile: file)
         #expect(FileManager.default.fileExists(atPath: marker.path))
     }
+    @Test func launchActivityFollowsTheGameInsteadOfTheRequestReceipt() throws {
+        let (paths, store, environment, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        var operation = OperationRecord(kind: "Launch Example", state: "running", detail: "Preparing")
+        try store.put(operation, kind: "operation", id: operation.id.uuidString)
+        var session = LaunchSession(id: operation.id, appID: "42", environmentID: environment.id, state: "requested")
+        try store.putSession(session)
+        operation.state = "requested"; operation.detail = "Request sent"
+        try store.finishOperation(operation)
+        var saved = try #require(store.all(OperationRecord.self, kind: "operation").first)
+        #expect(saved.state == "requested"); #expect(saved.statusTitle == "Request sent")
+        session.state = "running"; session.detail = "Game process observed."
+        try store.putSession(session)
+        // A delayed receipt cannot overwrite a later process observation.
+        try store.finishOperation(operation)
+        saved = try #require(store.all(OperationRecord.self, kind: "operation").first)
+        #expect(saved.state == "started"); #expect(saved.statusTitle == "Running")
+        session.state = "failed"; session.endedAt = Date(); session.detail = "The game did not start."
+        try store.putSession(session)
+        saved = try #require(store.all(OperationRecord.self, kind: "operation").first)
+        #expect(saved.state == "failed"); #expect(saved.detail == session.detail)
+        session.state = "running"; session.endedAt = nil
+        #expect(try !store.putSession(session))
+        try store.finishOperation(operation)
+        #expect(try store.all(OperationRecord.self, kind: "operation").first?.state == "failed")
+        let historical = OperationRecord(kind: "Launch Older game", state: "completed", detail: "Completed")
+        #expect(historical.statusTitle == "Request sent")
+        #expect(OperationRecord(kind: "Back up environment", state: "completed", detail: "Completed").statusTitle == "Completed")
+    }
     @Test func stopWaitsForAnInFlightLaunchLock() async throws {
         let (paths, _, environment, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: paths.root) }

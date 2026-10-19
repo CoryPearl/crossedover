@@ -31,6 +31,12 @@ try:
  launcher=prefix/'drive_c/Program Files/Epic Games/Launcher/Portal/Binaries/Win64/EpicGamesLauncher.exe'
  launcher.parent.mkdir(parents=True)
  subprocess.run(['x86_64-w64-mingw32-gcc','-O2','-static',str(PROJECT/'runtime/epic-handoff-smoke.c'),'-o',str(launcher)],check=True)
+ # Register an actual Windows protocol handler for the owned stand-in. This
+ # exercises ShellExecute, rather than merely accepting a URI as argv[1].
+ command('force-stop')
+ with (prefix/'system.reg').open('a') as registry:
+  registry.write('\n'+r'[Software\\Classes\\com.epicgames.launcher]'+'\n@="Owned Epic protocol"\n"URL Protocol"=""\n')
+  registry.write('\n'+r'[Software\\Classes\\com.epicgames.launcher\\shell\\open\\command]'+'\n@='+json.dumps('"'+r'C:\Program Files\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe'+'" "%1"')+'\n')
  game=prefix/'drive_c/Program Files/Epic Games/OwnedProbe'; game.mkdir(parents=True)
  shutil.copy2(runtime/'share/crossedover/d3d11-smoke-64.exe',game/'Brawlhalla.exe')
  manifests=prefix/'drive_c/ProgramData/Epic/EpicGamesLauncher/Data/Manifests'; manifests.mkdir(parents=True)

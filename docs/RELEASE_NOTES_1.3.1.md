@@ -2,7 +2,8 @@
 
 A local validation candidate for Brawlhalla launch and native window controls. Publication is pending user confirmation.
 
-- Epic-installed Brawlhalla now launches through Epic’s composite game URI, preserving the owning client’s authorization and Ubisoft handoff. Previously the card sent a bare Ubisoft URL, which opened the launcher without starting the game.
+- Epic-installed Brawlhalla requests launch through Windows ShellExecute and Epic’s registered composite game URI handler, preserving the owning client’s authorization and Ubisoft handoff. Previously the card sent a bare Ubisoft URL, which opened the launcher without starting the game.
+- Activity tracks the game session instead of marking the launch completed at request acknowledgement. A missing game becomes Failed; a delivered request alone is Request sent.
 - The cold Epic startup path now also applies to partner games. Windows launchers start from their own executable directory.
 - The included runtime contains Brawlhalla’s scoped native title-bar controls. Existing environments need **Settings → Advanced → Use included runtime** with Windows software closed; updating the Mac app alone does not change their selected runtime.
 - A **Game Launchers** menu groups Steam, Epic Games, and installed Ubisoft Connect.

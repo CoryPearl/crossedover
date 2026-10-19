@@ -31,6 +31,34 @@ public final class Store: Sendable {
     public func remove(kind: String, id: String) throws {
         try database.write { db in try db.execute(sql: "DELETE FROM records WHERE kind=? AND id=?", arguments: [kind, id]) }
     }
+    /// Game sessions share an ID with their launch operation. Commit both
+    /// together so a delivered request is never mistaken for a started game.
+    @discardableResult public func putSession(_ session: LaunchSession) throws -> Bool {
+        try database.write { db in
+            let id = session.id.uuidString
+            if let old = try Data.fetchOne(db, sql: "SELECT payload FROM records WHERE kind='session' AND id=?", arguments: [id]),
+               try JSONDecoder().decode(LaunchSession.self, from: old).endedAt != nil, session.endedAt == nil { return false }
+            try db.execute(sql: "INSERT INTO records(kind,id,payload) VALUES('session',?,?) ON CONFLICT(kind,id) DO UPDATE SET payload=excluded.payload", arguments: [id, try JSONEncoder().encode(session)])
+            if let data = try Data.fetchOne(db, sql: "SELECT payload FROM records WHERE kind='operation' AND id=?", arguments: [id]) {
+                var operation = try JSONDecoder().decode(OperationRecord.self, from: data)
+                if operation.kind.hasPrefix("Launch ") {
+                    operation.state = session.state == "running" ? "started" : session.state
+                    operation.detail = session.detail ?? (session.state == "requested" ? "Launch request sent. Waiting for the game process." : "Game state: \(session.state).")
+                    operation.updatedAt = Date()
+                    try db.execute(sql: "UPDATE records SET payload=? WHERE kind='operation' AND id=?", arguments: [try JSONEncoder().encode(operation), id])
+                }
+            }
+            return true
+        }
+    }
+    public func finishOperation(_ operation: OperationRecord) throws {
+        try database.write { db in
+            if operation.state == "requested",
+               let data = try Data.fetchOne(db, sql: "SELECT payload FROM records WHERE kind='operation' AND id=?", arguments: [operation.id.uuidString]),
+               try JSONDecoder().decode(OperationRecord.self, from: data).state != "running" { return }
+            try db.execute(sql: "INSERT INTO records(kind,id,payload) VALUES('operation',?,?) ON CONFLICT(kind,id) DO UPDATE SET payload=excluded.payload", arguments: [operation.id.uuidString, try JSONEncoder().encode(operation)])
+        }
+    }
     /// Worker replies can arrive after Stop. Check and write in one transaction
     /// so a delayed reply cannot resurrect a terminal run.
     @discardableResult func updateActiveWindowsRun(_ run: WindowsAppRun) throws -> Bool {
