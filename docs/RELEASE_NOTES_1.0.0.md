@@ -1,10 +1,14 @@
-# crossedover v1.0.0
+# crossedover v1.0.0 · build 21
 
 A native Mac home for Windows Steam games. This first release includes a searchable library, compact grid and list views, Steam installation, per-game Play and management controls, and the independently built game runtime.
 
 Settings includes descriptions for all graphics profiles, separate Finder games-folder and Steam Downloads actions, manual-only full backups with cleanup, and a complete app/data uninstaller. Library refresh work runs away from the interface thread and skips unchanged results and background polling.
 
 **More than Steam games is coming soon:** other games, launchers, and platforms are planned.
+
+This build adds **⋯ → Mods & files**, with Finder shortcuts to the installed game and Windows Documents, plus manual-mod and Workshop guidance. Steam's native host is labelled **crossedover Steam**; games retain their own names. Windows mod managers and DLL-based loaders may require additional setup.
+
+The app's version remains 1.0.0, with build number 21. The original v1.0.0 release remains available; this build has its own source tag.
 
 ## Install
 

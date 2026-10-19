@@ -8,7 +8,7 @@ Compatibility is experimental. TrackMania Nations Forever is the first tested de
 
 ## Install
 
-1. Download **crossedover-1.0.0.dmg** from the [v1.0.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.0.0).
+1. Download **crossedover-1.0.0.dmg** from the [v1.0.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.0.0-build.21).
 2. Open it and drag **crossedover** onto **Applications**.
 3. Eject the disk image and open crossedover from Applications.
 
@@ -41,6 +41,18 @@ Graphics profiles are explained in Settings:
 - **Metal:** DXMT for DirectX 10–11; used by CS2. Compatibility varies by game.
 
 Quit Steam and all games before changing profiles. TrackMania uses Performance; CS2 uses Metal and opens in a desktop-sized window. CS2's native window controls and match performance are still being validated.
+
+## Mods
+
+Games keep their normal Windows files, so manual mods can be installed in the locations specified by each mod's instructions. Quit the game before changing files.
+
+- **crossedover:** use **⋯ → Mods & files → Game folder** to open the installation in Finder, or **Windows Documents** for games that store maps, skins, or mods there. Copy extracted mod files into the folder required by the mod.
+- **Steam:** open the game's **Properties → Installed Files → Browse**. This uses the runtime's Windows file explorer for the same installed game. Use crossedover's Finder action if you prefer.
+- **Steam Workshop:** for games that support it, subscribe to items in Windows Steam, let downloads finish, and enable them in the game if needed. [Valve's Workshop guide](https://partner.steamgames.com/doc/features/workshop/implementation) explains how subscriptions are delivered.
+
+Mod compatibility depends on the game and mod. Windows mod managers, script extenders, DLL overrides, and additional frameworks may need separate Wine setup; crossedover does not currently install or configure them. Steam updates and verification can replace modified files. Save a copy of files you replace yourself; crossedover does not make automatic full backups.
+
+The managed Steam host is labelled **crossedover Steam** in macOS. For an older installation, quit Windows Steam and all games, then choose **Settings → Advanced → Use included runtime** after updating the app. Reopen Steam to apply the label. Game names and descriptive Steam dialog titles are retained.
 
 ## Your files
 

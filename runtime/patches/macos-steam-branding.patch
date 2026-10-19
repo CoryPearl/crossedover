@@ -1,0 +1,77 @@
+Subject: macOS: Brand managed Steam hosts as crossedover Steam.
+
+Opt-in only. Game and non-generic dialog titles retain their original names.
+
+--- a/dlls/ntdll/unix/loader.c
++++ b/dlls/ntdll/unix/loader.c
+@@ -646,6 +646,14 @@
+     char *app_name = extract_exe_name(image_path);
+     if (app_name)
+     {
++        /* crossedover: brand Steam's macOS host, retaining every game's own name. */
++        if (getenv("CROSSEDOVER_STEAM_BRANDING") &&
++            (!strcasecmp(app_name, "steam.exe") || !strcasecmp(app_name, "steamwebhelper.exe")))
++        {
++            free(app_name);
++            app_name = strdup("crossedover Steam");
++            if (!app_name) return;
++        }
+         char *preloader_path = create_preloader_link(*wineloader_path, app_name);
+         if (preloader_path)
+         {
+--- a/dlls/winemac.drv/cocoa_app.m
++++ b/dlls/winemac.drv/cocoa_app.m
+@@ -338,9 +338,10 @@
+ 
+             mainMenu = [[[NSMenu alloc] init] autorelease];
+ 
+-            // Application menu
+-            submenu = [[[NSMenu alloc] initWithTitle:WineLocalizedString(STRING_MENU_WINE)] autorelease];
++            // Application menu. Keep the managed Steam label consistent in macOS.
+             bundleName = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString*)kCFBundleNameKey];
++            NSString* menuName = [bundleName isEqualToString:@"crossedover Steam"] ? bundleName : WineLocalizedString(STRING_MENU_WINE);
++            submenu = [[[NSMenu alloc] initWithTitle:menuName] autorelease];
+ 
+             if ([bundleName length])
+                 title = [NSString stringWithFormat:WineLocalizedString(STRING_MENU_ITEM_HIDE_APPNAME), bundleName];
+@@ -366,7 +367,7 @@
+             item = [submenu addItemWithTitle:title action:@selector(terminate:) keyEquivalent:@"q"];
+             [item setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagOption];
+             item = [[[NSMenuItem alloc] init] autorelease];
+-            [item setTitle:WineLocalizedString(STRING_MENU_WINE)];
++            [item setTitle:menuName];
+             [item setSubmenu:submenu];
+             [mainMenu addItem:item];
+ 
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -3574,6 +3574,11 @@
+         titleString = [NSString stringWithCharacters:title length:length];
+     else
+         titleString = @"";
++    /* Only replace generic Steam host titles, preserving sign-in and dialog titles. */
++    if ([[[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString*)kCFBundleNameKey] isEqualToString:@"crossedover Steam"] &&
++        (![titleString length] || [titleString caseInsensitiveCompare:@"wine"] == NSOrderedSame ||
++         [titleString caseInsensitiveCompare:@"steam"] == NSOrderedSame))
++        titleString = @"crossedover Steam";
+     OnMainThreadAsync(^{
+         [window setTitle:titleString];
+         if ([window isOrderedIn] && ![window isExcludedFromWindowsMenu])
+--- a/loader/main.c
++++ b/loader/main.c
+@@ -205,6 +205,15 @@
+     const char* new_bundle_name = getenv("WINEPRELOADERAPPNAME");
+     size_t new_bundle_name_len;
+ 
++    /* crossedover: initial launches do not pass through the child-process preloader. */
++    if (!new_bundle_name && argc > 1 && getenv("CROSSEDOVER_STEAM_BRANDING"))
++    {
++        const char *name = argv[1], *separator;
++        if ((separator = strrchr(name, '\\'))) name = separator + 1;
++        if ((separator = strrchr(name, '/'))) name = separator + 1;
++        if (!strcasecmp(name, "steam.exe") || !strcasecmp(name, "steamwebhelper.exe"))
++            new_bundle_name = "crossedover Steam";
++    }
+     unsetenv("WINEPRELOADERAPPNAME");
+ 
+     if (!new_bundle_name && argc < 2)

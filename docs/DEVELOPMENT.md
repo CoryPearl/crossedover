@@ -75,3 +75,11 @@ Steam owns authentication, purchases, DRM, installs, and downloads. crossedover 
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 Original code: GPL-3.0-or-later. Upstream components retain their own licenses. No affiliation with CodeWeavers, Valve, or Apple.
+
+## Mods and Steam host identity
+
+The per-game **Mods & files** sheet opens the game's discovered install folder or a contained Windows Documents directory. Steam's Properties → Installed Files → Browse continues to use Wine's built-in explorer. Mods use their normal Windows paths; external mod managers and DLL overrides are not configured automatically.
+
+The optional runtime `steamLoaderRelativePath` points to a copy of Wine's native loader named `crossedover Steam`, beside its ordinary Wine modules. Steam launch and installation requests use it; older manifests fall back to the ordinary loader. The opt-in macOS naming patch covers direct Steam startup, child Steam/web-helper processes, the application menu, and generic Steam/Wine captions, while preserving game and descriptive dialog titles.
+
+`runtime/modding-smoke.c` verifies a Windows file round trip and can exercise shell folder opening with `--browse`. It uses a temporary test folder under `C:\crossedover\modding-smoke`; compile it for Windows with MinGW and run only in an isolated managed prefix.

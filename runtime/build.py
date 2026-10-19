@@ -174,6 +174,10 @@ def main():
     if "bool native_fullscreen = false;" not in (SOURCE / "dlls/winemac.drv/macdrv_main.c").read_text():
         run(["git", "apply", "--check", fixed_fullscreen_patch], cwd=SOURCE)
         run(["git", "apply", fixed_fullscreen_patch], cwd=SOURCE)
+    branding_patch = PROJECT / "runtime/patches/macos-steam-branding.patch"
+    if "crossedover: brand Steam's macOS host" not in (SOURCE / "dlls/ntdll/unix/loader.c").read_text():
+        run(["git", "apply", "--check", branding_patch], cwd=SOURCE)
+        run(["git", "apply", branding_patch], cwd=SOURCE)
     dependency_archive = fetch(LOCK["developmentDependencies"])
     titlebar_patch = PROJECT / "runtime/patches/winemac-preserve-game-titlebar.patch"
     if "SDL games can draw their own non-client area" not in (SOURCE / "dlls/winemac.drv/window.c").read_text():
@@ -259,12 +263,16 @@ def main():
         content = content.replace("\ttools/sfnt2fon/sfnt2fon ", "\t/usr/bin/env DYLD_FALLBACK_LIBRARY_PATH=" + str(alias / "lib") + ":/usr/lib tools/sfnt2fon/sfnt2fon ")
         makefile.write_text(content)
         run(["make", "-j" + str(args.jobs)], cwd=WORK, env=env, log=WORK / "build-output.log")
-    if args.skip_build and args.x87:
+    if args.skip_build:
         # An older cached Wine build may predate the opt-in loader handshake.
-        run(["make", "-j" + str(args.jobs), "dlls/ntdll/ntdll.so"], cwd=WORK, env=env, log=WORK / "x87-loader-output.log")
+        run(["make", "-j" + str(args.jobs), "dlls/ntdll/ntdll.so", "loader/wine"], cwd=WORK, env=env, log=WORK / "x87-loader-output.log")
     if args.skip_build:
         run(["make", "-j" + str(args.jobs), "dlls/winemac.drv/winemac.so"], cwd=WORK, env=env, log=WORK / "window-driver-output.log")
     run(["make", "install"], cwd=WORK, env=env, log=WORK / "install-output.log")
+    # A distinct native executable gives Steam its own macOS application name.
+    # Keep it beside ntdll.so so Wine's normal relative module lookup is unchanged.
+    steam_loader = OUTPUT / "lib/wine/x86_64-unix/crossedover Steam"
+    shutil.copy2(OUTPUT / "lib/wine/x86_64-unix/wine", steam_loader)
     # Development dependencies retain their @loader_path-relative dependency graph.
     for source in (dependency_root / "lib").iterdir():
         if source.name == "wine":
@@ -367,6 +375,7 @@ def main():
         "name": "CrossedOver source Wine 11.0" + (" + DXMT 0.80" if args.metal else "") + (" + D9VK / MoltenVK 1.4.2" if args.d3d9 else "") + (" + x87 acceleration" if args.x87 else ""),
         "version": "11.0-cx26.3.0", "architecture": "x86_64", "minimumMacOS": 15,
         "wineRelativePath": "bin/wine", "wineserverRelativePath": "bin/wineserver",
+        "steamLoaderRelativePath": "lib/wine/x86_64-unix/crossedover Steam",
         "observerRelativePath": "share/crossedover/process-observer.exe", "profiles": profiles,
         "supportsMSync": True,
         "sourceURL": LOCK["wine"]["url"], "sourceSHA256": LOCK["wine"]["sha256"], "experimental": True,

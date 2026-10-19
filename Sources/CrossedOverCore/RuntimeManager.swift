@@ -93,7 +93,7 @@ public actor RuntimeManager {
               !manifest.id.isEmpty, manifest.id != ".", !manifest.id.hasPrefix("."), !manifest.id.contains("/"), !manifest.id.contains("\\") else {
             throw CrossedOverError.message("This runtime manifest is unsupported.")
         }
-        for path in [manifest.wineRelativePath, manifest.wineserverRelativePath] + [manifest.x87RelativePath].compactMap({ $0 }) {
+        for path in [manifest.wineRelativePath, manifest.wineserverRelativePath] + [manifest.x87RelativePath, manifest.steamLoaderRelativePath].compactMap({ $0 }) {
             let executable = try FileSafety.containedURL(path, in: root)
             guard FileManager.default.isExecutableFile(atPath: executable.path) else { throw CrossedOverError.message("Runtime executable missing: \(path)") }
         }

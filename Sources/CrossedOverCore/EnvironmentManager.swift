@@ -21,7 +21,7 @@ public enum WineConfiguration {
     public static let serverSyncMarker = ".crossedover-server-sync"
     public static func environment(runtime: InstalledRuntime, prefix: URL, profile: GraphicsProfile) -> [String: String] {
         var variables = ProcessInfo.processInfo.environment
-        for key in ["WINEPREFIX", "WINESERVER", "WINELOADER", "WINEDLLPATH", "WINEDLLOVERRIDES", "DYLD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "WINEARCH", "WINEMSYNC", "WINEESYNC", "WINEFSYNC", "DXVK_CONFIG_FILE", "DXVK_LOG_PATH", "DXVK_HUD", "ROSETTA_X87_PATH", "X87_SIDECAR_BOOTSTRAP", "CROSSEDOVER_FRAME_LOG"] { variables.removeValue(forKey: key) }
+        for key in ["WINEPREFIX", "WINESERVER", "WINELOADER", "WINEDLLPATH", "WINEDLLOVERRIDES", "DYLD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "WINEARCH", "WINEMSYNC", "WINEESYNC", "WINEFSYNC", "DXVK_CONFIG_FILE", "DXVK_LOG_PATH", "DXVK_HUD", "ROSETTA_X87_PATH", "X87_SIDECAR_BOOTSTRAP", "CROSSEDOVER_FRAME_LOG", "WINEPRELOADERAPPNAME", "CROSSEDOVER_STEAM_BRANDING"] { variables.removeValue(forKey: key) }
         variables["WINEPREFIX"] = prefix.path
         variables["WINESERVER"] = runtime.wineserver.path
         variables["WINEDEBUG"] = "-all"
@@ -29,6 +29,7 @@ public enum WineConfiguration {
         variables["MVK_CONFIG_LOG_LEVEL"] = "1"
         variables["DXMT_LOG_LEVEL"] = "error"
         variables["CROSSEDOVER_STEAM_CEF_COMPAT"] = "1"
+        variables["CROSSEDOVER_STEAM_BRANDING"] = "1"
         variables["DYLD_FALLBACK_LIBRARY_PATH"] = runtime.root.appendingPathComponent("lib").path + ":/usr/lib"
         variables["WINEDLLOVERRIDES"] = "winemetal,dxgi,d3d11,d3d10core,d3d9=b;mscoree,mshtml="
         let serverSync = FileManager.default.fileExists(atPath: prefix.appendingPathComponent(serverSyncMarker).path)

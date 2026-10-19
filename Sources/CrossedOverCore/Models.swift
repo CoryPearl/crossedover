@@ -36,6 +36,7 @@ public struct RuntimeManifest: Codable, Sendable, Equatable {
     public var minimumMacOS: Int
     public var wineRelativePath: String
     public var wineserverRelativePath: String
+    public var steamLoaderRelativePath: String?
     public var observerRelativePath: String?
     public var profiles: [GraphicsProfile]
     public var sourceURL: String
@@ -46,13 +47,14 @@ public struct RuntimeManifest: Codable, Sendable, Equatable {
     public var x87RelativePath: String?
     public init(id: String, name: String, version: String, wineRelativePath: String, wineserverRelativePath: String,
                 profiles: [GraphicsProfile] = [.legacy], sourceURL: String, sourceSHA256: String,
-                experimental: Bool = true, fileHashes: [String: String] = [:], observerRelativePath: String? = nil, supportsMSync: Bool = false, x87RelativePath: String? = nil) {
+                experimental: Bool = true, fileHashes: [String: String] = [:], observerRelativePath: String? = nil, supportsMSync: Bool = false, x87RelativePath: String? = nil, steamLoaderRelativePath: String? = nil) {
         schemaVersion = 1; self.id = id; self.name = name; self.version = version; architecture = "x86_64"
         minimumMacOS = 15; self.wineRelativePath = wineRelativePath; self.wineserverRelativePath = wineserverRelativePath
         self.profiles = profiles; self.sourceURL = sourceURL; self.sourceSHA256 = sourceSHA256
         self.experimental = experimental; self.fileHashes = fileHashes; self.observerRelativePath = observerRelativePath
         self.supportsMSync = supportsMSync
         self.x87RelativePath = x87RelativePath
+        self.steamLoaderRelativePath = steamLoaderRelativePath
     }
 }
 
@@ -62,6 +64,7 @@ public struct InstalledRuntime: Identifiable, Sendable, Equatable {
     public var id: String { manifest.id }
     public var wine: URL { root.appendingPathComponent(manifest.wineRelativePath) }
     public var wineserver: URL { root.appendingPathComponent(manifest.wineserverRelativePath) }
+    public var steamLoader: URL { root.appendingPathComponent(manifest.steamLoaderRelativePath ?? manifest.wineRelativePath) }
 }
 
 public struct ManagedEnvironment: Codable, Sendable, Identifiable, Equatable {

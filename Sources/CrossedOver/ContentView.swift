@@ -26,6 +26,8 @@ struct ContentView: View {
     @State private var uninstallConfirmation = false
     @State private var manualBackupConfirmation = false
     @State private var pendingRuntime: InstalledRuntime?
+    @State private var pendingIncludedRuntime = false
+    @State private var moddingGame: GameInstallation?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -73,10 +75,12 @@ struct ContentView: View {
             Button("Create backup") { model.backup() }
             Button("Cancel", role: .cancel) {}
         } message: { Text("This copies the entire Windows environment, including all games and local saves, and can take substantial disk space. No backups are created automatically.") }
-        .confirmationDialog("Change the Windows runtime?", isPresented: Binding(get: { pendingRuntime != nil }, set: { if !$0 { pendingRuntime = nil } }), titleVisibility: .visible) {
+        .confirmationDialog("Change the Windows runtime?", isPresented: Binding(get: { pendingRuntime != nil || pendingIncludedRuntime }, set: { if !$0 { pendingRuntime = nil; pendingIncludedRuntime = false } }), titleVisibility: .visible) {
             if let runtime = pendingRuntime { Button("Change runtime") { pendingRuntime = nil; model.useRuntime(runtime) } }
-            Button("Cancel", role: .cancel) { pendingRuntime = nil }
+            if pendingIncludedRuntime { Button("Use included runtime") { pendingIncludedRuntime = false; model.useIncludedRuntime() } }
+            Button("Cancel", role: .cancel) { pendingRuntime = nil; pendingIncludedRuntime = false }
         } message: { Text("Quit Steam and all games first. This updates the Windows environment in place, without an automatic backup. You can create a manual backup in Advanced before continuing.") }
+        .sheet(item: $moddingGame) { game in modding(game) }
         .sheet(isPresented: Binding(get: { model.diagnostics != nil }, set: { if !$0 { model.diagnostics = nil } })) { diagnostics }
     }
 
@@ -129,6 +133,8 @@ struct ContentView: View {
             switch model.selectedPage {
             case "settings": settings.frame(maxWidth: 940, alignment: .leading)
             case "activity": activity
+            case "mods" where renderingSnapshot:
+                if let game = model.games.first { modding(game) }
             default: library
             }
         }.padding(.horizontal, 32).padding(.top, 46).padding(.bottom, 40)
@@ -379,6 +385,7 @@ struct ContentView: View {
                 Menu {
                     Button("Game properties…") { model.manage(game, command: .gameProperties) }
                     Button("Show game files") { model.showGameFiles(game) }
+                    Button("Mods & files…") { moddingGame = game }
                     Button("Verify game files…") { model.manage(game, command: .verifyGame) }.disabled(model.currentSession != nil)
                     Divider()
                     Button("Uninstall…", role: .destructive) { model.manage(game, command: .uninstallGame) }.disabled(model.currentSession != nil)
@@ -387,6 +394,38 @@ struct ContentView: View {
                     .accessibilityLabel("Manage \(game.name)").help("Manage \(game.name)")
             }
         }.disabled(model.busy)
+    }
+
+    private func modding(_ game: GameInstallation) -> some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Mods & files").font(.system(size: 22, weight: .medium))
+                    Text(game.name).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                }
+                Spacer()
+                Button("Done") { moddingGame = nil }.buttonStyle(SecondaryButton()).keyboardShortcut(.cancelAction)
+            }
+            Rule()
+            VStack(alignment: .leading, spacing: 10) {
+                detailHeading("Manual mods")
+                Text("Open the game folder and follow the mod's Windows installation instructions. Some games store mods, maps, or skins in Windows Documents instead.")
+                    .font(.system(size: 12)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button("Game folder") { moddingGame = nil; model.showGameFiles(game) }.buttonStyle(SecondaryButton())
+                    Button("Windows Documents") { moddingGame = nil; model.showWindowsDocuments() }.buttonStyle(SecondaryButton())
+                }
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                detailHeading("Steam Workshop")
+                Text("For games with Workshop support, subscribe to items in Windows Steam and let their downloads finish. Enable them inside the game if required.")
+                    .font(.system(size: 12)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                Button("Open Steam") { moddingGame = nil; model.openSteam() }.buttonStyle(SecondaryButton())
+            }
+            Rule()
+            Text("Quit the game before changing files. Mods that need a Windows mod manager, DLL overrides, or additional software may need extra setup. Steam verification and updates can replace modified files.")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+        }.padding(30).frame(width: 540).foregroundStyle(Palette.ink).background(Palette.canvas)
     }
 
     @ViewBuilder private func managementLabel(compact: Bool) -> some View {
@@ -495,6 +534,9 @@ struct ContentView: View {
                 Text(model.runtime?.manifest.name ?? "No runtime installed").font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled)
                 HStack(spacing: 8) {
                     Button("Import runtime…") { model.importRuntime() }.buttonStyle(SecondaryButton())
+                    if model.bundledRuntime != nil && model.environment != nil {
+                        Button("Use included runtime…") { pendingIncludedRuntime = true }.buttonStyle(SecondaryButton())
+                    }
                     let alternatives = model.runtimes.filter { model.environment != nil && $0.id != model.environment?.runtimeID }
                     if !alternatives.isEmpty {
                         if renderingSnapshot { menuLabel("Switch runtime…") }

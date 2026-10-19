@@ -228,9 +228,24 @@ import CrossedOverCore
     }
     func showGameFiles(_ game: GameInstallation) {
         guard let environment else { return }
+        let prefix = paths.prefix(environment)
+        Task {
+            do {
+                let folder = try await Task.detached(priority: .utility) {
+                    guard let current = try SteamDiscovery().discover(environment: environment, prefix: prefix).first(where: { $0.appID == game.appID }) else {
+                        throw CrossedOverError.message("This game is no longer installed.")
+                    }
+                    return URL(fileURLWithPath: current.directory, isDirectory: true)
+                }.value
+                guard NSWorkspace.shared.open(folder) else { throw CrossedOverError.message("Finder couldn't open this game's files.") }
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+    func showWindowsDocuments() {
+        guard let environment else { return }
         do {
-            guard let current = try SteamDiscovery().discover(environment: environment, prefix: paths.prefix(environment)).first(where: { $0.appID == game.appID }) else { throw CrossedOverError.message("This game is no longer installed.") }
-            NSWorkspace.shared.open(URL(fileURLWithPath: current.directory, isDirectory: true))
+            let folder = try GameFiles.documents(prefix: paths.prefix(environment))
+            guard NSWorkspace.shared.open(folder) else { throw CrossedOverError.message("Finder couldn't open Windows Documents.") }
         } catch { self.error = error.localizedDescription }
     }
     func recipe(for game: GameInstallation) -> GameRecipe? { recipes.first { $0.appID == game.appID } }
@@ -349,6 +364,23 @@ import CrossedOverCore
         perform("Change runtime") {
             _ = try await self.environmentManager.migrate(environment, from: runtime, to: replacement)
             self.notice = "Runtime changed. No automatic backup was created."
+        }
+    }
+    func useIncludedRuntime() {
+        guard let bundledRuntime, let environment, let current = runtime else { return }
+        guard currentSession == nil else { error = "Quit your game before updating the runtime."; return }
+        perform("Use included runtime") {
+            let manifest = try await Task.detached(priority: .utility) {
+                try JSONDecoder().decode(RuntimeManifest.self, from: Data(contentsOf: bundledRuntime.appendingPathComponent("runtime.json")))
+            }.value
+            guard manifest.id != current.id else { self.notice = "The included runtime is already in use."; return }
+            try await self.environmentManager.requireStopped(environment, runtime: current)
+            let installed = try await self.runtimeManager.installed()
+            let replacement: InstalledRuntime
+            if let existing = installed.first(where: { $0.id == manifest.id }) { replacement = existing }
+            else { replacement = try await self.runtimeManager.importLocal(bundledRuntime) }
+            _ = try await self.environmentManager.migrate(environment, from: current, to: replacement)
+            self.notice = "Included runtime is ready. Reopen Steam to apply its updates."
         }
     }
     func clearBackups() {

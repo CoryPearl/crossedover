@@ -114,6 +114,7 @@ import Testing
         #expect(fastVariables["WINEDLLOVERRIDES"]?.contains("d3d9=n;") == true)
         #expect(fastVariables["DXVK_CONFIG_FILE"] == "C:\\crossedover\\dxvk.conf")
         #expect(fastVariables["WINEMSYNC"] == "1")
+        #expect(fastVariables["CROSSEDOVER_STEAM_BRANDING"] == "1")
         #expect(fastVariables["WINE_D3D_CONFIG"] == "renderer=gdi")
         let legacy = try await manager.setProfile(.legacy, environment: fast, runtime: runtime)
         let legacyVariables = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: legacy.profile)
@@ -139,6 +140,20 @@ import Testing
         #expect(WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: .legacy)["WINEMSYNC"] == "1")
         _ = try await manager.restore(backup, current: environment, runtimeManager: RuntimeManager(paths: paths))
         #expect(WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: .legacy)["WINEMSYNC"] == "0")
+    }
+    @Test func steamLoaderIsOptionalExecutableAndContained() throws {
+        let (paths, _, _, original) = try fixture()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        #expect(original.steamLoader == original.wine)
+        var manifest = original.manifest
+        manifest.steamLoaderRelativePath = "crossedover Steam"
+        #expect(throws: (any Error).self) { try RuntimeManager.validate(manifest, root: original.root, verifyHashes: false) }
+        let loader = original.root.appendingPathComponent("crossedover Steam")
+        try FileManager.default.copyItem(at: original.wine, to: loader)
+        try RuntimeManager.validate(manifest, root: original.root, verifyHashes: false)
+        #expect(InstalledRuntime(manifest: manifest, root: original.root).steamLoader == loader)
+        manifest.steamLoaderRelativePath = "../outside"
+        #expect(throws: (any Error).self) { try RuntimeManager.validate(manifest, root: original.root, verifyHashes: false) }
     }
     @Test func x87HelperIsValidatedAndOnlySelectedForPerformance() throws {
         let (paths, _, environment, original) = try fixture()

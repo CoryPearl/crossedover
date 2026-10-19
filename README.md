@@ -6,7 +6,7 @@ crossedover brings a native Mac library, Windows Steam, and a Wine-based runtime
 
 ![The crossedover library](website/assets/library.png)
 
-**[Download v1.0.0](https://github.com/CoryPearl/crossedover/releases/tag/v1.0.0)** · **[Quickstart](QUICKSTART.md)** · **[Website](https://corypearl.github.io/crossedover/)**
+**[Download v1.0.0](https://github.com/CoryPearl/crossedover/releases/tag/v1.0.0-build.21)** · **[Quickstart](QUICKSTART.md)** · **[Website](https://corypearl.github.io/crossedover/)**
 
 ## Get playing
 
@@ -19,6 +19,8 @@ Requires **Apple silicon**, **macOS 15 or 26**, **Rosetta 2**, and **8 GiB free 
 Search your games, switch between grid and list views, and manage installations from the **⋯** menu. TrackMania Nations Forever is the first tested demo. CS2 is experimental; other titles are untested. Compatibility, performance, and long-session stability vary. Games are downloaded through your own Steam account.
 
 Use **Settings** to open your games folder in Finder or Steam Downloads, read graphics-profile descriptions, and clear old backups. Full environment backups are **manual only**. To remove the app **and all its managed games, local saves, and data**, quit Steam and games, then choose **Settings → Uninstall crossedover**. Empty Trash afterward. Dragging only the app to Trash leaves its separate data folder behind.
+
+Mods can be added through the game’s normal Windows file locations or Steam Workshop, where supported. **⋯ → Mods & files** opens the game folder or Windows Documents. See [modding](QUICKSTART.md#mods). Windows mod managers and DLL-based loaders may need additional setup.
 
 ## Build
 

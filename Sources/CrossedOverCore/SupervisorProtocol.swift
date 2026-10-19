@@ -171,7 +171,7 @@ public enum SupervisorEngine {
         if let route = routes[request.command], let appID = request.appID { arguments.append("steam://" + route + "/" + appID) }
         if request.command == .openDownloads { arguments.append("steam://nav/downloads") }
         let pipe = Pipe(), process = Process()
-        process.executableURL = runtime.wine; process.arguments = arguments
+        process.executableURL = runtime.steamLoader; process.arguments = arguments
         process.currentDirectoryURL = prefix.appendingPathComponent("drive_c")
         process.environment = WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile)
         process.standardInput = FileHandle.nullDevice; process.standardOutput = pipe; process.standardError = pipe

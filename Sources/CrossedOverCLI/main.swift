@@ -125,7 +125,7 @@ import CrossedOverCore
               runtime-list              List installed runtimes
               runtime-install [ID] [ARCHIVE]  Install a pinned experimental runtime
               runtime-import DIRECTORY  Import an explicitly trusted development runtime
-              runtime-use ID            Back up and migrate to an installed runtime
+              runtime-use ID            Change runtime without an automatic backup
               create                    Create the managed Steam environment
               environments              Inspect environment metadata
               steam-install             Download and install official Windows Steam

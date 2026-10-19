@@ -26,7 +26,7 @@ public actor SteamService {
         let installer = try FileSafety.containedURL("drive_c/crossedover/SteamSetup.exe", in: prefix)
         try FileManager.default.createDirectory(at: installer.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: installer, options: .atomic)
-        let result = try await ProcessRunner.run(runtime.wine, arguments: [installer.path, "/S"], workingDirectory: prefix.appendingPathComponent("drive_c"), environment: WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile), timeout: 300)
+        let result = try await ProcessRunner.run(runtime.steamLoader, arguments: [installer.path, "/S"], workingDirectory: prefix.appendingPathComponent("drive_c"), environment: WineConfiguration.environment(runtime: runtime, prefix: prefix, profile: environment.profile), timeout: 300)
         guard result.status == 0 else { throw CrossedOverError.message("Steam installation failed: \(Redaction.apply(result.output).suffix(1200))") }
         _ = try Self.steamExecutable(prefix: prefix)
     }
