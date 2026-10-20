@@ -15,8 +15,11 @@
 - CS2 gains a one-time low-detail performance preset targeting 60 FPS in
   matches: MSAA and ambient occlusion off, lower scene detail, with dynamic
   shadows, audio and the confirmed window/input policy retained. Later user
-  graphics choices remain intact. The owner reports that local play looks
-  good at 60 FPS with this preset; a universal minimum is not established.
+  graphics choices remain intact. The old 720p preset upgrades once to 1600×900;
+  later resolution choices are respected. Executable-scoped Metal presentation
+  timing complements the game’s 60 FPS cap. The owner confirmed matchmaking
+  works and the latest online run is sharper and smooth; a universal minimum
+  frame rate is not established.
 - Every installed store game has a renderer recommendation in card/list views
   and its graphics details. Known recipes and bounded executable API hints
   take precedence; unknown titles get a labeled starting point. Minecraft
@@ -38,15 +41,13 @@ the Windows Xbox app or general Game Pass compatibility.
 
 Existing public download URLs still point to the previous v1.3.1 artifact.
 Publishing v1.4.0 waits for the Minecraft flow and remaining release checks.
-The owner confirmed online matchmaking in a clean Windows Steam environment.
-After promotion to permanent storage and crossedover's launch setup, window
-controls worked and FPS reached 60 with periodic drops, but VAC rejected the
-session again. The current source restores Steam's normal overlay handling for
-CS2, removing crossedover's prior forced-disable entries while retaining the
-window/input policy and graphics preset. The owner confirmed the corrected run works, including window controls, online
-matchmaking and satisfactory performance. A sustained minimum frame rate across
-all hardware remains unmeasured. TrackMania keeps
-its separate, previously tested overlay optimization.
+CS2 retains the working native window/input policy and normal Steam overlay
+handling. Its policy removes crossedover’s earlier forced overlay-disable
+entries. After the sharper 1600×900 and presentation-timing update, the owner
+confirmed **“Matchmaking works; sharper and smooth”** in the requested online
+test. No game binaries or anti-cheat components were changed. A sustained minimum
+frame rate across maps, displays and hardware remains unmeasured. TrackMania
+keeps its separate, previously tested overlay optimization.
 Retained Windows environments now contribute to one library, with game actions
 routed to their owning installation and duplicate titles preferring the default.
 Rendering recommendations do not certify every game’s online compatibility.

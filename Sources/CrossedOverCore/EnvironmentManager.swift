@@ -21,7 +21,7 @@ public enum WineConfiguration {
     public static let serverSyncMarker = ".crossedover-server-sync"
     public static func environment(runtime: InstalledRuntime, prefix: URL, profile: GraphicsProfile) -> [String: String] {
         var variables = ProcessInfo.processInfo.environment
-        for key in ["WINEPREFIX", "WINESERVER", "WINELOADER", "WINEDLLPATH", "WINEDLLOVERRIDES", "DYLD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "WINEARCH", "WINEMSYNC", "WINEESYNC", "WINEFSYNC", "DXVK_CONFIG_FILE", "DXVK_LOG_PATH", "DXVK_HUD", "ROSETTA_X87_PATH", "X87_SIDECAR_BOOTSTRAP", "CROSSEDOVER_FRAME_LOG", "WINEPRELOADERAPPNAME", "CROSSEDOVER_STEAM_BRANDING"] { variables.removeValue(forKey: key) }
+        for key in ["WINEPREFIX", "WINESERVER", "WINELOADER", "WINEDLLPATH", "WINEDLLOVERRIDES", "DYLD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "WINEARCH", "WINEMSYNC", "WINEESYNC", "WINEFSYNC", "DXVK_CONFIG_FILE", "DXVK_LOG_PATH", "DXVK_HUD", "DXMT_CONFIG", "DXMT_CONFIG_FILE", "DXMT_METALFX_SPATIAL_SWAPCHAIN", "ROSETTA_X87_PATH", "X87_SIDECAR_BOOTSTRAP", "CROSSEDOVER_FRAME_LOG", "WINEPRELOADERAPPNAME", "CROSSEDOVER_STEAM_BRANDING"] { variables.removeValue(forKey: key) }
         variables["WINEPREFIX"] = prefix.path
         variables["WINESERVER"] = runtime.wineserver.path
         variables["WINEDEBUG"] = "-all"
@@ -38,6 +38,9 @@ public enum WineConfiguration {
         if profile == .metal || profile == .combined {
             variables["WINEDLLPATH"] = runtime.root.appendingPathComponent("dxmt").path
             variables["CROSSEDOVER_DLL_OVERLAY"] = "1"
+            // The file is generated before CS2 launches, with an executable
+            // section so other D3D11 software retains its normal presentation.
+            variables["DXMT_CONFIG_FILE"] = "C:\\crossedover\\cs2-presentation.conf"
         }
         if profile == .performance || profile == .combined {
             if profile == .performance {

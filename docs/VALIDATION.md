@@ -1,5 +1,66 @@
 # Validation record
 
+## CS2 sharper resolution and presentation timing confirmed — October 19, 2026
+
+The owner later reports recurring frame drops **throughout matches**, despite
+the earlier satisfactory response, and requests higher resolution while keeping
+VAC working. Stable 60 FPS is therefore not established. While CS2 was closed,
+allowlisted video fields confirmed 1280×720, low scene detail, no MSAA/FSR/VSync.
+The old recipe also forced `-w 1280 -h 720` on every launch, contradicting the
+promise to preserve later in-game resolution choices. Both connected displays
+report 120 Hz. Memory/thermal snapshots obtained while the game was closed do
+not diagnose its match-time bottleneck.
+
+The candidate removes those resolution arguments and upgrades the old 720p preset
+once to 1600×900, preserving higher/custom dimensions and later choices. A small
+settings recovery copy is retained. The game keeps its 60 FPS work cap. Metal
+profiles pass an owned DXMT configuration file whose `[cs2.exe]` section requests
+`d3d11.preferredMaxFrameRate = 60`, following the pinned upstream implementation.
+This schedules presentation; it does not prove that frames finish within budget.
+Other executables do not receive that section's configuration. Normal Steam
+launch/overlay policy, runtime binaries, official game files, mouse/window
+controls and the restored library remain unchanged.
+
+**92 tests in 16 suites passed**, followed by four focused CS2 checks. Coverage
+checks scoped configuration, preserved later resolution choices, unchanged Steam
+registry bytes during video preparation, no insecure/third-party launch flags,
+and removal of the old overlay-disable entries. Release compilation and strict
+deep signature verification of the new local preview passed.
+
+An owned, bounded D3D11 fixture ran in a disposable prefix with an APFS runtime
+clone, then removed its prefix/runtime. An observable adapter-description label
+in that fixture verifies that executable-specific DXMT sections apply only to
+the matching process. The label is never written into the real CS2 policy.
+An initial assumption that CPU-side `Present` return intervals measure scanout
+was rejected: presentation is asynchronous. Fixture loop timings are retained
+as **CPU-loop statistics only**, not game or displayed FPS. The game work cap
+remains 60 instead of raising it to spend more render work.
+
+With no Steam/game process active and Minecraft's idle lock acquired, only the
+old native GUI was replaced. CS2 was requested through Windows Steam; observation
+confirms both CS2 and the normal Steam overlay helper. Saved dimensions now read
+1600×900, with a framed window and MSAA/FSR/VSync still disabled. The production
+presentation file contains only the scoped frame-rate option. No diagnostic HUD
+was enabled in this security check. The owner then joined the requested online
+test and confirmed **“Matchmaking works; sharper and smooth.”** This confirms
+working matchmaking, improved perceived clarity and smooth play in the tested
+configuration. No numerical FPS range or automated sustained frame-time trace
+was supplied; a guaranteed 60 FPS minimum across matches, displays and hardware
+is not established. The working configuration is retained without further
+runtime, overlay or game-file changes.
+
+Preview: `.cache/previews/crossedover-1.4.0-cs2-pacing-900p.app`.
+Evidence: `.cache/cs2-frame-pacing/` and
+`.cache/d3d11-pacing-0b3a8211-6f4d-41c2-bf80-1ecdd17e27d9/results.json`.
+The owned runtime fixture is reproducible with
+`scripts/d3d11-pacing-integration.py`; it is not a CS2 benchmark. No public push
+or release has been performed.
+
+After recording the owner result, release consistency checks, website generation,
+all three website tests, the release resource rebuild and whitespace checks
+passed. Public download links remain on v1.3.1; this working v1.4.0 configuration
+is retained locally without interrupting the running game.
+
 ## Confirmed CS2 correction and retained library recovery — October 19, 2026
 
 After restoring normal Steam overlay handling, the owner reports **“everything

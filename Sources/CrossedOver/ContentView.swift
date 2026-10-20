@@ -679,7 +679,7 @@ struct ContentView: View {
                             .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                     }
                     if game.store == .steam && game.appID == "730" {
-                        Text("60 FPS target · 1280 × 720 launch window. The performance preset lowers scene detail and disables MSAA and ambient occlusion, keeping dynamic shadows. It applies once; later in-game choices are preserved. FSR stays disabled for clarity. Fullscreen can increase render resolution on larger displays; check Video settings if needed. FPS depends on hardware and gameplay.")
+                        Text("60 FPS target · the old 720p preset upgrades once to 1600 × 900. Choose another resolution in CS2’s Video settings; later choices are preserved. The preset uses low scene detail, MSAA/AO off and dynamic shadows on, with FSR disabled for clarity. Metal presentation timing targets 60 FPS alongside the game’s frame cap. Fullscreen can raise render resolution. This is a target, not a guaranteed minimum.")
                             .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                     }
                     Text("For updates, verification, and uninstall, use this game's management controls inside \(game.managementStore.title). The launcher owns download progress and confirmation dialogs.")

@@ -19,8 +19,8 @@
     "profile": "metal",
     "executableNames": ["cs2.exe"],
     "status": "experimental",
-    "notes": "Use DXMT for CS2's DirectX 11 graphics. The combined DirectX 9–11 profile also includes this backend. The owner confirmed working window controls, online matchmaking and satisfactory performance after restoring Steam's normal overlay handling in the clean environment. The tuned preset targets 60 FPS on the tested M4. This local result does not establish a minimum frame rate across every map, monitor or Mac.",
+    "notes": "Use DXMT for CS2's DirectX 11 graphics. The combined DirectX 9–11 profile also includes this backend. The owner confirmed working window controls and online matchmaking with normal Steam overlay handling. The latest online test was confirmed sharper and smooth with Metal presentation timing and a 1600x900 starting resolution. The preset targets 60 FPS; the 720p launch override is removed so later Video settings are respected. A sustained minimum across maps, displays and hardware is not established.",
     "compatibleProfiles": ["metal", "combined"],
-    "launchArguments": ["-windowed", "-w", "1280", "-h", "720", "+fps_max", "60"]
+    "launchArguments": ["-windowed", "+fps_max", "60"]
   }
 ]
