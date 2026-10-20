@@ -19,7 +19,7 @@
     "profile": "metal",
     "executableNames": ["cs2.exe"],
     "status": "experimental",
-    "notes": "Use DXMT for CS2's DirectX 11 graphics. The combined DirectX 9–11 profile also includes this backend. Local play is reported around 60 FPS with the tuned preset on M4. Current tests encounter a signature error on VAC-secured servers, including through Steam's own Play button after verification and a fresh client session with blank launch options. This recommendation covers rendering; secure matchmaking remains blocked in the tested setup.",
+    "notes": "Use DXMT for CS2's DirectX 11 graphics. The combined DirectX 9–11 profile also includes this backend. The tuned preset reaches around 60 FPS on the tested M4, with periodic drops. The owner confirmed online matchmaking in a clean Steam environment, followed by a VAC signature error after crossedover's launch setup. Restoring Steam's normal overlay handling is under test; secure matchmaking and sustained performance still need confirmation with this configuration.",
     "compatibleProfiles": ["metal", "combined"],
     "launchArguments": ["-windowed", "-w", "1280", "-h", "720", "+fps_max", "60"]
   }

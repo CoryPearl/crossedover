@@ -12,12 +12,16 @@ struct GameLibraryTests {
         #expect(shooter.contains("\"FullscreenIgnoreMaxSize\"=\"Y\""))
         #expect(shooter.contains("\"NativeFullscreen\"=\"Y\""))
         #expect(shooter.contains("\"CaptureDisplaysForFullscreen\"=\"N\""))
+        #expect(shooter.contains("\"gameoverlayrenderer\"=-"))
+        #expect(shooter.contains("\"gameoverlayrenderer64\"=-"))
+        #expect(!shooter.contains("\"gameoverlayrenderer64\"=\"\""))
         #expect(!shooter.contains("TmForever.exe"))
         let demo = try #require(GameWindowingPolicy.registry(for: "11020"))
         #expect(demo.contains("AppDefaults\\TmForever.exe\\Mac Driver"))
         #expect(demo.contains("\"AllowCursorClipping\"=\"N\""))
         #expect(demo.contains("\"NativeFullscreen\"=\"N\""))
         #expect(demo.contains("\"CursorClippingFollowsWindow\"=\"N\""))
+        #expect(demo.contains("\"gameoverlayrenderer64\"=\"\""))
         #expect(GameWindowingPolicy.registry(for: "99999") == nil)
     }
     private func temporary() throws -> URL {

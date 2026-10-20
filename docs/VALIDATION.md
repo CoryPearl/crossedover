@@ -48,6 +48,78 @@ complete. The new client was requested, and the owner reports **“steam is
 updating.”** Microsoft/Steam authentication is not automated. Manual Steam
 sign-in and the clean-prefix matchmaking comparison remain pending.
 
+Follow-up: Steam's updater completed and the clean client's installation route
+was requested explicitly. The clean prefix now has its own CS2 manifest with
+`StateFlags=4`, build `25966348`, no pending download bytes, and an observed
+`cs2.exe` process. This confirms installation and execution in the isolated
+environment; an earlier warning report made before that manifest existed was
+not sufficient to establish which installation ran. The owner now reports
+**“new install is working lets use this from now on.”** VAC-secured matchmaking
+success has been asked separately and is not yet confirmed.
+
+The owner also reports missing macOS window controls in that fresh run. Its
+allowlisted video settings show a framed window at 2560×1440, with no crossedover
+native-window migration marker. The prior tested window/input policy has not
+yet been applied through crossedover's normal launch route in this environment.
+No settings were rewritten while the game was active.
+
+A read-only promotion preflight passed: the permanent destination is unused,
+source and destination are on the same filesystem, runtime manifests match,
+and the prefix has no absolute symbolic links to repair. The prepared move uses
+a rename rather than a game copy and retains the previous environment's files
+and metadata. The move waited while process observation still found CS2 and
+Windows Steam running; neither was terminated.
+
+After the owner confirmed both apps closed, a second observation found only
+Wine system services. The new prefix was renamed into permanent Application
+Support storage at `Environments/E6AAFFD1-27B6-4323-85E8-05E08B9BA60C`. An explicit
+SQLite transaction made it the sole active environment, retaining the prior
+environment's metadata as `retiredEnvironment` and leaving its prefix and all
+game/app records in place. No game files were copied or deleted, and no full
+backup was created. The old environment's games are preserved but are not
+installed in the newly selected environment; Minecraft's separate backend is
+unchanged.
+
+The owner reported lower FPS and missing traffic-light controls in the fresh
+run. An allowlisted comparison found 2560×1440, 2× MSAA and higher shadows,
+textures and particles, versus the previous 1280×720/low preset. Neither window
+nor performance migration marker was present. The first normal crossedover
+launch in permanent storage successfully applied both migrations and imported
+the existing per-CS2 Mac Driver policy. Numeric settings and migration markers
+now confirm framed 1280×720, MSAA/AO/FSR/VSync off, low scene detail and retained
+dynamic shadows. The generated policy enables native fullscreen and cursor
+tracking across window changes. A separate live `reg.exe query` exited 1 without
+output, so it did not independently confirm the in-memory registry values.
+The game process was subsequently observed from the new permanent environment.
+The owner confirmed **the window buttons work**, with FPS reaching **60 but
+dropping periodically**, and the VAC warning appearing again. They also
+clarified that the clean environment had **successfully joined an online match
+before** promotion and launch preparation. This is a regression comparison,
+not evidence that all VAC matchmaking is incompatible with this runtime.
+
+The first focused correction leaves Steam's official overlay handling at its
+defaults for CS2. `GameWindowingPolicy` now deletes the two per-CS2 forced-disable
+DLL entries while retaining every Mac Driver window/input setting; TrackMania's
+separate optimization is unchanged. The three GameLibrary tests passed, including
+the regression assertions, and release compilation succeeded. After the owner
+quit all Windows apps, observation confirmed no game or Steam process before the
+new launch applied the correction. A public-registry query using the same full
+Wine environment as the launcher confirms native fullscreen/cursor tracking are
+enabled and both overlay-disable entries are absent. The earlier empty query
+result came from an incomplete diagnostic environment; the later query succeeded.
+
+CS2 and Steam's overlay helper were observed after relaunch. A new local v1.4.0
+preview passed strict deep code-signature verification and replaced only the
+previous idle native GUI, so subsequent card launches use the corrected policy.
+Preview: `.cache/previews/crossedover-1.4.0-cs2-steam-overlay-default.app`.
+**Repeat online matchmaking and stable frame pacing remain unconfirmed.**
+The forced overlay-disable setting is a hypothesis under test, not an established
+cause or verified VAC repair. No game binaries or anti-cheat components changed.
+
+Promotion/settings evidence is in `.cache/cs2-performance/promoted-settings.json`
+and `new-vs-previous-settings.json`; the test root retains `promotion.json` and
+updated status metadata. No push or public release was performed.
+
 Evidence: `.cache/cs2-performance/signature-refresh-*.json`,
 `cache-reset-inventory.json`, and the inventory directory referenced by
 `signature-refresh-stash.txt`; the clean-root pointer is `clean-prefix-root.txt`.

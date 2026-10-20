@@ -38,13 +38,14 @@ the Windows Xbox app or general Game Pass compatibility.
 
 Existing public download URLs still point to the previous v1.3.1 artifact.
 Publishing v1.4.0 waits for the Minecraft flow and remaining release checks.
-The latest CS2 online test encounters a VAC file-signature error from both
-crossedover and Windows Steam's own Play button, including after Steam's file
-verification jobs finished with No Error and after a fresh Windows Steam
-session. Local play is owner-confirmed around 60 FPS in the tested run;
-secure matchmaking remains blocked even with blank saved Steam launch options.
-The renderer details explain this current limitation. The exact VAC failure
-cause is unconfirmed; no verified runtime correction has been identified.
+The owner confirmed online matchmaking in a clean Windows Steam environment.
+After promotion to permanent storage and crossedover's launch setup, window
+controls worked and FPS reached 60 with periodic drops, but VAC rejected the
+session again. The current source restores Steam's normal overlay handling for
+CS2, removing crossedover's prior forced-disable entries while retaining the
+window/input policy and graphics preset. A repeat online test is pending; the
+regression cause and sustained 60 FPS are not yet confirmed. TrackMania keeps
+its separate, previously tested overlay optimization.
 Rendering recommendations do not certify online play.
 See [backend build instructions](../runtime/bedrock/README.md) and the
 [validation record](VALIDATION.md).
