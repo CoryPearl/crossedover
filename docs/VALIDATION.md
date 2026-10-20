@@ -1,5 +1,57 @@
 # Validation record
 
+## CS2 requested cache/signature repair trial — October 19, 2026
+
+The owner requested a Proton prefix/shader-cache reset, Proton Experimental,
+cleared preloads and forced reacquisition of game signature manifests. This
+installation runs Windows Steam through Wine on macOS, not Linux Steam/Proton.
+There is no `steamapps/compatdata/730` directory; the shared crossedover prefix
+was preserved. Steam's `shadercache/730` has four empty subdirectories and no
+files (zero cached bytes).
+Neither `LD_PRELOAD` nor `DYLD_INSERT_LIBRARIES` is set in the launcher's parent
+environment; `WineConfiguration` already removes the macOS injection variable
+from its child environment. Linux shell launch syntax and Proton Experimental
+were not applied to Windows Steam. Native DXMT shader caches were preserved.
+
+With CS2 and Windows Steam both closed (observer reports only system services),
+the environment lock protected a reversible move of exactly four files from
+the game's `bin/win64`: `csgo.signatures`, `foreign.signatures`,
+`system.signatures`, and `vpk.signatures`, totaling **23,134 bytes**. Steam was
+opened and its normal verification requested. It downloaded fresh replacements
+for all four; the new jobs ended at 22:12:47 local time with `No Error`, and the
+game returned to Fully Installed. All four replacement SHA-256 hashes match
+the original files exactly. This establishes their original bytes matched
+Steam's replacements; it does not prove the game's signature-validation path
+works under the runtime. Redundant temporary recovery copies were then removed,
+retaining only the inventory/result metadata.
+
+CS2 was requested again through the normal launch route, preserving the tested
+60 FPS settings, audio, runtime and window/input policy. The owner retried and
+confirmed **“VAC warning still appears.”** No shared-prefix reset, game binary
+patch, preload hook, app rebuild, push or release was performed for this trial.
+
+To test the underlying prefix-reset hypothesis safely, a separate disposable
+root was prepared at `.cache/cs2-clean-prefix-a6fe12b20ca3`, with environment
+`E6AAFFD1-27B6-4323-85E8-05E08B9BA60C`. It imports and verifies the same runtime
+and selects the same dedicated Metal profile. The bootstrap stop operation was
+scoped only to that new test prefix. A fresh official Windows Steam installer
+was run; no original Steam credentials, account/config folders, registry state,
+or per-user video settings were copied. The original shared environment and
+Minecraft backend were not reset or replaced.
+
+The installed game payload was cloned using APFS `clonefile`, with no full-copy
+fallback: **3,194 files / 73,919,379,180 logical bytes**. Preflight rejects
+symlinks/non-regular files. Cloned files have distinct identities and share disk
+blocks until written; they are not hard links to the original game. Game
+discovery/validation in fresh Steam and any resulting downloads still need to
+complete. The new client was requested, and the owner reports **“steam is
+updating.”** Microsoft/Steam authentication is not automated. Manual Steam
+sign-in and the clean-prefix matchmaking comparison remain pending.
+
+Evidence: `.cache/cs2-performance/signature-refresh-*.json`,
+`cache-reset-inventory.json`, and the inventory directory referenced by
+`signature-refresh-stash.txt`; the clean-root pointer is `clean-prefix-root.txt`.
+
 ## CS2 scene-cost preset and game renderer recommendations — October 19, 2026
 
 The owner reports acceptable CS2 menu performance but poor match performance,
