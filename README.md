@@ -49,6 +49,7 @@ For Minecraft in a v1.4.0 build with its backend, choose **Game Launchers → Mi
 ## Your software, your library
 
 - **One place to launch.** Open clients from Game Launchers; launch installed games and added executables from their cards. Minecraft uses its own environment alongside the shared Steam/Epic/app environment.
+- **Graphics guidance per game.** Library cards show a renderer recommendation from known profiles or detected DirectX imports. Unknown games get a labeled starting point; open the recommendation for details. CS2 includes a low-detail preset targeting 60 FPS, with performance depending on hardware, resolution and gameplay.
 - **Files and mods stay accessible.** Open installation folders in Finder. Use Steam Workshop where supported, or add Windows mod managers as Apps. Steam, Epic, and Ubisoft keep their own verification/uninstall flows.
 - **Keep control.** The bottom status bar tracks opening and running software. Stop closes the managed Windows session; Minecraft's Stop action affects only Minecraft. Unsaved progress can be lost.
 - **No automatic full backups.** Create or clear backups in Settings. Use the in-app uninstaller for complete app/data removal; dragging only the Mac app to Trash leaves its separate data folder behind. Minecraft's game uninstaller keeps worlds.

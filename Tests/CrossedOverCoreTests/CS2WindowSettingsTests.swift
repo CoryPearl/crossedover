@@ -3,6 +3,47 @@ import Testing
 @testable import CrossedOverCore
 
 struct CS2WindowSettingsTests {
+    @Test func performanceMigrationReducesSceneCostOnceAndKeepsWindowAudioAndClarity() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("cs2_video.txt")
+        let original = """
+        "video.cfg"
+        {
+            "setting.msaa_samples" "2"
+            "setting.videocfg_texture_detail" "1"
+            "setting.videocfg_particle_detail" "1"
+            "setting.videocfg_shadow_quality" "1"
+            "setting.videocfg_dynamic_shadows" "1"
+            "setting.videocfg_ao_detail" "3"
+            "setting.videocfg_fsr_detail" "0"
+            "setting.fullscreen" "1"
+            "setting.defaultres" "1920"
+            "setting.defaultresheight" "1080"
+            "setting.audio_unknown" "preserve"
+        }
+        """
+        try Data(original.utf8).write(to: file)
+        try Data().write(to: file.appendingPathExtension("crossedover-native-window-v2"))
+        try CS2WindowSettings.prepare(file: file)
+        let first = try String(contentsOf: file, encoding: .utf8)
+        for key in ["msaa_samples", "videocfg_texture_detail", "videocfg_particle_detail", "videocfg_shadow_quality", "videocfg_ao_detail"] {
+            #expect(first.contains("\"setting.\(key)\" \"0\""))
+        }
+        #expect(first.contains("\"setting.videocfg_dynamic_shadows\" \"1\""))
+        #expect(first.contains("\"setting.fullscreen\" \"1\""))
+        #expect(first.contains("\"setting.defaultres\" \"1920\""))
+        #expect(first.contains("\"setting.videocfg_fsr_detail\" \"0\""))
+        #expect(first.contains("\"setting.audio_unknown\" \"preserve\""))
+        let backup = file.appendingPathExtension("crossedover-performance-v1.bak")
+        #expect(try Data(contentsOf: backup) == Data(original.utf8))
+        let later = first.replacingOccurrences(of: "\"setting.msaa_samples\" \"0\"", with: "\"setting.msaa_samples\" \"4\"")
+        try Data(later.utf8).write(to: file)
+        try CS2WindowSettings.prepare(file: file)
+        #expect(try String(contentsOf: file, encoding: .utf8) == later)
+        #expect(try Data(contentsOf: backup) == Data(original.utf8))
+    }
     @Test func clarityMigrationKeepsExistingFullscreenResolutionAndBackup() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

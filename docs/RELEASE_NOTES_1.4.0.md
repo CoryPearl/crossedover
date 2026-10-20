@@ -12,6 +12,14 @@
 - CS2 has an opt-in input-bounds fix for native window moves/resizes. Owned
   32/64-bit fixtures pass, and the owner confirmed clicks align across the
   larger monitor after moving the running game.
+- CS2 gains a one-time low-detail performance preset targeting 60 FPS in
+  matches: MSAA and ambient occlusion off, lower scene detail, with dynamic
+  shadows, audio and the confirmed window/input policy retained. Later user
+  graphics choices remain intact. Sustained match FPS still needs validation.
+- Every installed store game has a renderer recommendation in card/list views
+  and its graphics details. Known recipes and bounded executable API hints
+  take precedence; unknown titles get a labeled starting point. Minecraft
+  shows its separate DXMT configuration. Recommendations don't add DirectX 12.
 - Epic partner launches use the repaired prerequisites and queued client handoff.
   Brawlhalla opens from crossedover. A new scoped runtime patch adds native
   controls to shaped/layered main windows and keeps desktop title bars onscreen.
@@ -29,5 +37,8 @@ the Windows Xbox app or general Game Pass compatibility.
 
 Existing public download URLs still point to the previous v1.3.1 artifact.
 Publishing v1.4.0 waits for the Minecraft flow and remaining release checks.
+The latest CS2 online test encountered a VAC file-signature error; Steam file
+verification is pending. Secure matchmaking and sustained match FPS are not
+validated in this build.
 See [backend build instructions](../runtime/bedrock/README.md) and the
 [validation record](VALIDATION.md).

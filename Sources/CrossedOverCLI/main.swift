@@ -119,9 +119,17 @@ import CrossedOverCore
             guard arguments.count == 2, let id = UUID(uuidString: arguments[1]) else { throw CrossedOverError.message("app-run requires a Windows app card UUID.") }
             let environment = try current()
             try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchWindowsApp, windowsAppID: id, runID: UUID())))
-        case "games":
+        case "games", "renderers":
             let environment = try current()
-            try printJSON(GameLibrary.discover(environment: environment, prefix: paths.prefix(environment)))
+            let games = GameLibrary.discover(environment: environment, prefix: paths.prefix(environment))
+            if command == "games" { try printJSON(games) }
+            else {
+                let recommendations = await RendererRecommendations.shared.recommendations(for: games, recipes: try ResourceCatalog.recipes())
+                try printJSON(games.compactMap { game -> [String: String]? in
+                    guard let value = recommendations[game.id] else { return nil }
+                    return ["name": game.name, "store": game.store.title, "renderer": value.title, "basis": value.basis, "detail": value.detail]
+                })
+            }
         case "smoke", "benchmark":
             let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
             let prefix = paths.prefix(environment), lock = try EnvironmentLock(prefix: paths.prefix(environment))
@@ -213,6 +221,7 @@ import CrossedOverCore
               ubisoft-verify ID         Open Ubisoft for file verification
               ubisoft-uninstall ID      Open Ubisoft for uninstall
               games                     Discover installed Steam, Epic, and Ubisoft games
+              renderers                 Show installed games' graphics recommendations
               smoke [--graphics]        Check 32/64-bit execution and optional GPU readback
               benchmark                 Run a synthetic D3D9 workload (not game FPS)
               install APPID             Open the game's Windows Steam install dialog

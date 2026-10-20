@@ -7,7 +7,7 @@
       "TmForever.exe"
     ],
     "status": "experimental",
-    "notes": "Current demo. Game startup and sound confirmed by the user on M4/macOS 26.6.2. Legacy performance is too low for comfortable play; graphics optimization is in progress.",
+    "notes": "Use the dedicated DirectX 9 Metal path with TrackMania's tuned audio and scene settings. The OpenGL fallback is available if rendering fails, but can be considerably slower. Performance varies by hardware and track.",
     "compatibleProfiles": [
       "performance",
       "legacy"
@@ -19,7 +19,7 @@
     "profile": "metal",
     "executableNames": ["cs2.exe"],
     "status": "experimental",
-    "notes": "Startup and the menu are confirmed on M4 with the Direct3D 11 Metal backend. Native fullscreen and gameplay performance are under validation.",
+    "notes": "DXMT translates CS2's DirectX 11 graphics to Metal. Use the game's DirectX 11 mode for this recommendation. The combined DirectX 9–11 profile also includes this backend; neither profile adds DirectX 12 support.",
     "compatibleProfiles": ["metal", "combined"],
     "launchArguments": ["-windowed", "-w", "1280", "-h", "720", "+fps_max", "60"]
   }

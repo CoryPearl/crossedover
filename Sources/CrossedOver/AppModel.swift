@@ -16,6 +16,7 @@ import CrossedOverCore
     var runtimes: [InstalledRuntime] = []
     var environment: ManagedEnvironment?
     var games: [GameInstallation] = []
+    var rendererRecommendations: [String: RendererRecommendation] = [:]
     var windowsApps: [WindowsApp] = []
     var windowsRuns: [WindowsAppRun] = []
     var recipes: [GameRecipe] = []
@@ -114,6 +115,7 @@ import CrossedOverCore
         }.value
     }
     func preparePreviewArtwork() async {
+        rendererRecommendations = await RendererRecommendations.shared.recommendations(for: games, recipes: recipes)
         await refreshMinecraftArtwork()
         for path in Set(games.compactMap { artworkPath(for: $0) } + [logoPath, minecraftArtworkPath].compactMap { $0 }) {
             previewArtwork[path] = await LibraryArtworkCache.shared.image(at: path)
@@ -205,6 +207,8 @@ import CrossedOverCore
             if windowsRuns != snapshot.7 { windowsRuns = snapshot.7 }
             if epicPath != snapshot.8 { epicPath = snapshot.8 }
             if ubisoftPath != snapshot.9 { ubisoftPath = snapshot.9 }
+            let recommendations = await RendererRecommendations.shared.recommendations(for: snapshot.1, recipes: recipes, refresh: refreshSizes)
+            if rendererRecommendations != recommendations { rendererRecommendations = recommendations }
             await refreshMinecraftInstallation()
         } catch { self.error = error.localizedDescription }
     }
@@ -584,6 +588,9 @@ import CrossedOverCore
         } catch { self.error = error.localizedDescription }
     }
     func recipe(for game: GameInstallation) -> GameRecipe? { game.store == .steam ? recipes.first { $0.appID == game.appID } : nil }
+    func rendererRecommendation(for game: GameInstallation) -> RendererRecommendation {
+        rendererRecommendations[game.id] ?? .startingPoint(for: game, recipes: recipes)
+    }
     func gameName(appID: String) -> String {
         games.first { $0.sessionAppID == appID }?.name ?? recipes.first { $0.appID == appID }?.name ?? "Game \(appID)"
     }

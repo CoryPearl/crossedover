@@ -17,6 +17,39 @@ public enum CS2WindowSettings {
     static func prepare(file: URL) throws {
         try prepareWindow(file: file)
         try prepareClarity(file: file)
+        try preparePerformance(file: file)
+    }
+
+    /// Lower scene-rendering cost once, without resetting window/input settings or
+    /// repeatedly overriding the user's later choices. Values match the game's
+    /// shipped settings_video.xml. Keep all dynamic shadows for opponent visibility.
+    private static func preparePerformance(file: URL) throws {
+        let marker = file.appendingPathExtension("crossedover-performance-v1")
+        guard !FileManager.default.fileExists(atPath: marker.path) else { return }
+        let original = try Data(contentsOf: file)
+        guard original.count <= 1_048_576, var text = String(data: original, encoding: .utf8) else {
+            throw CrossedOverError.message("Could not read CS2's video settings.")
+        }
+        let settings = [
+            "setting.msaa_samples": "0", "setting.r_csgo_cmaa_enable": "0",
+            "setting.videocfg_shadow_quality": "0", "setting.videocfg_dynamic_shadows": "1",
+            "setting.videocfg_texture_detail": "0", "setting.videocfg_particle_detail": "0",
+            "setting.videocfg_ao_detail": "0", "setting.shaderquality": "0",
+            "setting.videocfg_hdr_detail": "3", "setting.mat_vsync": "0"
+        ]
+        var found = false
+        for (key, value) in settings.sorted(by: { $0.key < $1.key }) {
+            let expression = try NSRegularExpression(pattern: "\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*\"(-?[0-9]+)\"")
+            guard let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                  let range = Range(match.range(at: 1), in: text) else { continue }
+            text.replaceSubrange(range, with: value); found = true
+        }
+        // Don't mark a pre-install/incomplete configuration as tuned.
+        guard found else { return }
+        let backup = file.appendingPathExtension("crossedover-performance-v1.bak")
+        if !FileManager.default.fileExists(atPath: backup.path) { try original.write(to: backup, options: .atomic) }
+        try Data(text.utf8).write(to: file, options: .atomic)
+        try Data("60 FPS target: low scene detail, MSAA/AO off, dynamic shadows retained. Later user choices are preserved.\n".utf8).write(to: marker, options: .atomic)
     }
 
     private static func prepareWindow(file: URL) throws {

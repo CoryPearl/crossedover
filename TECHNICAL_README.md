@@ -352,6 +352,12 @@ The current Epic client requires the Metal Direct3D 11 path. Its launch environm
 
 D3D9 is intentionally left out of the process-wide DLL override string in this combined environment. Wine's environment overrides would take precedence over per-executable registry choices. Fixed `AppDefaults` policy selects builtin D3D9 for launcher helpers and native/builtin D3D9 for Brawlhalla. This avoids forcing the launcher's D3D9 choice onto its game.
 
+### Per-game renderer recommendations
+
+`RendererRecommendations` runs off the UI actor after discovery, with a five-minute cache keyed by installation identity and metadata. Manual size/library refresh invalidates the cache. Known Steam recipes take precedence and never match an Epic/Ubisoft ID by accident. Other games use their manifest's declared executable, or a bounded search of at most 1,200 entries, six directory levels and six non-helper executables. Each read is capped at 16 MiB. The PE reader checks normal and RVA-based delay imports against file-backed sections, not arbitrary strings or bundled DLL names. Malformed/large/dynamically loaded images can yield no hint.
+
+Direct3D 9 imports suggest the dedicated DXVK mode; 10/11 suggest DXMT; mixed imports suggest the combination. An exclusively detected Direct3D 12 import reports that the runtime lacks that backend, without treating absence of a Direct3D 11 import as proof that no alternate mode exists. Unknown games receive a clearly labeled combined-mode starting point. Recommendations do not change profiles during scrolling or discovery, and aren't compatibility/performance guarantees. Applying a supported Steam recommendation uses the existing stopped-environment guard. Epic/Ubisoft retain launcher-managed policy; Minecraft displays its fixed separate DXMT configuration. CLI `renderers` exposes the same recommendations without account paths.
+
 ### MSync and x87
 
 Runtimes can advertise MSync support. `WINEMSYNC` is enabled only when supported and when the prefix's `.crossedover-server-sync` marker is absent. That marker selects standard Wine server synchronization instead. The choice is prefix-local so the GUI, CLI, and workers agree.
@@ -367,12 +373,12 @@ A recipe is an explicit configuration for a known Steam App ID: preferred/compat
 | Game | Preparation in this source version |
 | --- | --- |
 | TrackMania Nations Forever (`11020`) | Performance-oriented settings, window/cursor policy, optional OpenAL Soft replacement, overlay disable policy, and fixed D9VK tuning |
-| Counter-Strike 2 (`730`) | Metal profile, a bounded 1280×720 desktop launch, a 60 FPS cap, one-time framed-window and FSR-setting migrations, and native fullscreen policy |
+| Counter-Strike 2 (`730`) | Metal profile, a bounded 1280×720 desktop launch, a 60 FPS cap, one-time framed-window/FSR/performance migrations, and native fullscreen/input-bounds policy |
 | Brawlhalla | Scoped D3D9 selection and a per-executable native window-controls policy |
 
 [TrackManiaSettings](Sources/CrossedOverCore/TrackManiaSettings.swift) preserves an original settings copy and uses a marker for the initial Performance preset. [TrackManiaAudio](Sources/CrossedOverCore/TrackManiaAudio.swift) verifies the runtime's optional OpenAL component and keeps distinct replaced originals by content hash before installing it for that game. Other applications do not receive that game-specific audio replacement.
 
-[CS2WindowSettings](Sources/CrossedOverCore/CS2WindowSettings.swift) retains small original-file backups and migration markers. Its FSR migration disables internal upscaling once; later user choices are preserved. A recipe's 60 FPS cap is an upper limit, not an achieved minimum.
+[CS2WindowSettings](Sources/CrossedOverCore/CS2WindowSettings.swift) retains small original-file backups and migration markers. Its FSR migration disables internal upscaling once. A separate performance migration disables MSAA/CMAA, ambient occlusion and VSync, lowers textures/particles/shaders/shadow resolution, and selects performance HDR, retaining dynamic shadows, audio and window settings. Only existing numeric keys are changed. Separate markers preserve later user choices. Preparation runs only after the supervisor confirms CS2 is closed. A recipe's 60 FPS cap is an upper limit, not an achieved minimum.
 
 The Wine Mac Driver patches in [runtime/patches/](runtime/patches/) address cursor capture, fullscreen sizing, fixed-window fullscreen eligibility, caption preservation, and Steam host identity. The Brawlhalla-only `ForceWindowControls` option is default-off in the runtime and opt-in through its app policy. It adds native controls to eligible main windows, including shaped and layered game content, while preserving the content mask/alpha and excluding helpers, owned dialogs and inactive tools. Disabled main windows keep a title bar with disabled buttons. Desktop frames are constrained to the display work area so a screen-sized content request cannot push the title bar offscreen; native AppKit fullscreen transitions keep their own frames. The owner confirmed Brawlhalla's buttons, minimize and fullscreen work with the new runtime. Importing the runtime alone does not activate it in an environment still using an older runtime.
 

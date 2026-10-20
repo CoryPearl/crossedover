@@ -77,6 +77,8 @@ Use **⋯** for properties, game files, verification, or uninstall. Steam handle
 
 Graphics profiles are explained in Settings:
 
+Installed game cards and list rows show a **Recommended** renderer, or a **Starting point** when the graphics API could not be identified. Click that line or choose **⋯ → Graphics recommendation…** for the basis, current renderer and an option to apply a supported Steam recommendation. Quit Windows software before applying it; Steam and added apps share this setting. Epic/Ubisoft manage their combination automatically, and Minecraft uses its separate DXMT environment. An executable import hint does not establish game compatibility, and DirectX 12 is unavailable in this runtime.
+
 - **DirectX 9–11:** combines DXVK for DirectX 9 with DXMT for DirectX 10–11, both through Metal. Useful for mixed libraries and apps with components using different versions.
 - **DirectX 10–11:** DXMT and Metal for software requiring DirectX 10 or 11; DirectX 9 falls back to OpenGL.
 - **DirectX 9:** DXVK and Metal for software requiring DirectX 9 without needing the DirectX 10–11 path.
@@ -85,6 +87,10 @@ Graphics profiles are explained in Settings:
 Only modes supported by the selected runtime can be chosen. **DirectX 9–11** requires both included backends. Your existing renderer stays selected after updating (the old Legacy, Performance, and Metal choices are now named OpenGL fallback, DirectX 9, and DirectX 10–11). Quit all Windows software before changing **Settings → Graphics renderer**. Epic and Ubisoft retain their launcher-managed combination. These modes do not add DirectX 12 support. Choose resolution, detail, and frame limits inside the app or game; known compatibility presets may still apply.
 
 Known game presets may request a dedicated renderer. Quit Windows software before accepting a renderer restart. Native window controls and gameplay performance remain title-dependent.
+
+CS2 launches at 1280×720 with a 60 FPS cap. Its next launch applies a one-time performance preset: low textures, particles, shaders and shadow quality, with MSAA and ambient occlusion off. Dynamic shadows, sound, window controls and the display-move mouse fix are retained. FSR remains disabled for clarity. Later in-game settings are preserved. Fullscreen can raise the rendering resolution on a larger monitor; check **Video → Resolution** before comparing match FPS. A 60 FPS cap is a target, not a guaranteed minimum. Only a small original video-settings file is retained for recovery; no full environment backup is created.
+
+If CS2 reports missing or invalid signatures, quit the game and use **⋯ → Verify game files…**, then check Steam's progress. Secure matchmaking is unconfirmed in the current local build; a successful offline Practice match does not validate VAC-secured play. See [Steam's verification instructions](https://help.steampowered.com/en/faqs/view/0C48-FCBD-DA71-93EB/).
 
 ## Mods
 

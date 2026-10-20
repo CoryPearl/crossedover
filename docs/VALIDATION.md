@@ -1,5 +1,59 @@
 # Validation record
 
+## CS2 scene-cost preset and game renderer recommendations — October 19, 2026
+
+The owner reports acceptable CS2 menu performance but poor match performance,
+and requests a 60 FPS minimum on any monitor. No numeric match baseline was
+provided. A universal minimum cannot be established from menu FPS or the
+monitor's dimensions. The selected DXMT profile, 1280×720 saved dimensions,
+disabled FSR/VSync and enabled MSync were confirmed before changing anything.
+
+`CS2WindowSettings` now applies a separate one-time performance migration only
+after the supervisor's existing stopped-game check: MSAA/CMAA and ambient
+occlusion off; low textures, particles, shaders and shadow quality; performance
+HDR. All dynamic shadows remain enabled. Only existing numeric settings are
+changed; window/input/audio settings and subsequent user choices are retained.
+Settings values follow the installed game's `settings_video.xml`. The normal
+launch route applied the preset; the original settings copy is **1,033 bytes**,
+not a full environment backup. The existing cursor-following runtime is kept.
+
+Every discovered store game receives a renderer recommendation. Known Steam
+recipes and Brawlhalla's existing Ubisoft executable policy take precedence;
+other games use bounded normal/delay PE import hints. Unknown titles receive
+a labeled starting point. Minecraft shows its separate DXMT configuration.
+Recommendations appear in grid/list views with details; Steam application uses
+the existing stopped-environment and supported-runtime guards. Discovery and
+caching run outside the UI actor; no game code runs during API inspection.
+
+- **90 Swift tests in 16 suites passed**, including 32/64-bit normal and delay
+  imports, malformed/truncated images, resource-string false positives,
+  unsupported DirectX 12, store ID collisions, declared executable precedence,
+  cache refresh and escaping manifest paths. Performance migration tests check
+  original settings recovery and preservation of later resolution/quality choices.
+- Release compilation and fresh v1.4.0/build 26 preview packaging passed. The
+  final app passed strict deep code-signature verification and was opened after
+  checking no CS2/Bedrock session was active; only the previous idle GUI closed.
+- Owned SwiftUI grid/list renders were visually reviewed. The installed
+  Brawlhalla/CS2/TrackMania and Minecraft preview cards show recommendations
+  without clipping. README/technical/setup/runtime notes and screenshots updated.
+  Pages build, release/link/image/offline-guide checks and **3 website tests** pass.
+- CS2's process was observed after requesting launch. An allowlisted config
+  check confirms the intended low settings, 1280×720 and FSR disabled. The owner
+  attempted online matchmaking and supplied a screenshot of a **Valve Anti-Cheat
+  missing/invalid file-signature warning**. No match FPS was obtained. The normal
+  code path launches through Steam, without `-insecure`, direct executable launch
+  or third-party-injection options. No local `d3d11.dll`/`dxgi.dll` replacements
+  were found in the two game executable folders. These checks don't establish
+  the signature error's cause. After the owner quit CS2, Steam file verification
+  was requested through its normal flow; completion/repair results are pending.
+  **Sustained match FPS, frametime improvement and this run's click alignment
+  remain unconfirmed; VAC-secured matchmaking is blocked in the reported run.**
+  No game UI capture, input automation, driver replacement,
+  remote push or public release was performed.
+
+Evidence: `.cache/cs2-performance/`. Current preview:
+`.cache/previews/crossedover-1.4.0-cs2-performance-verified.app`.
+
 ## Minecraft artwork and product scope — October 19, 2026
 
 Minecraft's card and list row now read its official grass-block artwork from the

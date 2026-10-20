@@ -314,6 +314,10 @@ struct ContentView: View {
                 Text("MINECRAFT · WINDOWS").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
                 Text("Minecraft Bedrock").font(.system(size: 17, weight: .medium)).tracking(-0.3)
             }.frame(height: 66, alignment: .topLeading).frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            Text("Recommended: DirectX 10–11")
+                .font(.system(size: 10)).foregroundStyle(Palette.muted)
+                .help("Minecraft's separate environment uses DXMT automatically; the shared graphics setting does not change it.")
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.bottom, 12)
             Rule()
             HStack { Text(minecraftState).font(.system(size: 11)).foregroundStyle(Palette.muted); Spacer(); minecraftActions }
                 .padding(.horizontal, 16).padding(.vertical, 14)
@@ -325,6 +329,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Minecraft Bedrock").font(.system(size: 13, weight: .medium))
                 Text("Minecraft · " + minecraftState).font(.system(size: 10)).foregroundStyle(Palette.muted)
+                Text("Recommended: DirectX 10–11").font(.system(size: 10)).foregroundStyle(Palette.muted)
             }.frame(maxWidth: .infinity, alignment: .leading)
             minecraftActions
         }.padding(16)
@@ -482,6 +487,7 @@ struct ContentView: View {
                     Text(game.name).font(.system(size: 13, weight: .medium)).lineLimit(1).help(game.name)
                     Text(game.store.title + " · " + gameState(game) + (game.sizeBytes > 0 ? " · " + ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""))
                         .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1)
+                    rendererHint(game)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) { manageMenu(game, compact: true); gameAction(game) }.fixedSize()
             }
@@ -506,6 +512,7 @@ struct ContentView: View {
             artwork(game).frame(height: 112)
             Rule()
             gameDetails(game).padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            rendererHint(game).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.bottom, 12)
             Rule()
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -569,6 +576,17 @@ struct ContentView: View {
         }.frame(height: 66, alignment: .topLeading)
     }
 
+    @ViewBuilder private func rendererHint(_ game: GameInstallation?) -> some View {
+        if let game {
+            let recommendation = model.rendererRecommendation(for: game)
+            Button { propertiesGame = game } label: {
+                Text(recommendation.summary).font(.system(size: 10)).foregroundStyle(Palette.muted)
+                    .lineLimit(1).truncationMode(.middle)
+            }.buttonStyle(.plain).help(recommendation.detail)
+                .accessibilityLabel("Graphics for \(game.name): \(recommendation.summary)")
+        }
+    }
+
     private func gameState(_ game: GameInstallation?) -> String {
         if let session = session(for: game) {
             switch session.state {
@@ -601,6 +619,7 @@ struct ContentView: View {
             if renderingSnapshot { managementLabel(compact: compact) }
             else {
                 Menu {
+                    Button("Graphics recommendation…") { propertiesGame = game }
                     Button("Game properties…") {
                         if game.store != .steam { propertiesGame = game }
                         else { model.manage(game, command: .gameProperties) }
@@ -629,19 +648,45 @@ struct ContentView: View {
                 Button("Done") { propertiesGame = nil }.buttonStyle(SecondaryButton()).keyboardShortcut(.cancelAction)
             }
             Rule()
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Installed · " + (game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : "Size unavailable")).font(.system(size: 12))
-                Text(game.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                Button("Show game files") { model.showGameFiles(game) }.buttonStyle(SecondaryButton())
-            }
-            Rule()
-            Text("Graphics: " + (game.store != .steam ? "DirectX 9–11 (launcher managed)" : model.environment?.profile.title ?? "Not configured")).font(.system(size: 12, weight: .medium))
-            Text(game.store == .ubisoft || game.epicPartnerGameID != nil ? "Ubisoft Connect manages this installation, including games Epic delegates to Ubisoft. The launcher manages DXMT for DirectX 10–11 and DXVK for DirectX 9 when available. Compatibility varies by software." : "Epic manages DXMT for DirectX 10–11 and DXVK for DirectX 9 when available. Steam and added apps keep their selected graphics renderer. Compatibility varies by software.")
-                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-            Text("For updates, verification, and uninstall, use this game's management controls inside \(game.managementStore.title). The launcher owns download progress and confirmation dialogs.")
-                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-            Button("Manage in \(game.managementStore.title)…") { propertiesGame = nil; model.manage(game, command: .gameProperties) }.buttonStyle(SecondaryButton()).disabled(model.busy)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Installed · " + (game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : "Size unavailable")).font(.system(size: 12))
+                        Text(game.directory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                            .font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        Button("Show game files") { model.showGameFiles(game) }.buttonStyle(SecondaryButton())
+                    }
+                    Rule()
+                    let recommendation = model.rendererRecommendation(for: game)
+                    Text(recommendation.summary).font(.system(size: 14, weight: .medium))
+                    Text(recommendation.detail)
+                        .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                    if game.store == .steam {
+                        Text("Current shared renderer: " + (model.environment?.profile.title ?? "Not configured"))
+                            .font(.system(size: 12))
+                        if let profile = recommendation.profile, model.runtime?.manifest.supports(profile) != true {
+                            Text("The selected runtime does not include this renderer. Import a runtime with the required graphics backend before applying it.")
+                                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let profile = recommendation.profile, model.environment?.profile != profile {
+                            Button("Use \(profile.title)") { model.changeProfile(profile) }.buttonStyle(SecondaryButton())
+                                .disabled(model.busy || model.currentSession != nil || model.runtime?.manifest.supports(profile) != true)
+                            Text("Quit Windows games, apps and launchers first. This changes the shared renderer for Steam and added apps; your other games keep their recommendations.")
+                                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else {
+                        Text("Launcher managed: DXVK for DirectX 9 and DXMT for DirectX 10–11, when included in the runtime. The shared graphics setting does not change the launcher's renderer policy.")
+                            .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if game.store == .steam && game.appID == "730" {
+                        Text("60 FPS target · 1280 × 720 launch window. The performance preset lowers scene detail and disables MSAA and ambient occlusion, keeping dynamic shadows. It applies once; later in-game choices are preserved. FSR stays disabled for clarity. Fullscreen can increase render resolution on larger displays; check Video settings if needed. FPS depends on hardware and gameplay.")
+                            .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text("For updates, verification, and uninstall, use this game's management controls inside \(game.managementStore.title). The launcher owns download progress and confirmation dialogs.")
+                        .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                    Button("Manage in \(game.managementStore.title)…") { propertiesGame = nil; model.manage(game, command: .gameProperties) }.buttonStyle(SecondaryButton()).disabled(model.busy)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }.frame(maxHeight: 520)
         }.padding(30).frame(width: 550).foregroundStyle(Palette.ink).background(Palette.canvas)
     }
 
