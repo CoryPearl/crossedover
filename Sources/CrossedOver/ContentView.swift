@@ -272,16 +272,13 @@ struct ContentView: View {
                     }.padding(28).frame(maxWidth: 420, alignment: .leading).panel()
                 } else {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("A home for your Windows games.").font(.system(size: 18, weight: .medium))
-                        Text("Install through Windows Steam or Epic. Completed downloads appear here automatically. Add .exe for games from elsewhere.")
+                        Text("Your library starts here.").font(.system(size: 18, weight: .medium))
+                        Text("Choose a launcher or add a Windows .exe. Your installed games will appear here automatically.")
                             .font(.system(size: 12)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                         HStack(spacing: 8) {
                             Button(model.steamInstalled ? "Open Steam" : "Set up Steam") { model.openSteam() }.buttonStyle(SecondaryButton())
                             Button(model.epicInstalled ? "Open Epic" : "Set up Epic") { model.openEpic() }.buttonStyle(SecondaryButton())
                         }.disabled(model.busy)
-                        if model.steamInstalled, let demo = model.recipes.first(where: { $0.appID == "11020" }) {
-                            Button("Install TrackMania demo") { model.install(demo) }.buttonStyle(TextButton()).disabled(model.busy)
-                        }
                     }.padding(28).frame(maxWidth: 510, alignment: .leading).panel()
                 }
             } else if games.isEmpty && apps.isEmpty && !showingMinecraft {
@@ -542,13 +539,13 @@ struct ContentView: View {
         }.padding(16)
     }
 
-    private func session(for game: GameInstallation?) -> LaunchSession? {
-        guard let game, let session = model.currentSession,
+    private func session(for game: GameInstallation) -> LaunchSession? {
+        guard let session = model.currentSession,
               session.appID == game.sessionAppID, session.environmentID == game.environmentID else { return nil }
         return session
     }
 
-    private func gameCard(_ game: GameInstallation?) -> some View {
+    private func gameCard(_ game: GameInstallation) -> some View {
         VStack(spacing: 0) {
             artwork(game).frame(height: 112)
             Rule()
@@ -561,13 +558,13 @@ struct ContentView: View {
                         Circle().fill(Palette.muted).frame(width: 5, height: 5)
                         Text(gameState(game)).font(.system(size: 11, weight: .medium)).lineLimit(1).help(gameState(game))
                     }
-                    if let game, game.sizeBytes > 0 {
+                    if game.sizeBytes > 0 {
                         Text(ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file))
                             .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1).help("Installed game files")
                     }
                 }
                 Spacer(minLength: 8)
-                if let game { manageMenu(game, compact: true) }
+                manageMenu(game, compact: true)
                 gameAction(game)
             }.padding(.horizontal, 16).padding(.vertical, 14)
             if session(for: game)?.state == "unknown" {
@@ -581,20 +578,15 @@ struct ContentView: View {
         }.panel()
     }
 
-    private func artwork(_ game: GameInstallation?, compact: Bool = false) -> some View {
-        let isDemo = game == nil || (game?.store == .steam && game?.appID == "11020")
+    private func artwork(_ game: GameInstallation, compact: Bool = false) -> some View {
+        let isTrackMania = game.store == .steam && game.appID == "11020"
         let path = model.artworkPath(for: game)
         return LibraryArtwork(path: path, preview: renderingSnapshot ? path.flatMap { model.previewArtwork[$0] } : nil) { image in
             ZStack {
-                (isDemo ? Color(white: 0.85) : Palette.sidebar)
+                (isTrackMania ? Color(white: 0.85) : Palette.sidebar)
                 if let image {
                     Image(decorative: image, scale: 1).resizable().scaledToFit().padding(.horizontal, compact ? 8 : 22).padding(.vertical, compact ? 8 : 18)
-                        .accessibilityLabel("\(game?.name ?? "TrackMania Nations Forever") artwork")
-                } else if isDemo && !compact {
-                    VStack(spacing: 5) {
-                        Text("TRACKMANIA").font(.system(size: 25, weight: .heavy, design: .rounded)).tracking(-1)
-                        Text("NATIONS FOREVER").font(.system(size: 10, weight: .semibold)).tracking(2)
-                    }.foregroundStyle(Color(white: 0.12))
+                        .accessibilityLabel("\(game.name) artwork")
                 } else {
                     Image(systemName: "gamecontroller").font(.system(size: compact ? 20 : 26, weight: .ultraLight))
                         .foregroundStyle(Palette.muted).accessibilityHidden(true)
@@ -603,32 +595,25 @@ struct ContentView: View {
         }
     }
 
-    private func gameDetails(_ game: GameInstallation?) -> some View {
-        let isDemo = game == nil || (game?.store == .steam && game?.appID == "11020")
-        return VStack(alignment: .leading, spacing: 0) {
-            Text(game?.store.title.uppercased() ?? "STEAM").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
+    private func gameDetails(_ game: GameInstallation) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(game.store.title.uppercased()).font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
                 .padding(.bottom, 10)
-            Text(isDemo ? "TrackMania" : game?.name ?? "Windows game")
-                .font(.system(size: 17, weight: .medium)).tracking(-0.3).lineLimit(2)
-                .help(game?.name ?? "TrackMania Nations Forever")
-            if isDemo {
-                Text("Nations Forever").font(.system(size: 11)).foregroundStyle(Palette.muted).padding(.top, 3)
-            }
+            Text(game.name).font(.system(size: 17, weight: .medium)).tracking(-0.3).lineLimit(2)
+                .help(game.name)
         }.frame(height: 66, alignment: .topLeading)
     }
 
-    @ViewBuilder private func rendererHint(_ game: GameInstallation?) -> some View {
-        if let game {
-            let recommendation = model.rendererRecommendation(for: game)
-            Button { propertiesGame = game } label: {
-                Text(recommendation.summary).font(.system(size: 10)).foregroundStyle(Palette.muted)
-                    .lineLimit(1).truncationMode(.middle)
-            }.buttonStyle(.plain).help(recommendation.detail)
-                .accessibilityLabel("Graphics for \(game.name): \(recommendation.summary)")
-        }
+    private func rendererHint(_ game: GameInstallation) -> some View {
+        let recommendation = model.rendererRecommendation(for: game)
+        return Button { propertiesGame = game } label: {
+            Text(recommendation.summary).font(.system(size: 10)).foregroundStyle(Palette.muted)
+                .lineLimit(1).truncationMode(.middle)
+        }.buttonStyle(.plain).help(recommendation.detail)
+            .accessibilityLabel("Graphics for \(game.name): \(recommendation.summary)")
     }
 
-    private func gameState(_ game: GameInstallation?) -> String {
+    private func gameState(_ game: GameInstallation) -> String {
         if let session = session(for: game) {
             switch session.state {
             case "requested": return "Opening…"
@@ -636,23 +621,16 @@ struct ContentView: View {
             default: return session.state.capitalized
             }
         }
-        return game != nil ? "Installed" : model.steamInstalled ? "Ready to install" : "Steam setup required"
+        return "Installed"
     }
 
-    @ViewBuilder private func gameAction(_ game: GameInstallation?) -> some View {
-        if let game {
-            let tracked = session(for: game)
-            Button { model.requestLaunch(game) } label: {
-                Label(tracked == nil ? "Play" : tracked?.state == "running" ? "In game" : "Sent", systemImage: "play.fill")
-                    .lineLimit(1).fixedSize().frame(minWidth: 48)
-            }.buttonStyle(PrimaryButton()).disabled(model.busy || model.currentSession != nil)
-                .accessibilityLabel("Play \(game.name)")
-        } else if !model.steamInstalled {
-            Button(model.setupStep > 0 ? "Continue setup" : "Set up Steam") { model.setup() }
-                .buttonStyle(PrimaryButton()).disabled(model.busy || model.host?.supported != true)
-        } else if let recipe = model.recipes.first(where: { $0.appID == "11020" }) {
-            Button("Install demo") { model.install(recipe) }.buttonStyle(PrimaryButton()).disabled(model.busy)
-        }
+    private func gameAction(_ game: GameInstallation) -> some View {
+        let tracked = session(for: game)
+        return Button { model.requestLaunch(game) } label: {
+            Label(tracked == nil ? "Play" : tracked?.state == "running" ? "In game" : "Sent", systemImage: "play.fill")
+                .lineLimit(1).fixedSize().frame(minWidth: 48)
+        }.buttonStyle(PrimaryButton()).disabled(model.busy || model.currentSession != nil)
+            .accessibilityLabel("Play \(game.name)")
     }
 
     private func manageMenu(_ game: GameInstallation, compact: Bool = false) -> some View {

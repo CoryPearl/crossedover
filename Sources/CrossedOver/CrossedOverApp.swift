@@ -33,12 +33,12 @@ import CrossedOverCore
                 let compact = CommandLine.arguments.contains("--compact-preview")
                 if let stateIndex = CommandLine.arguments.firstIndex(of: "--preview-state"), stateIndex + 1 < CommandLine.arguments.count {
                     switch CommandLine.arguments[stateIndex + 1] {
-                    case "setup": model.environment = nil; model.games = []
-                    case "install": model.games = []
+                    case "setup": model.environment = nil; model.environments = []; model.games = []; model.windowsApps = []; model.bedrockInstalled = false
+                    case "install": model.games = []; model.windowsApps = []; model.bedrockInstalled = false
                     case "opening", "running", "unknown":
-                        if let environment = model.environment {
+                        if let environment = model.environment, let game = model.games.first {
                             let state = CommandLine.arguments[stateIndex + 1]
-                            model.currentSession = LaunchSession(appID: model.games.first?.sessionAppID ?? "11020", environmentID: environment.id, state: state == "opening" ? "requested" : state)
+                            model.currentSession = LaunchSession(appID: game.sessionAppID, environmentID: environment.id, state: state == "opening" ? "requested" : state)
                         }
                     case "preparing":
                         model.openingGame = model.games.first

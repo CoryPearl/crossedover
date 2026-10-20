@@ -1,16 +1,16 @@
-# crossedover v1.4.1 quickstart
+# crossedover v1.4.3 quickstart
 
-**v1.4.1 adds Settings search and includes the Windows runtime and separate Minecraft Bedrock backend.** Owned-account installation and local gameplay have passed initial testing. Broader compatibility and release validation remain open. Downloads require repository access while the GitHub repository is private.
+**v1.4.3 starts with an empty library and includes the Windows runtime and separate Minecraft Bedrock backend.** No games, demo cards, or TrackMania install prompts are included. Install games through your own accounts or add your own .exe files. Updating preserves existing libraries. Owned-account installation and local gameplay have passed initial testing. Broader compatibility and release validation remain open. Downloads require repository access while the GitHub repository is private.
 
 ## Before you start
 
 You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, and an internet connection for setup. Use a Steam or Epic account only for that store, or your owning Microsoft account for Minecraft. Minecraft’s separate backend requires macOS 26+. Allow **8 GiB free for setup, plus space for apps and games**. Recommended: **16 GB+ unified memory**, or **24–32 GB+** for heavier games. [Hardware guidelines](#hardware-guidelines).
 
-Compatibility is experimental. TrackMania Nations Forever is the first tested demo, CS2 is experimental, and compatibility with other games and apps varies. A version number does not certify every game or sustained performance.
+Compatibility is experimental. TrackMania, CS2, Brawlhalla and Minecraft have local test evidence; compatibility with other games and apps varies. A version number does not certify every game or sustained performance.
 
 ## Install
 
-1. Download **crossedover-1.4.1.dmg** from the [v1.4.1 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.1).
+1. Download **crossedover-1.4.3.dmg** from the [v1.4.3 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.3).
 2. Open it and drag **crossedover** onto **Applications**.
 3. Eject the disk image and open crossedover from Applications.
 

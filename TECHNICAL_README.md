@@ -1,8 +1,8 @@
 # crossedover — Technical README
 
-This document explains how the **v1.4.1 source implementation** works, from the macOS interface to Windows process execution. It is intended for contributors and readers who want to understand the whole app. For installation, use the [quickstart](QUICKSTART.md); for system requirements, see the [hardware guidelines](docs/HARDWARE.md).
+This document explains how the **v1.4.3 source implementation** works, from the macOS interface to Windows process execution. It is intended for contributors and readers who want to understand the whole app. For installation, use the [quickstart](QUICKSTART.md); for system requirements, see the [hardware guidelines](docs/HARDWARE.md).
 
-v1.4.1 adds Settings search to the Minecraft release. Describing a launch path or runtime patch here does not mean every affected game has passed interactive validation. The [validation record](docs/VALIDATION.md) distinguishes automated checks, user observations, and pending work.
+v1.4.3 removes demo-install affordances and placeholder game cards. New data directories start empty; libraries are populated only by discovered installations and user-added executables. Existing libraries and compatibility profiles are retained, along with Settings search and Minecraft support. Describing a launch path or runtime patch here does not mean every affected game has passed interactive validation. The [validation record](docs/VALIDATION.md) distinguishes automated checks, user observations, and pending work.
 
 ## Contents
 
@@ -479,7 +479,7 @@ python3 scripts/package.py --skip-build --dmg
 
 The runtime builder uses [source-lock.json](runtime/source-lock.json) for component URLs, hashes, and source revisions. The current component set includes Wine 11.0-cx26.3.0, DXMT 0.80, a pinned D9VK revision, MoltenVK 1.4.2, the selected x87 helper, and optional OpenAL Soft 1.25.2. Its runtime ID includes a digest derived from the output file-hash inventory. `build-provenance.json` records component and patch information.
 
-The v1.4.1 runtime still uses some pinned prebuilt dependency components. Independent source-complete dependency builds, licensing/source delivery, and the other [public-release gates](docs/RELEASE.md) remain separate work. Being based on published FOSS source does not by itself complete those gates.
+The v1.4.3 runtime still uses some pinned prebuilt dependency components. Independent source-complete dependency builds, licensing/source delivery, and the other [public-release gates](docs/RELEASE.md) remain separate work. Being based on published FOSS source does not by itself complete those gates.
 
 ### App bundle and DMG
 

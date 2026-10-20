@@ -117,9 +117,9 @@ import CrossedOverCore
         return nil
     }
     @ObservationIgnored var previewArtwork: [String: CGImage] = [:]
-    func artworkPath(for game: GameInstallation?) -> String? {
-        if game == nil || (game?.store == .steam && game?.appID == "11020") { return logoPath ?? game?.artworkPath }
-        return game?.artworkPath
+    func artworkPath(for game: GameInstallation) -> String? {
+        if game.store == .steam && game.appID == "11020" { return logoPath ?? game.artworkPath }
+        return game.artworkPath
     }
     private func refreshMinecraftArtwork() async {
         guard minecraftArtworkPath == nil else { return }
@@ -555,13 +555,6 @@ import CrossedOverCore
         let log = paths.logs.appendingPathComponent("windows-app-" + app.id.uuidString + ".log")
         guard FileManager.default.fileExists(atPath: log.path) else { notice = "No launch log yet. Run the app first."; return }
         NSWorkspace.shared.open(log)
-    }
-    func install(_ recipe: GameRecipe) {
-        guard let environment, steamInstalled else { setup(); return }
-        perform("Request \(recipe.name) installation") {
-            _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .installGame, appID: recipe.appID))
-            self.notice = "Confirm the download in Steam."
-        }
     }
     func manage(_ game: GameInstallation, command: SupervisorRequest.Command) {
         guard let environment = environment(for: game), [.uninstallGame, .gameProperties, .verifyGame].contains(command) else { return }

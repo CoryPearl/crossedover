@@ -1,5 +1,38 @@
 # Validation record
 
+## v1.4.3 empty first-install libraries — October 20, 2026
+
+The owner requested shipping without the TrackMania demo and version 1.4.3.
+Build 28 removes both demo-install affordances, the unused GUI install handler,
+and optional/nil game-card paths that previously supplied TrackMania labels,
+artwork and actions. Store-card helpers now require an actual installation.
+Existing library discovery, user-added executables, TrackMania compatibility
+tuning, game launch policies and user files are retained.
+
+A separate fresh data root was opened by the real AppModel preview and CLI.
+The records table, Games list and environment directory were empty: no game,
+app or environment records were seeded. App-owned ImageRenderer previews were
+inspected for fresh Games, fresh Apps and an empty library with existing Steam
+setup. None showed demo cards/install prompts. The fresh Games/Apps previews
+replace the website/README images; historical installed-list examples are
+labelled as examples. Preview fixture setup also clears only its in-memory
+cards and never uses TrackMania as a missing-game session fallback.
+
+All 92 core tests in 16 suites, release compilation, release/site checks and
+three website tests passed. Strict deep ad-hoc signature verification and both
+bundled inventories passed. The Windows runtime manifest is identical to
+v1.4.1. Package inspection found no TrackMania/CS2/Minecraft/Pong game executables,
+Steam install manifests or user database. The DMG checksum and mounted version
+1.4.3/build 28, offline guide and Applications link passed.
+
+DMG SHA-256:
+`400e1c867bafd0bbaba0cca33fcd31b1b51c7796f8654dc8d489822a4aadc7f5`.
+Evidence is local under `.cache/blank-1.4.3/`. No installed user game, save,
+runtime or active Windows process was removed or changed. The standalone Pong
+test executable remains separate from the app/release. Existing broader
+compatibility and notarization limits remain open. GitHub Pages permits the
+exact v1.4.3 release tag for the publication-triggered refresh.
+
 ## v1.4.1 Settings search — October 19, 2026
 
 The owner requested Settings search and a v1.4.1 release. Version/build are

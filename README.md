@@ -18,14 +18,14 @@
   <a href="TECHNICAL_README.md">Technical README</a>
 </p>
 
-<p align="center"><sub>v1.4.1 · Settings search &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
+<p align="center"><sub>v1.4.3 · Your library, your choice &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
 
 <br>
 
 <p align="center">
-  <img src="website/assets/library.png" width="1100" alt="crossedover’s monochrome game library with search, Steam, Epic, and Minecraft cards, and a Game Launchers menu">
+  <img src="website/assets/library.png" width="1100" alt="crossedover’s empty monochrome game library with Add .exe, launcher setup options, search, and a Game Launchers menu">
   <br>
-  <sub>A little less launcher. A little more library. Interface preview · v1.4.0.</sub>
+  <sub>A little less launcher. A little more library. New installation · v1.4.3. No games included.</sub>
 </p>
 
 crossedover is a **macOS home for Windows apps and games**. Install games through Steam or Epic, play Minecraft Bedrock, or add a local Windows `.exe`. Keep what you play in **Games** and everything else in **Apps**, with search, grid/list views, and launch controls in one place.
@@ -34,7 +34,7 @@ crossedover is a **macOS home for Windows apps and games**. Install games throug
 | --- | --- | --- |
 | Install through the official Windows clients. Completed games appear automatically; Epic can hand off to Ubisoft Connect. | Sign in with the Microsoft account that owns Minecraft for Windows. Install locally, then launch from its Games card. | Add games, utilities, installers, and mod managers as cards. Choose **Play** or **Run**. No store launcher is required. |
 
-**[Download v1.4.1](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.1)** — includes the Windows runtime and separate Minecraft backend. Minecraft sign-in, verified installation, and local gameplay with controls, sound, and saving have been tested on the current Mac. Downloads require repository access while this GitHub repository is private. [v1.4.1 notes](docs/RELEASE_NOTES_1.4.1.md) · [Validation](docs/VALIDATION.md).
+**[Download v1.4.3](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.3)** — starts with empty Games and Apps libraries. No preinstalled games, sample cards, or TrackMania demo-install prompts. The Windows runtime and separate Minecraft backend are included; install only what you choose. Minecraft sign-in, verified installation, and local gameplay with controls, sound, and saving have been tested on the current Mac. Downloads require repository access while this GitHub repository is private. [v1.4.3 notes](docs/RELEASE_NOTES_1.4.3.md) · [Validation](docs/VALIDATION.md).
 
 ## Get started
 
