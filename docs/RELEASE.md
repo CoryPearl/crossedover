@@ -1,6 +1,6 @@
 # Release status and remaining validation
 
-v1.4.0/build 26 is the owner-requested Minecraft release in the existing private GitHub repository. The DMG includes both the Windows runtime and the separate Minecraft backend. Microsoft sign-in, signed-package download/install, and local-world play with controls/sound, saving and normal quit passed on the current Mac. CS2’s latest online test confirmed working matchmaking, sharper visuals and smooth play.
+v1.4.1/build 27 adds Settings search to the owner-requested Minecraft release in the existing private GitHub repository. The DMG includes both the Windows runtime and the separate Minecraft backend. Microsoft sign-in, signed-package download/install, and local-world play with controls/sound, saving and normal quit passed on the current Mac. CS2’s latest online test confirmed working matchmaking, sharper visuals and smooth play.
 
 The app is locally signed, not Developer ID signed or notarized. Publishing this version does not complete broader compatibility, clean-machine or source-complete dependency validation. The following work remains open for a broadly validated public distribution; no unchecked item is claimed complete.
 

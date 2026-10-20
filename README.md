@@ -18,7 +18,7 @@
   <a href="TECHNICAL_README.md">Technical README</a>
 </p>
 
-<p align="center"><sub>v1.4.0 · Minecraft release &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
+<p align="center"><sub>v1.4.1 · Settings search &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
 
 <br>
 
@@ -34,7 +34,7 @@ crossedover is a **macOS home for Windows apps and games**. Install games throug
 | --- | --- | --- |
 | Install through the official Windows clients. Completed games appear automatically; Epic can hand off to Ubisoft Connect. | Sign in with the Microsoft account that owns Minecraft for Windows. Install locally, then launch from its Games card. | Add games, utilities, installers, and mod managers as cards. Choose **Play** or **Run**. No store launcher is required. |
 
-**[Download v1.4.0](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.0)** — includes the Windows runtime and separate Minecraft backend. Minecraft sign-in, verified installation, and local gameplay with controls, sound, and saving have been tested on the current Mac. Downloads require repository access while this GitHub repository is private. [v1.4.0 notes](docs/RELEASE_NOTES_1.4.0.md) · [Validation](docs/VALIDATION.md).
+**[Download v1.4.1](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.1)** — includes the Windows runtime and separate Minecraft backend. Minecraft sign-in, verified installation, and local gameplay with controls, sound, and saving have been tested on the current Mac. Downloads require repository access while this GitHub repository is private. [v1.4.1 notes](docs/RELEASE_NOTES_1.4.1.md) · [Validation](docs/VALIDATION.md).
 
 ## Get started
 
@@ -48,6 +48,7 @@ For Minecraft, choose **Game Launchers → Minecraft Bedrock… → Install & Pl
 
 ## Your software, your library
 
+- **Find a setting.** Search Settings by name or topic, including Advanced controls. Press **⌘F** while in Settings to focus search.
 - **One place to launch.** Open clients from Game Launchers; launch installed games and added executables from their cards. Minecraft uses its own environment alongside the shared Steam/Epic/app environment.
 - **Graphics guidance per game.** Library cards show a renderer recommendation from known profiles or detected DirectX imports. Unknown games get a labeled starting point; open the recommendation for details. CS2 includes a low-detail preset targeting 60 FPS, with performance depending on hardware, resolution and gameplay.
 - **Files and mods stay accessible.** Open installation folders in Finder. Use Steam Workshop where supported, or add Windows mod managers as Apps. Steam, Epic, and Ubisoft keep their own verification/uninstall flows.

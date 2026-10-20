@@ -5,6 +5,7 @@ import SwiftUI
 /// viewport width. Scrolling never feeds intrinsic-size constraints back into
 /// the outer SwiftUI layout. Libraries retain SwiftUI's lazy virtualization.
 struct NativePageScroll<Content: View>: NSViewRepresentable {
+    var resetPosition: String? = nil
     @ViewBuilder var content: () -> Content
 
     struct Document: View {
@@ -15,12 +16,14 @@ struct NativePageScroll<Content: View>: NSViewRepresentable {
     }
     final class Coordinator {
         var controller: NSHostingController<Document>?
+        var resetPosition: String?
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     final class PageScrollView: NSScrollView {
         var measure: ((CGFloat) -> CGFloat)?
         var contentChanged = true
+        var scrollToTop = false
         private var measuredWidth: CGFloat = -1
         private var measuredHeight: CGFloat = 0
         override func layout() {
@@ -34,6 +37,11 @@ struct NativePageScroll<Content: View>: NSViewRepresentable {
             }
             let size = NSSize(width: width, height: max(contentSize.height, measuredHeight))
             if documentView.frame.size != size { documentView.setFrameSize(size) }
+            if scrollToTop {
+                scrollToTop = false
+                contentView.scroll(to: NSPoint(x: 0, y: documentView.isFlipped ? 0 : max(0, size.height - contentSize.height)))
+                reflectScrolledClipView(contentView)
+            }
         }
     }
 
@@ -60,6 +68,10 @@ struct NativePageScroll<Content: View>: NSViewRepresentable {
 
     func updateNSView(_ scroll: PageScrollView, context: Context) {
         context.coordinator.controller?.rootView = Document(content: content())
+        if context.coordinator.resetPosition != resetPosition {
+            context.coordinator.resetPosition = resetPosition
+            scroll.scrollToTop = true
+        }
         scroll.contentChanged = true
         scroll.needsLayout = true
     }

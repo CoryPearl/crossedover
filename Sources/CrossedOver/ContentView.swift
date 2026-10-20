@@ -11,6 +11,30 @@ private enum Palette {
     static let line = Color(white: 0.21)
 }
 
+/// Search only local setting labels and concepts, never account or game data.
+private enum SettingsSection: CaseIterable {
+    case graphics, drive, steam, epic, platforms, recovery, runtime, support, backups, uninstall
+
+    var isAdvanced: Bool { [.recovery, .runtime, .support].contains(self) }
+    var index: String {
+        switch self {
+        case .graphics: "Windows environment graphics renderer DirectX DXMT DXVK Metal OpenGL performance legacy quality resolution frame limits"
+        case .drive: "Windows environment C: drive files folders installed imported apps user Finder"
+        case .steam: "Windows Steam client account library store open quit set up downloaded games download folder Finder progress updates"
+        case .epic: "Windows Epic Games Launcher account library store open set up repair launch support graphics DirectX DXMT DXVK Metal downloaded games download folder files progress updates"
+        case .platforms: "Other platforms Xbox Cloud Gaming stream browser account controller Minecraft Bedrock Windows edition WineGDK Microsoft sign in launcher"
+        case .recovery: "Advanced recovery restore backups repair environment force quit stop files"
+        case .runtime: "Advanced runtime import use included switch Wine version"
+        case .support: "Advanced support diagnostics report show backups macOS memory hardware system requirements"
+        case .backups: "Backups manual create clear delete Trash default Windows environment games apps saves disk space storage"
+        case .uninstall: "Uninstall crossedover remove delete Windows apps games saves app data disk space storage"
+        }
+    }
+    func matches(_ query: String) -> Bool {
+        query.split(whereSeparator: \.isWhitespace).allSatisfy { index.localizedStandardContains(String($0)) }
+    }
+}
+
 struct ContentView: View {
     @Bindable var model: AppModel
     var renderingSnapshot = false
@@ -19,6 +43,8 @@ struct ContentView: View {
     var previewSearch: String? = nil
     @AppStorage("libraryPresentation") private var libraryPresentation = "grid"
     @State private var searchText = ""
+    @State private var settingsSearchText = ""
+    @FocusState private var settingsSearchFocused: Bool
     @AppStorage("gameStoreFilter") private var gameStoreFilter = "all"
     @FocusState private var searchFocused: Bool
     @State private var advancedExpanded = false
@@ -42,7 +68,17 @@ struct ContentView: View {
                     Color.clear.overlay(alignment: .topLeading) {
                         page.fixedSize(horizontal: false, vertical: true)
                     }.clipped()
-                } else if ["settings", "activity"].contains(model.selectedPage) {
+                } else if model.selectedPage == "settings" {
+                    VStack(alignment: .leading, spacing: 22) {
+                        pageHeader
+                        settingsSearchBar
+                    }.padding(.horizontal, 32).padding(.top, 46).padding(.bottom, 22)
+                    NativePageScroll(resetPosition: settingsQuery) {
+                        settings.padding(.horizontal, 32).padding(.bottom, 40)
+                            .frame(maxWidth: 1004, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                } else if model.selectedPage == "activity" {
                     NativePageScroll { page.frame(maxWidth: .infinity, alignment: .topLeading) }
                 } else {
                     ScrollView { page.frame(maxWidth: .infinity, alignment: .topLeading) }
@@ -55,8 +91,11 @@ struct ContentView: View {
         .foregroundStyle(Palette.ink).background(Palette.canvas).tint(Palette.ink)
         .ignoresSafeArea(.container, edges: .top)
         .focusedSceneValue(\.librarySearch, {
-            if !["library", "apps"].contains(model.selectedPage) { model.selectedPage = "library" }
-            searchFocused = true
+            if model.selectedPage == "settings" { settingsSearchFocused = true }
+            else {
+                if !["library", "apps"].contains(model.selectedPage) { model.selectedPage = "library" }
+                searchFocused = true
+            }
         })
         .alert("Couldn't complete the action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
@@ -158,7 +197,9 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 28) {
             pageHeader
             switch model.selectedPage {
-            case "settings": settings.frame(maxWidth: 940, alignment: .leading)
+            case "settings":
+                settingsSearchBar
+                settings.frame(maxWidth: 940, alignment: .leading)
             case "activity": activity
             case "mods" where renderingSnapshot:
                 if let game = model.games.first { modding(game) }
@@ -732,142 +773,213 @@ struct ContentView: View {
         } else { menuLabel("Manage", icon: "ellipsis") }
     }
 
+    private var settingsQuery: String {
+        (previewSearch ?? settingsSearchText).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private var settingsSections: Set<SettingsSection> {
+        Set(SettingsSection.allCases.filter {
+            !([.drive, .recovery].contains($0) && model.environment == nil) && $0.matches(settingsQuery)
+        })
+    }
+    private var showAdvancedSettings: Bool { !settingsQuery.isEmpty || advancedExpanded || previewAdvanced }
+
+    private var advancedHeader: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Advanced").font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.ink)
+                Text("Recovery, runtime, and diagnostics").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            }
+            Spacer()
+            if settingsQuery.isEmpty {
+                Image(systemName: showAdvancedSettings ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.muted)
+            }
+        }.padding(22).contentShape(Rectangle())
+    }
+
+    private var settingsSearchBar: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Palette.muted)
+            if renderingSnapshot {
+                Text(settingsQuery.isEmpty ? "Search settings" : settingsQuery)
+                    .foregroundStyle(settingsQuery.isEmpty ? Palette.muted : Palette.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                TextField("Search settings", text: $settingsSearchText).textFieldStyle(.plain)
+                    .focused($settingsSearchFocused).accessibilityLabel("Search settings")
+                    .onExitCommand {
+                        if settingsSearchText.isEmpty { settingsSearchFocused = false }
+                        else { settingsSearchText = "" }
+                    }
+            }
+            if !settingsQuery.isEmpty {
+                Button { settingsSearchText = ""; settingsSearchFocused = true } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.muted)
+                }.buttonStyle(.plain).accessibilityLabel("Clear settings search").help("Clear search")
+            }
+        }.font(.system(size: 12)).padding(.horizontal, 11).frame(height: 34).frame(maxWidth: 420)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(settingsSearchFocused ? Palette.muted : Palette.line))
+            .background {
+                if !renderingSnapshot { SearchFocusDismissal(isFocused: settingsSearchFocused) { settingsSearchFocused = false } }
+            }
+            .help("Find settings by name or topic (⌘F)")
+    }
+
     private var settings: some View {
         VStack(alignment: .leading, spacing: 26) {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionLabel("WINDOWS ENVIRONMENT")
-                VStack(alignment: .leading, spacing: 0) {
-                settingRow("Graphics renderer", detail: "Used by the default Windows environment. For other games, use their graphics recommendation. Quit its Windows software before changing it.") {
-                    Group {
-                        if renderingSnapshot { menuLabel(model.environment?.profile.title ?? "Not set up") }
-                        else {
-                            Menu {
-                                ForEach(model.runtime?.manifest.graphicsProfiles ?? []) { profile in
-                                    Button(profile.title) { model.changeProfile(profile) }
+            if settingsSections.contains(.graphics) {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionLabel("WINDOWS ENVIRONMENT")
+                    VStack(alignment: .leading, spacing: 0) {
+                        settingRow("Graphics renderer", detail: "Used by the default Windows environment. For other games, use their graphics recommendation. Quit its Windows software before changing it.") {
+                            Group {
+                                if renderingSnapshot { menuLabel(model.environment?.profile.title ?? "Not set up") }
+                                else {
+                                    Menu {
+                                        ForEach(model.runtime?.manifest.graphicsProfiles ?? []) { profile in
+                                            Button(profile.title) { model.changeProfile(profile) }
+                                        }
+                                    } label: { menuLabel(model.environment?.profile.title ?? "Not set up") }
+                                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                                 }
-                            } label: { menuLabel(model.environment?.profile.title ?? "Not set up") }
-                                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                            }.disabled(model.busy || model.environment == nil)
                         }
-                    }.disabled(model.busy || model.environment == nil)
-                }
-                Rule().padding(.horizontal, 22)
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach([GraphicsProfile.combined, .metal, .performance, .legacy]) { profile in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(profile.title) · \(profile.subtitle)").font(.system(size: 11, weight: .medium))
-                            Text(profile.explanation).font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-                            if let runtime = model.runtime, !runtime.manifest.supports(profile) {
-                                Text("Not available in this runtime").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                        Rule().padding(.horizontal, 22)
+                        VStack(alignment: .leading, spacing: 14) {
+                            ForEach([GraphicsProfile.combined, .metal, .performance, .legacy]) { profile in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(profile.title) · \(profile.subtitle)").font(.system(size: 11, weight: .medium))
+                                    Text(profile.explanation).font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                                    if let runtime = model.runtime, !runtime.manifest.supports(profile) {
+                                        Text("Not available in this runtime").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                                    }
+                                }
                             }
-                        }
-                    }
-                    Text("Epic and Ubisoft manage their own renderer combination. DirectX 12 is not supported by these modes. Change resolution, visual quality, and frame limits inside each app.")
-                        .font(.system(size: 10)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-                }.padding(22)
-                }.panel()
+                            Text("Epic and Ubisoft manage their own renderer combination. DirectX 12 is not supported by these modes. Change resolution, visual quality, and frame limits inside each app.")
+                                .font(.system(size: 10)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        }.padding(22)
+                    }.panel()
+                }
             }
-            if model.environment != nil {
+            if settingsSections.contains(.drive) {
                 VStack(spacing: 0) {
                     settingRow("Windows C: drive", detail: "Installed apps, imported files, and Windows user folders.") {
                         Button("Open in Finder") { model.showWindowsDrive() }.buttonStyle(SecondaryButton())
                     }
                 }.panel()
             }
-            VStack(alignment: .leading, spacing: 12) {
-                sectionLabel("WINDOWS STEAM")
-                VStack(spacing: 0) {
-                    settingRow("Steam client", detail: "Your account, library, and store.") {
+            if settingsSections.contains(.steam) {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionLabel("WINDOWS STEAM")
+                    VStack(spacing: 0) {
+                        settingRow("Steam client", detail: "Your account, library, and store.") {
+                            if model.steamInstalled {
+                                Button("Open") { model.openSteam() }.buttonStyle(SecondaryButton())
+                                Button("Quit") { model.stop(force: false) }.buttonStyle(SecondaryButton())
+                            } else {
+                                Button("Set up") { model.setup() }.buttonStyle(SecondaryButton()).disabled(model.host?.supported != true)
+                            }
+                        }
                         if model.steamInstalled {
-                            Button("Open") { model.openSteam() }.buttonStyle(SecondaryButton())
-                            Button("Quit") { model.stop(force: false) }.buttonStyle(SecondaryButton())
-                        } else {
-                            Button("Set up") { model.setup() }.buttonStyle(SecondaryButton()).disabled(model.host?.supported != true)
+                            Rule().padding(.horizontal, 22)
+                            settingRow("Downloaded games", detail: "Open the installed games folder in Finder.") {
+                                Button { model.openDownloadsFolder() } label: { Label("Open download folder", systemImage: "folder") }.buttonStyle(SecondaryButton())
+                            }
+                            Rule().padding(.horizontal, 22)
+                            settingRow("Steam Downloads", detail: "Manage download progress and updates in Steam.") {
+                                Button { model.openSteamDownloads() } label: { Label("Steam Downloads", systemImage: "arrow.up.right") }.buttonStyle(SecondaryButton())
+                            }
                         }
-                    }
-                    if model.steamInstalled {
-                        Rule().padding(.horizontal, 22)
-                        settingRow("Downloaded games", detail: "Open the installed games folder in Finder.") {
-                            Button { model.openDownloadsFolder() } label: { Label("Open download folder", systemImage: "folder") }.buttonStyle(SecondaryButton())
-                        }
-                        Rule().padding(.horizontal, 22)
-                        settingRow("Steam Downloads", detail: "Manage download progress and updates in Steam.") {
-                            Button { model.openSteamDownloads() } label: { Label("Steam Downloads", systemImage: "arrow.up.right") }.buttonStyle(SecondaryButton())
-                        }
-                    }
-                }.panel().disabled(model.busy)
+                    }.panel().disabled(model.busy)
+                }
             }
-            VStack(alignment: .leading, spacing: 12) {
-                sectionLabel("WINDOWS EPIC GAMES")
-                VStack(spacing: 0) {
-                    settingRow("Epic Games Launcher", detail: "Your Epic account, library, and store.") {
-                        Button(model.epicInstalled ? "Open Epic" : "Set up Epic") { model.openEpic() }.buttonStyle(SecondaryButton())
-                    }
-                    if model.epicInstalled {
-                        Rule().padding(.horizontal, 22)
-                        settingRow("Launch support", detail: "Installs Epic components needed by Play. Quit Windows games and launchers before repairing.") {
-                            Button("Repair launch support") { model.repairEpicLaunchSupport() }.buttonStyle(SecondaryButton())
+            if settingsSections.contains(.epic) {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionLabel("WINDOWS EPIC GAMES")
+                    VStack(spacing: 0) {
+                        settingRow("Epic Games Launcher", detail: "Your Epic account, library, and store.") {
+                            Button(model.epicInstalled ? "Open Epic" : "Set up Epic") { model.openEpic() }.buttonStyle(SecondaryButton())
                         }
-                        Rule().padding(.horizontal, 22)
-                        settingRow("Graphics", detail: "DXMT handles DirectX 10–11; DXVK handles DirectX 9 when available. The launcher manages this combination.") {
-                            Text("Managed").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        if model.epicInstalled {
+                            Rule().padding(.horizontal, 22)
+                            settingRow("Launch support", detail: "Installs Epic components needed by Play. Quit Windows games and launchers before repairing.") {
+                                Button("Repair launch support") { model.repairEpicLaunchSupport() }.buttonStyle(SecondaryButton())
+                            }
+                            Rule().padding(.horizontal, 22)
+                            settingRow("Graphics", detail: "DXMT handles DirectX 10–11; DXVK handles DirectX 9 when available. The launcher manages this combination.") {
+                                Text("Managed").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                            }
+                            Rule().padding(.horizontal, 22)
+                            settingRow("Downloaded games", detail: "Default install folder. Each game's menu opens its actual files.") {
+                                Button("Open download folder") { model.openEpicGamesFolder() }.buttonStyle(SecondaryButton())
+                            }
+                            Rule().padding(.horizontal, 22)
+                            settingRow("Epic downloads", detail: "Open Epic, then use its Downloads control for progress and updates.") {
+                                Button("Open Epic") { model.openEpicDownloads() }.buttonStyle(SecondaryButton())
+                            }
                         }
-                        Rule().padding(.horizontal, 22)
-                        settingRow("Downloaded games", detail: "Default install folder. Each game's menu opens its actual files.") {
-                            Button("Open download folder") { model.openEpicGamesFolder() }.buttonStyle(SecondaryButton())
-                        }
-                        Rule().padding(.horizontal, 22)
-                        settingRow("Epic downloads", detail: "Open Epic, then use its Downloads control for progress and updates.") {
-                            Button("Open Epic") { model.openEpicDownloads() }.buttonStyle(SecondaryButton())
-                        }
-                    }
-                }.panel().disabled(model.busy)
+                    }.panel().disabled(model.busy)
+                }
             }
-            VStack(alignment: .leading, spacing: 12) {
-                sectionLabel("OTHER PLATFORMS")
+            if settingsSections.contains(.platforms) {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionLabel("OTHER PLATFORMS")
+                    VStack(spacing: 0) {
+                        settingRow("Xbox Cloud Gaming", detail: "Stream supported titles in your browser. Account, plan, region, and controller requirements vary. These are not local downloads.") {
+                            Link("Open Xbox Cloud", destination: URL(string: "https://www.xbox.com/play")!).buttonStyle(SecondaryButton())
+                        }
+                        Rule().padding(.horizontal, 22)
+                        settingRow("Minecraft Bedrock", detail: "A local preview using its own WineGDK runtime and Microsoft sign-in. Requires an owned Windows edition; availability depends on the included backend.") {
+                            Button("Open Minecraft…") { model.showingMinecraft = true }.buttonStyle(SecondaryButton())
+                        }
+                    }.panel()
+                }
+            }
+            if settingsSections.contains(where: { $0.isAdvanced }) {
                 VStack(spacing: 0) {
-                    settingRow("Xbox Cloud Gaming", detail: "Stream supported titles in your browser. Account, plan, region, and controller requirements vary. These are not local downloads.") {
-                        Link("Open Xbox Cloud", destination: URL(string: "https://www.xbox.com/play")!).buttonStyle(SecondaryButton())
-                    }
-                    Rule().padding(.horizontal, 22)
-                    settingRow("Minecraft Bedrock", detail: "A local preview using its own WineGDK runtime and Microsoft sign-in. Requires an owned Windows edition; availability depends on the included backend.") {
-                        Button("Open Minecraft…") { model.showingMinecraft = true }.buttonStyle(SecondaryButton())
-                    }
+                    if settingsQuery.isEmpty {
+                        Button { advancedExpanded.toggle() } label: { advancedHeader }
+                            .buttonStyle(.plain).accessibilityValue(showAdvancedSettings ? "Expanded" : "Collapsed")
+                    } else { advancedHeader.accessibilityAddTraits(.isHeader) }
+                    if showAdvancedSettings { Rule(); advanced.frame(maxWidth: .infinity, alignment: .leading).padding(22) }
                 }.panel()
             }
-            VStack(spacing: 0) {
-                Button { advancedExpanded.toggle() } label: {
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Advanced").font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.ink)
-                            Text("Recovery, runtime, and diagnostics").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            if settingsSections.contains(.backups) || settingsSections.contains(.uninstall) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if settingsSections.contains(.backups) {
+                        settingRow("Backups", detail: "Manual only. Includes the default Windows environment and its games and apps.") {
+                            HStack(spacing: 8) {
+                                Button("Create backup…") { manualBackupConfirmation = true }
+                                    .buttonStyle(SecondaryButton()).disabled(model.environment == nil)
+                                Button("Clear backups…") { clearBackupsConfirmation = true }.buttonStyle(SecondaryButton())
+                            }
                         }
-                        Spacer()
-                        Image(systemName: advancedExpanded || previewAdvanced ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.muted)
-                    }.padding(22).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityValue(advancedExpanded || previewAdvanced ? "Expanded" : "Collapsed")
-                if advancedExpanded || previewAdvanced { Rule(); advanced.padding(22) }
-            }.panel()
-            VStack(alignment: .leading, spacing: 0) {
-                settingRow("Backups", detail: "Manual only. Includes the default Windows environment and its games and apps.") {
-                    HStack(spacing: 8) {
-                        Button("Create backup…") { manualBackupConfirmation = true }
-                            .buttonStyle(SecondaryButton()).disabled(model.environment == nil)
-                        Button("Clear backups…") { clearBackupsConfirmation = true }.buttonStyle(SecondaryButton())
                     }
-                }
-                Rule().padding(.horizontal, 22)
-                settingRow("Uninstall crossedover", detail: "Remove crossedover, Windows apps, games, saves, and app data.") {
-                    Button("Uninstall…") { uninstallConfirmation = true }.buttonStyle(SecondaryButton())
-                }
-            }.panel().disabled(model.busy)
+                    if settingsSections.contains(.backups) && settingsSections.contains(.uninstall) { Rule().padding(.horizontal, 22) }
+                    if settingsSections.contains(.uninstall) {
+                        settingRow("Uninstall crossedover", detail: "Remove crossedover, Windows apps, games, saves, and app data.") {
+                            Button("Uninstall…") { uninstallConfirmation = true }.buttonStyle(SecondaryButton())
+                        }
+                    }
+                }.panel().disabled(model.busy)
+            }
+            if settingsSections.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("No settings found").font(.system(size: 16, weight: .medium))
+                    Text("Try graphics, downloads, Minecraft, or backups.")
+                        .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Button("Clear search") { settingsSearchText = ""; settingsSearchFocused = true }
+                        .buttonStyle(SecondaryButton())
+                }.padding(.vertical, 32)
+            }
             Text("crossedover \(AppVersion.current)").font(.system(size: 10)).foregroundStyle(Palette.muted)
         }
     }
 
     private var advanced: some View {
         VStack(alignment: .leading, spacing: 26) {
-            if let environment = model.environment {
+            if settingsSections.contains(.recovery), let environment = model.environment {
                 VStack(alignment: .leading, spacing: 12) {
                     detailHeading("Recovery")
                     Text("Quit Steam, Epic, games, and Windows apps before restoring or repairing. Full environment backups are manual only; small copies of changed settings are kept for recovery.").font(.system(size: 11)).foregroundStyle(Palette.muted)
@@ -877,44 +989,49 @@ struct ContentView: View {
                     }.disabled(model.busy)
                     Button("Force quit environment…") { forceStopConfirmation = true }.buttonStyle(TextButton()).disabled(model.busy)
                 }
-                Rule()
             }
-            VStack(alignment: .leading, spacing: 12) {
-                detailHeading("Runtime")
-                Text(model.runtime?.manifest.name ?? "No runtime installed").font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled)
-                HStack(spacing: 8) {
-                    Button("Import runtime…") { model.importRuntime() }.buttonStyle(SecondaryButton())
-                    if model.bundledRuntime != nil && model.environment != nil {
-                        Button("Use included runtime…") { pendingIncludedRuntime = true }.buttonStyle(SecondaryButton())
-                    }
-                    let alternatives = model.runtimes.filter { model.environment != nil && $0.id != model.environment?.runtimeID }
-                    if !alternatives.isEmpty {
-                        if renderingSnapshot { menuLabel("Switch runtime…") }
-                        else {
-                            Menu {
-                                ForEach(alternatives) { runtime in
-                                    Button("Use \(runtime.manifest.name)") { pendingRuntime = runtime }
-                                }
-                            } label: { menuLabel("Switch runtime…") }
-                                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            if settingsSections.contains(.runtime) {
+                if settingsSections.contains(.recovery) { Rule() }
+                VStack(alignment: .leading, spacing: 12) {
+                    detailHeading("Runtime")
+                    Text(model.runtime?.manifest.name ?? "No runtime installed").font(.system(size: 11)).foregroundStyle(Palette.muted).textSelection(.enabled)
+                    HStack(spacing: 8) {
+                        Button("Import runtime…") { model.importRuntime() }.buttonStyle(SecondaryButton())
+                        if model.bundledRuntime != nil && model.environment != nil {
+                            Button("Use included runtime…") { pendingIncludedRuntime = true }.buttonStyle(SecondaryButton())
                         }
-                    }
-                }.disabled(model.busy)
-            }
-            Rule()
-            VStack(alignment: .leading, spacing: 12) {
-                detailHeading("Support")
-                HStack(spacing: 8) {
-                    Button("Diagnostics…") { model.showDiagnostics() }.buttonStyle(SecondaryButton())
-                    Button("Show backups") { NSWorkspace.shared.open(model.paths.backups) }.buttonStyle(SecondaryButton())
+                        let alternatives = model.runtimes.filter { model.environment != nil && $0.id != model.environment?.runtimeID }
+                        if !alternatives.isEmpty {
+                            if renderingSnapshot { menuLabel("Switch runtime…") }
+                            else {
+                                Menu {
+                                    ForEach(alternatives) { runtime in
+                                        Button("Use \(runtime.manifest.name)") { pendingRuntime = runtime }
+                                    }
+                                } label: { menuLabel("Switch runtime…") }
+                                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                            }
+                        }
+                    }.disabled(model.busy)
                 }
-                if let host = model.host {
-                    Text("macOS \(host.osVersion) · \(host.memoryGB) GB memory").font(.system(size: 11)).foregroundStyle(Palette.muted)
-                    ForEach(host.blockers, id: \.self) { Text($0).font(.system(size: 11)).foregroundStyle(Palette.muted) }
+            }
+            if settingsSections.contains(.support) {
+                if settingsSections.contains(.recovery) || settingsSections.contains(.runtime) { Rule() }
+                VStack(alignment: .leading, spacing: 12) {
+                    detailHeading("Support")
+                    HStack(spacing: 8) {
+                        Button("Diagnostics…") { model.showDiagnostics() }.buttonStyle(SecondaryButton())
+                        Button("Show backups") { NSWorkspace.shared.open(model.paths.backups) }.buttonStyle(SecondaryButton())
+                    }
+                    if let host = model.host {
+                        Text("macOS \(host.osVersion) · \(host.memoryGB) GB memory").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        ForEach(host.blockers, id: \.self) { Text($0).font(.system(size: 11)).foregroundStyle(Palette.muted) }
+                    }
                 }
             }
         }
     }
+
 
     @ViewBuilder private func recoveryActions(_ environment: ManagedEnvironment) -> some View {
         Button("Restore…") { model.restoreBackup() }.buttonStyle(SecondaryButton())

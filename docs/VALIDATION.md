@@ -1,5 +1,36 @@
 # Validation record
 
+## v1.4.1 Settings search — October 19, 2026
+
+The owner requested Settings search and a v1.4.1 release. Version/build are
+1.4.1/27. The native interface filters settings groups by local names/topic
+keywords; multiple words must match the same group. Matching Advanced controls
+appear without changing the saved disclosure state. The header/search field
+remain outside the scroll document, with independent Settings/library queries,
+contextual ⌘F, clearing/Escape, outside-click focus dismissal and an empty state.
+
+All 92 core tests in 16 suites passed, and the final release build passed.
+App-owned ImageRenderer previews were inspected for Diagnostics, multiword
+Backups results, Graphics and no results at widths from 840 to 1600 points.
+An owned hidden-window native scroll fixture passed query/clear resets with
+unchanged document size, result shrink, width/height resize and scroll geometry.
+Its 240-step synthetic scroll CPU timing was p95 0.029 ms, maximum 0.124 ms;
+these are layout timings, not displayed frame rates. No user-app window was
+inspected or controlled, and interactive keyboard/focus behavior is not claimed
+as owner-confirmed by these checks.
+
+Release/site checks, website generation and all three website tests passed.
+The app's strict deep ad-hoc signature and both bundled inventories verified.
+The packaged Windows runtime manifest is identical to v1.4.0, preserving its
+game/Steam/VAC setup; no game/runtime compatibility policy was changed. The DMG
+checksum and mounted version/build, offline guide and Applications link passed.
+DMG SHA-256:
+`768dd6f94163ad79d4f7d3034a22b25f5176fc7fdde2c665e933a78259a3874a`.
+Evidence is local under `.cache/settings-1.4.1/`. The release includes the same
+runtime/backend sources as v1.4.0, with existing validation limits unchanged.
+GitHub Pages permits the exact v1.4.1 tag in addition to main and the prior
+v1.4.0 tag, so publication can refresh the site and aggregate download counter.
+
 ## v1.4.0 release preparation — October 19, 2026
 
 Following the confirmed CS2 online test, the owner requested publishing v1.4.0

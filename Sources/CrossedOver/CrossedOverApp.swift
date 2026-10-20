@@ -116,7 +116,7 @@ struct CrossedOverApp: App {
             }
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .textEditing) {
-                Button("Search Library…") { librarySearch?() }.keyboardShortcut("f").disabled(librarySearch == nil)
+                Button("Find…") { librarySearch?() }.keyboardShortcut("f").disabled(librarySearch == nil)
             }
             CommandMenu("Game Launchers") {
                 if let model { GameLauncherActions(model: model) }

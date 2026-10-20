@@ -1,6 +1,6 @@
-# crossedover v1.4.0 quickstart
+# crossedover v1.4.1 quickstart
 
-**v1.4.0 includes the Windows runtime and separate Minecraft Bedrock backend.** Owned-account installation and local gameplay have passed initial testing. Broader compatibility and release validation remain open. Downloads require repository access while the GitHub repository is private.
+**v1.4.1 adds Settings search and includes the Windows runtime and separate Minecraft Bedrock backend.** Owned-account installation and local gameplay have passed initial testing. Broader compatibility and release validation remain open. Downloads require repository access while the GitHub repository is private.
 
 ## Before you start
 
@@ -10,7 +10,7 @@ Compatibility is experimental. TrackMania Nations Forever is the first tested de
 
 ## Install
 
-1. Download **crossedover-1.4.0.dmg** from the [v1.4.0 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.0).
+1. Download **crossedover-1.4.1.dmg** from the [v1.4.1 release](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.1).
 2. Open it and drag **crossedover** onto **Applications**.
 3. Eject the disk image and open crossedover from Applications.
 
@@ -23,6 +23,10 @@ If macOS offers to install Rosetta 2, follow Apple's prompt.
 ## Games and Apps
 
 **Games** contains completed Steam/Epic installs, Minecraft Bedrock after setup in v1.4.0, and Windows game cards you add yourself. **Apps** contains tools, mod managers, installers, and other Windows software. Both libraries support search (⌘F), refresh (⌘R), and grid/list views.
+
+## Search Settings
+
+Open **Settings** and type in **Search settings**, or press **⌘F**. Search for names or topics such as graphics, Steam downloads, diagnostics, runtime, or backups. Matching groups appear as you type, including Advanced controls without opening that section first. The field stays visible while scrolling. Use its clear button or Escape to restore all settings; click elsewhere to leave the field. Games and Apps keep their own separate library search.
 
 ## Add a Windows .exe
 
