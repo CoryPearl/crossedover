@@ -43,9 +43,12 @@ After promotion to permanent storage and crossedover's launch setup, window
 controls worked and FPS reached 60 with periodic drops, but VAC rejected the
 session again. The current source restores Steam's normal overlay handling for
 CS2, removing crossedover's prior forced-disable entries while retaining the
-window/input policy and graphics preset. A repeat online test is pending; the
-regression cause and sustained 60 FPS are not yet confirmed. TrackMania keeps
+window/input policy and graphics preset. The owner confirmed the corrected run works, including window controls, online
+matchmaking and satisfactory performance. A sustained minimum frame rate across
+all hardware remains unmeasured. TrackMania keeps
 its separate, previously tested overlay optimization.
-Rendering recommendations do not certify online play.
+Retained Windows environments now contribute to one library, with game actions
+routed to their owning installation and duplicate titles preferring the default.
+Rendering recommendations do not certify every game’s online compatibility.
 See [backend build instructions](../runtime/bedrock/README.md) and the
 [validation record](VALIDATION.md).

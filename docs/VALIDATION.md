@@ -1,5 +1,55 @@
 # Validation record
 
+## Confirmed CS2 correction and retained library recovery — October 19, 2026
+
+After restoring normal Steam overlay handling, the owner reports **“everything
+is working good now”** in response to the online-matchmaking repeat test. Window
+buttons were explicitly confirmed in the preceding run; the latest response
+confirms the corrected configuration is satisfactory, including online play.
+This is owner testing, not an automated sustained minimum-FPS measurement.
+The working CS2 environment remains
+`E6AAFFD1-27B6-4323-85E8-05E08B9BA60C`, with the tuned preset and native window
+policy intact. No game binaries or anti-cheat components were modified.
+
+The owner then noticed Brawlhalla and TrackMania were missing. Promotion had
+switched the whole default environment and excluded its retained predecessor
+from discovery. The files were preserved, but the library should have kept
+them accessible. The old environment was reconnected with an explicit default
+selection for the new CS2 environment, without moving or copying any game files.
+
+The GUI now discovers registered environments in preferred order, hides duplicate
+store/game IDs in favor of that environment, and preserves each card's owning
+environment. Launch, management, files/Documents, renderer recommendations,
+runtime selection and process observation use the card's owner. Imported app
+cards retain their environments. Steam opens in the default environment;
+Epic/Ubisoft reuse the environment containing their launcher. Stop targets all
+registered Windows environments, while uninstall checks each before removing
+managed data. Manual backup and general Settings remain scoped to the default
+environment and now describe that scope explicitly.
+
+**91 tests in 16 suites passed.** Expanded retained-library coverage also passed
+after adding a colliding Epic/Steam ID: the new CS2 copy wins, TrackMania/Epic
+stay in the old environment, and uninstalling the preferred copy exposes the
+retained copy without changing the default. Release compilation passed. Actual
+discovery reports Brawlhalla and TrackMania in the preserved environment, one CS2
+card in the new environment, and existing files for all three. The new local
+preview passed strict deep signature verification; its owned SwiftUI render
+was reviewed and shows all three cards with artwork, sizes and Play buttons.
+No real game window was captured, and no Windows game/launcher was stopped for
+this metadata/library correction. Minecraft's separate data was not moved.
+
+Evidence: `.cache/cs2-performance/restored-library.json` and
+`restored-library.png`. This validates restored discovery and routing; the two
+older games have not been replayed after this GUI change. No push or public
+release was performed.
+
+The final local preview is
+`.cache/previews/crossedover-1.4.0-library-verified.app`. Its release build and
+strict deep signature check passed, along with version/link/offline-guide checks,
+Pages generation and all three website tests. The final GUI was reopened without
+stopping any Windows process. A metadata check confirms the new CS2 environment
+is still preferred and Minecraft's installed game folder is intact.
+
 ## CS2 requested cache/signature repair trial — October 19, 2026
 
 The owner requested a Proton prefix/shader-cache reset, Proton Experimental,

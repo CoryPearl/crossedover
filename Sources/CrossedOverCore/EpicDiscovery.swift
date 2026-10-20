@@ -81,6 +81,15 @@ public struct EpicDiscovery: Sendable {
 
 /// A transient rewrite in one launcher must not erase the other store's library.
 public enum GameLibrary {
+    /// Discover all retained installations. Prefer the selected environment for
+    /// duplicates, but keep each visible card's original environment ID/path.
+    public static func discover(environments: [ManagedEnvironment], paths: AppPaths, previous: [GameInstallation] = [], refreshSizes: Bool = false) -> [GameInstallation] {
+        var seen = Set<String>()
+        return environments.flatMap { environment in
+            discover(environment: environment, prefix: paths.prefix(environment), previous: previous.filter { $0.environmentID == environment.id }, refreshSizes: refreshSizes)
+        }.filter { seen.insert($0.sessionAppID).inserted }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
     public static func discover(environment: ManagedEnvironment, prefix: URL, previous: [GameInstallation] = [], refreshSizes: Bool = false) -> [GameInstallation] {
         let steam = (try? SteamDiscovery().discover(environment: environment, prefix: prefix)) ?? previous.filter { $0.store == .steam && $0.environmentID == environment.id }
         let epic = (try? EpicDiscovery().discover(environment: environment, prefix: prefix)) ?? previous.filter { $0.store == .epic && $0.environmentID == environment.id }

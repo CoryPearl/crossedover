@@ -90,9 +90,9 @@ Known game presets may request a dedicated renderer. Quit Windows software befor
 
 CS2 launches at 1280×720 with a 60 FPS cap. Its next launch applies a one-time performance preset: low textures, particles, shaders and shadow quality, with MSAA and ambient occlusion off. Dynamic shadows, sound, window controls and the display-move mouse fix are retained. FSR remains disabled for clarity. Later in-game settings are preserved. Fullscreen can raise the rendering resolution on a larger monitor; check **Video → Resolution** before comparing match FPS. A 60 FPS cap is a target, not a guaranteed minimum. Only a small original video-settings file is retained for recovery; no full environment backup is created.
 
-If CS2 reports missing or invalid signatures, quit the game and use **⋯ → Verify game files…**, then check Steam's progress. Secure matchmaking is unconfirmed in the current local build; a successful offline Practice match does not validate VAC-secured play. See [Steam's verification instructions](https://help.steampowered.com/en/faqs/view/0C48-FCBD-DA71-93EB/).
+If CS2 reports missing or invalid signatures, quit the game and use **⋯ → Verify game files…**, then check Steam's progress. An offline Practice match alone does not validate VAC-secured play. See [Steam's verification instructions](https://help.steampowered.com/en/faqs/view/0C48-FCBD-DA71-93EB/).
 
-Current v1.4.0 testing reports CS2 around 60 FPS with periodic drops on the M4 Mac. The owner joined an online match in a clean Steam environment, then encountered a VAC signature warning after crossedover’s launch setup. The current source restores Steam’s normal overlay handling while retaining native window controls and the graphics preset; a repeat online test is pending. The exact regression cause and sustained frame rate are not established. The renderer recommendation does not certify online compatibility.
+The latest v1.4.0 CS2 test confirms working native window controls, online matchmaking and satisfactory performance on the tested M4 after restoring Steam’s normal overlay handling. The preset targets 60 FPS; an automated sustained minimum has not been measured. Retained Windows environments share one library, with each game opening from its original environment. The preferred environment supplies duplicate titles and receives new installs; existing games do not need to be copied or downloaded again.
 
 ## Mods
 
@@ -114,7 +114,7 @@ The app is in **/Applications/crossedover.app**. Games, imported apps, Windows S
 ~/Library/Application Support/CrossedOver/
 ~~~
 
-Use **Open download folder** to browse installed games, or **⋯ → Show game files** for one game. Full environment backups are **manual only** and include all installed games, apps, and imported cards. Restoring a pre-v1.1.0 backup clears imported cards because that version did not have them. Small copies of settings changed by crossedover are kept for recovery. Use **Settings → Backups → Create backup** for a manual copy. **Clear backups**, beside it, moves old full backups to Trash; your current games and saves stay in place. Empty Trash in Finder to reclaim space (APFS clones can share blocks).
+Use **Open download folder** to browse installed games, or **⋯ → Show game files** for one game. Environment backups are **manual only** and cover the selected default environment, including its games, apps, and imported cards. Other retained environments remain separate. Restoring a pre-v1.1.0 backup clears imported cards because that version did not have them. Small copies of settings changed by crossedover are kept for recovery. Use **Settings → Backups → Create backup** for a manual copy. **Clear backups**, beside it, moves old full backups to Trash; your current games and saves stay in place. Empty Trash in Finder to reclaim space (APFS clones can share blocks).
 
 ### Uninstall everything
 

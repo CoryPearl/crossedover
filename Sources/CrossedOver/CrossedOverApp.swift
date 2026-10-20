@@ -11,9 +11,10 @@ import CrossedOverCore
                 // or changing interrupted-operation records.
                 let model = try AppModel(recoverInterruptedOperations: false)
                 model.runtimes = try await model.runtimeManager.installed()
-                model.environment = try model.store.all(ManagedEnvironment.self, kind: "environment").first
-                if let environment = model.environment {
-                    model.games = GameLibrary.discover(environment: environment, prefix: model.paths.prefix(environment))
+                model.environment = try model.store.libraryEnvironments().first
+                if model.environment != nil {
+                    model.environments = try model.store.libraryEnvironments()
+                    model.games = GameLibrary.discover(environments: model.environments, paths: model.paths)
                 }
                 model.windowsApps = try model.store.all(WindowsApp.self, kind: "windowsApp")
                 model.windowsRuns = try model.store.all(WindowsAppRun.self, kind: "windowsRun").sorted { $0.startedAt > $1.startedAt }

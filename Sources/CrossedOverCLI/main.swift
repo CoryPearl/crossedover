@@ -27,8 +27,18 @@ import CrossedOverCore
         let runtimes = RuntimeManager(paths: paths), environments = EnvironmentManager(paths: paths, store: store)
         let command = arguments.first ?? "help"
         func current() throws -> ManagedEnvironment {
-            guard let environment = try store.all(ManagedEnvironment.self, kind: "environment").first else { throw CrossedOverError.message("Create an environment first.") }
+            guard let environment = try store.libraryEnvironments().first else { throw CrossedOverError.message("Create an environment first.") }
             return environment
+        }
+        func installedEnvironment(store gameStore: GameStore, appID: String? = nil) throws -> ManagedEnvironment {
+            for environment in try store.libraryEnvironments() {
+                let prefix = paths.prefix(environment)
+                if let appID {
+                    if GameLibrary.discover(environment: environment, prefix: prefix).contains(where: { ($0.store == gameStore || (gameStore == .ubisoft && $0.managementStore == .ubisoft)) && ($0.appID == appID || $0.epicPartnerGameID == appID) }) { return environment }
+                } else if gameStore == .epic, (try? EpicService.executable(prefix: prefix)) != nil { return environment }
+                else if gameStore == .ubisoft, (try? UbisoftDiscovery.executable(prefix: prefix)) != nil { return environment }
+            }
+            return try current()
         }
         switch command {
         case "minecraft-status", "minecraft":
@@ -87,15 +97,15 @@ import CrossedOverCore
             try await EpicService(paths: paths).install(environment: environment, runtime: runtime)
             print("Windows Epic Games Launcher installed.")
         case "epic-repair":
-            let environment = try current(), runtime = try await runtimes.resolve(environment.runtimeID)
+            let environment = try installedEnvironment(store: .epic), runtime = try await runtimes.resolve(environment.runtimeID)
             try await EpicService(paths: paths).repairLaunchSupport(environment: environment, runtime: runtime)
             print("Epic launch support is ready.")
         case "epic", "epic-launch", "epic-manage", "epic-verify", "epic-uninstall", "epic-downloads":
-            let environment = try current()
+            let environment = try installedEnvironment(store: .epic, appID: arguments.count > 1 ? arguments[1] : nil)
             let operation: SupervisorRequest.Command = ["epic": .openEpic, "epic-launch": .launchEpicGame, "epic-manage": .epicProperties, "epic-verify": .verifyEpicGame, "epic-uninstall": .uninstallEpicGame, "epic-downloads": .epicDownloads][command]!
             try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: operation, appID: arguments.count > 1 ? arguments[1] : nil)))
         case "ubisoft", "ubisoft-launch", "ubisoft-manage", "ubisoft-verify", "ubisoft-uninstall":
-            let environment = try current()
+            let environment = try installedEnvironment(store: .ubisoft, appID: arguments.count > 1 ? arguments[1] : nil)
             let operation: SupervisorRequest.Command = ["ubisoft": .openUbisoft, "ubisoft-launch": .launchUbisoftGame, "ubisoft-manage": .ubisoftProperties, "ubisoft-verify": .verifyUbisoftGame, "ubisoft-uninstall": .uninstallUbisoftGame][command]!
             try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: operation, appID: arguments.count > 1 ? arguments[1] : nil)))
         case "steam-install":
@@ -103,7 +113,8 @@ import CrossedOverCore
             try await SteamService(paths: paths).install(environment: environment, runtime: runtime)
             print("Windows Steam installed.")
         case "steam", "install", "launch", "uninstall", "properties", "verify", "downloads", "stop", "force-stop", "observe":
-            let environment = try current()
+            let environment = try ["launch", "uninstall", "properties", "verify"].contains(command)
+                ? installedEnvironment(store: .steam, appID: arguments.count > 1 ? arguments[1] : nil) : current()
             let operation: SupervisorRequest.Command = ["steam": .openSteam, "install": .installGame, "launch": .launchGame, "uninstall": .uninstallGame, "properties": .gameProperties, "verify": .verifyGame, "downloads": .openDownloads, "stop": .shutdown, "force-stop": .forceStop, "observe": .observe][command]!
             let appID = arguments.count > 1 ? arguments[1] : nil
             try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: operation, appID: appID)))
@@ -117,11 +128,11 @@ import CrossedOverCore
             try printJSON(app)
         case "app-run":
             guard arguments.count == 2, let id = UUID(uuidString: arguments[1]) else { throw CrossedOverError.message("app-run requires a Windows app card UUID.") }
-            let environment = try current()
-            try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: environment.id, command: .launchWindowsApp, windowsAppID: id, runID: UUID())))
+            guard let app = try store.all(WindowsApp.self, kind: "windowsApp").first(where: { $0.id == id }),
+                  try store.libraryEnvironments().contains(where: { $0.id == app.environmentID }) else { throw CrossedOverError.message("Windows app environment not found.") }
+            try await printJSON(SupervisorEngine.execute(SupervisorRequest(root: paths.root, environmentID: app.environmentID, command: .launchWindowsApp, windowsAppID: id, runID: UUID())))
         case "games", "renderers":
-            let environment = try current()
-            let games = GameLibrary.discover(environment: environment, prefix: paths.prefix(environment))
+            let games = GameLibrary.discover(environments: try store.libraryEnvironments(), paths: paths)
             if command == "games" { try printJSON(games) }
             else {
                 let recommendations = await RendererRecommendations.shared.recommendations(for: games, recipes: try ResourceCatalog.recipes())

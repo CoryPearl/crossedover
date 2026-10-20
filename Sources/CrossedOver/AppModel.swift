@@ -15,6 +15,7 @@ import CrossedOverCore
     var host: HostReport?
     var runtimes: [InstalledRuntime] = []
     var environment: ManagedEnvironment?
+    var environments: [ManagedEnvironment] = []
     var games: [GameInstallation] = []
     var rendererRecommendations: [String: RendererRecommendation] = [:]
     var windowsApps: [WindowsApp] = []
@@ -59,6 +60,23 @@ import CrossedOverCore
     var runtime: InstalledRuntime? {
         if let environment { return runtimes.first { $0.id == environment.runtimeID } }
         return runtimes.first { $0.id.hasPrefix("wine-11.0-cx") } ?? runtimes.first
+    }
+    var knownEnvironments: [ManagedEnvironment] {
+        if let environment { return [environment] + environments.filter { $0.id != environment.id } }
+        return environments
+    }
+    func environment(id: UUID) -> ManagedEnvironment? { knownEnvironments.first { $0.id == id } }
+    func environment(for game: GameInstallation) -> ManagedEnvironment? { environment(id: game.environmentID) }
+    func runtime(for game: GameInstallation) -> InstalledRuntime? {
+        guard let environment = environment(for: game) else { return nil }
+        return runtimes.first { $0.id == environment.runtimeID }
+    }
+    private func launcherEnvironment(_ store: GameStore) -> ManagedEnvironment? {
+        if store == .steam { return environment }
+        return knownEnvironments.first {
+            let prefix = paths.prefix($0)
+            return store == .epic ? (try? EpicService.executable(prefix: prefix)) != nil : (try? UbisoftDiscovery.executable(prefix: prefix)) != nil
+        }
     }
     var bundledRuntime: URL? {
         guard let url = Bundle.main.resourceURL?.appendingPathComponent("BundledRuntime"),
@@ -123,9 +141,14 @@ import CrossedOverCore
     }
     func updateSteamLocation() {
         steamPath = environment.flatMap { try? SteamService.steamExecutable(prefix: paths.prefix($0)) }
-        epicPath = environment.flatMap { try? EpicService.executable(prefix: paths.prefix($0)) }
-        ubisoftPath = environment.flatMap { try? UbisoftDiscovery.executable(prefix: paths.prefix($0)) }
-        logoPath = steamPath.flatMap { try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: $0.deletingLastPathComponent()).path }
+        epicPath = launcherEnvironment(.epic).flatMap { try? EpicService.executable(prefix: paths.prefix($0)) }
+        ubisoftPath = launcherEnvironment(.ubisoft).flatMap { try? UbisoftDiscovery.executable(prefix: paths.prefix($0)) }
+        logoPath = knownEnvironments.compactMap { item -> String? in
+            guard let client = try? SteamService.steamExecutable(prefix: paths.prefix(item)),
+                  let file = try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: client.deletingLastPathComponent()),
+                  FileManager.default.fileExists(atPath: file.path) else { return nil }
+            return file.path
+        }.first
     }
     var setupStep: Int { runtimes.isEmpty ? 0 : environment == nil ? 1 : !steamInstalled ? 2 : 3 }
     var supervisor: SupervisorClient {
@@ -150,7 +173,7 @@ import CrossedOverCore
         await refresh()
         Task { await self.checkMinecraft() }
         if let previous = sessions.first(where: { ["requested", "running", "unknown"].contains($0.state) && $0.endedAt == nil }),
-           let game = games.first(where: { $0.sessionAppID == previous.appID && $0.environmentID == previous.environmentID }), let environment {
+           let game = games.first(where: { $0.sessionAppID == previous.appID && $0.environmentID == previous.environmentID }), let environment = environment(id: previous.environmentID) {
             currentSession = previous; monitor(game: game, environment: environment)
         }
         refreshTask = Task { [weak self] in
@@ -170,20 +193,30 @@ import CrossedOverCore
             // Keep them off the UI actor and leave unchanged observable values alone.
             let paths = paths, store = store
             let snapshot = try await Task.detached(priority: .utility) {
-                let environment = try store.all(ManagedEnvironment.self, kind: "environment").first
+                let environments = try store.libraryEnvironments()
+                let environment = environments.first
                 var games: [GameInstallation] = []
-                if let environment {
-                    let saved = try store.all(GameInstallation.self, kind: "game").filter { $0.environmentID == environment.id }
+                for item in environments {
+                    let saved = try store.all(GameInstallation.self, kind: "game").filter { $0.environmentID == item.id }
                         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                    games = GameLibrary.discover(environment: environment, prefix: paths.prefix(environment), previous: saved, refreshSizes: refreshSizes)
-                    if games != saved { try store.replaceGames(games, environmentID: environment.id) }
+                    let discovered = GameLibrary.discover(environment: item, prefix: paths.prefix(item), previous: saved, refreshSizes: refreshSizes)
+                    if discovered != saved { try store.replaceGames(discovered, environmentID: item.id) }
+                    games += discovered
                 }
+                var seen = Set<String>()
+                games = games.filter { seen.insert($0.sessionAppID).inserted }
+                    .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
                 let operations = try store.all(OperationRecord.self, kind: "operation").sorted { $0.updatedAt > $1.updatedAt }
                 let sessions = try store.all(LaunchSession.self, kind: "session").sorted { $0.startedAt > $1.startedAt }
                 let steam = environment.flatMap { try? SteamService.steamExecutable(prefix: paths.prefix($0)) }
-                let logo = steam.flatMap { try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: $0.deletingLastPathComponent()).path }
+                let logo = environments.compactMap { item -> String? in
+                    guard let client = try? SteamService.steamExecutable(prefix: paths.prefix(item)),
+                          let file = try? FileSafety.containedURL("appcache/librarycache/11020/logo.png", in: client.deletingLastPathComponent()),
+                          FileManager.default.fileExists(atPath: file.path) else { return nil }
+                    return file.path
+                }.first
                 let apps = try store.all(WindowsApp.self, kind: "windowsApp")
-                    .filter { $0.environmentID == environment?.id }
+                    .filter { app in environments.contains { $0.id == app.environmentID } }
                     .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
                 var runs = try store.all(WindowsAppRun.self, kind: "windowsRun").sorted { $0.startedAt > $1.startedAt }
                 for index in runs.indices where runs[index].isActive && runs[index].workerIsMissing {
@@ -191,13 +224,14 @@ import CrossedOverCore
                     runs[index].detail = "The launch worker stopped. You can try opening the app again."
                     try store.put(runs[index], kind: "windowsRun", id: runs[index].id.uuidString)
                 }
-                let epic = environment.flatMap { try? EpicService.executable(prefix: paths.prefix($0)) }
-                let ubisoft = environment.flatMap { try? UbisoftDiscovery.executable(prefix: paths.prefix($0)) }
-                return (environment, games, operations, sessions, steam, logo, apps, runs, epic, ubisoft)
+                let epic = environments.compactMap { try? EpicService.executable(prefix: paths.prefix($0)) }.first
+                let ubisoft = environments.compactMap { try? UbisoftDiscovery.executable(prefix: paths.prefix($0)) }.first
+                return (environment, games, operations, sessions, steam, logo, apps, runs, epic, ubisoft, environments)
             }.value
             guard !Task.isCancelled else { return }
             if runtimes != installed { runtimes = installed }
             if environment != snapshot.0 { environment = snapshot.0 }
+            if environments != snapshot.10 { environments = snapshot.10 }
             if games != snapshot.1 { games = snapshot.1 }
             if operations != snapshot.2 { operations = snapshot.2 }
             if sessions != snapshot.3 { sessions = snapshot.3 }
@@ -387,7 +421,9 @@ import CrossedOverCore
     }
     func openEpic(reinstall: Bool = false) {
         perform(reinstall ? "Repair Windows Epic" : "Open Windows Epic") {
-            let environment = try await self.prepareWindowsEnvironment()
+            let environment: ManagedEnvironment
+            if let existing = self.launcherEnvironment(.epic) { environment = existing }
+            else { environment = try await self.prepareWindowsEnvironment() }
             let runtime = try await self.runtimeManager.resolve(environment.runtimeID)
             if reinstall || (try? EpicService.executable(prefix: self.paths.prefix(environment))) == nil {
                 self.progress = "Downloading and installing Epic's Windows launcher…"
@@ -402,7 +438,7 @@ import CrossedOverCore
         }
     }
     func repairEpicLaunchSupport() {
-        guard let environment else { return }
+        guard let environment = launcherEnvironment(.epic) else { return }
         perform("Repair Epic launch support") {
             let runtime = try await self.runtimeManager.resolve(environment.runtimeID)
             self.progress = "Installing Epic’s required components. Keep Windows apps closed…"
@@ -411,7 +447,7 @@ import CrossedOverCore
         }
     }
     func openUbisoft() {
-        guard let environment, ubisoftInstalled else {
+        guard let environment = launcherEnvironment(.ubisoft), ubisoftInstalled else {
             error = "Ubisoft Connect is not installed. Open a supported Ubisoft game in Epic to complete its launcher setup."
             return
         }
@@ -421,14 +457,14 @@ import CrossedOverCore
         }
     }
     func openEpicDownloads() {
-        guard let environment else { openEpic(); return }
+        guard let environment = launcherEnvironment(.epic) else { openEpic(); return }
         perform("Open Epic downloads") {
             let reply = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .epicDownloads))
             self.notice = reply.message
         }
     }
     func openEpicGamesFolder() {
-        guard let environment else { return }
+        guard let environment = launcherEnvironment(.epic) else { return }
         do {
             let folder = try EpicService.gamesFolder(prefix: paths.prefix(environment))
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -456,7 +492,7 @@ import CrossedOverCore
         panel.canChooseDirectories = false; panel.canChooseFiles = true; panel.allowsMultipleSelection = false
         panel.title = app == nil ? "Add a Windows app or game" : "Choose the program to launch"
         panel.message = app == nil ? "Choose a local .exe. It will be added as a library card." : "After an installer finishes, choose the installed program’s .exe inside the Windows C: drive."
-        if app != nil, let environment { panel.directoryURL = paths.prefix(environment).appendingPathComponent("drive_c") }
+        if let app, let environment = environment(id: app.environmentID) { panel.directoryURL = paths.prefix(environment).appendingPathComponent("drive_c") }
         panel.allowedContentTypes = [UTType(filenameExtension: "exe") ?? .data]
         guard panel.runModal() == .OK else { return nil }
         return panel.url
@@ -464,7 +500,9 @@ import CrossedOverCore
     func addWindowsApp(_ url: URL, name: String, category: LibraryCategory, includeFolder: Bool, replacing: WindowsApp? = nil) {
         perform(replacing == nil ? "Add \(name)" : "Update \(name)") {
             try await Task.detached(priority: .utility) { try WindowsApps.validateExecutable(url) }.value
-            let environment = try await self.prepareWindowsEnvironment()
+            let environment: ManagedEnvironment
+            if let replacing, let existing = self.environment(id: replacing.environmentID) { environment = existing }
+            else { environment = try await self.prepareWindowsEnvironment() }
             self.progress = "Adding \(name) to your library…"
             let paths = self.paths, store = self.store
             let task = Task.detached(priority: .utility) {
@@ -502,7 +540,7 @@ import CrossedOverCore
         }
     }
     func showWindowsAppFiles(_ app: WindowsApp) {
-        guard let environment, environment.id == app.environmentID else { return }
+        guard let environment = environment(id: app.environmentID) else { return }
         do {
             // Allow opening the containing folder even when the executable was moved or deleted.
             let folder = try FileSafety.containedURL((app.executablePath as NSString).deletingLastPathComponent, in: paths.prefix(environment))
@@ -526,7 +564,7 @@ import CrossedOverCore
         }
     }
     func manage(_ game: GameInstallation, command: SupervisorRequest.Command) {
-        guard let environment, [.uninstallGame, .gameProperties, .verifyGame].contains(command) else { return }
+        guard let environment = environment(for: game), [.uninstallGame, .gameProperties, .verifyGame].contains(command) else { return }
         if [.uninstallGame, .verifyGame].contains(command), currentSession != nil {
             error = "Close the game before managing its files."; return
         }
@@ -563,7 +601,7 @@ import CrossedOverCore
         } catch { self.error = error.localizedDescription }
     }
     func showGameFiles(_ game: GameInstallation) {
-        guard let environment else { return }
+        guard let environment = environment(for: game) else { return }
         let prefix = paths.prefix(environment)
         Task {
             do {
@@ -580,8 +618,8 @@ import CrossedOverCore
             } catch { self.error = error.localizedDescription }
         }
     }
-    func showWindowsDocuments() {
-        guard let environment else { return }
+    func showWindowsDocuments(for game: GameInstallation? = nil) {
+        guard let environment = game.flatMap({ self.environment(for: $0) }) ?? environment else { return }
         do {
             let folder = try GameFiles.documents(prefix: paths.prefix(environment))
             guard NSWorkspace.shared.open(folder) else { throw CrossedOverError.message("Finder couldn't open Windows Documents.") }
@@ -596,8 +634,8 @@ import CrossedOverCore
     }
     func requestLaunch(_ game: GameInstallation) {
         guard currentSession == nil else { error = "Finish the current session before launching another game."; return }
-        if let recipe = recipe(for: game), let environment, !(recipe.compatibleProfiles ?? [recipe.profile]).contains(environment.profile) {
-            guard runtime?.manifest.supports(recipe.profile) == true else {
+        if let recipe = recipe(for: game), let environment = environment(for: game), !(recipe.compatibleProfiles ?? [recipe.profile]).contains(environment.profile) {
+            guard runtime(for: game)?.manifest.supports(recipe.profile) == true else {
                 error = "\(game.name) targets the \(recipe.profile.title) profile. Import the updated bundled runtime from Settings before trying this profile."; return
             }
             pendingGame = game
@@ -606,7 +644,7 @@ import CrossedOverCore
     func launch(_ game: GameInstallation, restart: Bool) {
         guard !busy, !stoppingWindows, currentSession == nil else { return }
         pendingGame = nil
-        guard let environment, let runtime else { return }
+        guard let environment = environment(for: game), let runtime = runtime(for: game) else { return }
         openingGame = game
         let sessionID = UUID()
         perform("Launch \(game.name)", id: sessionID, completionState: "requested") {
@@ -693,7 +731,7 @@ import CrossedOverCore
         }
     }
     func stopLaunchAndCloseWindows() {
-        guard !stoppingWindows, let environment else { return }
+        guard !stoppingWindows, !knownEnvironments.isEmpty else { return }
         stoppingWindows = true; pendingGame = nil
         let observation = monitorTask
         observation?.cancel()
@@ -707,11 +745,14 @@ import CrossedOverCore
             self.perform("Stop and close Windows", allowsStopping: true) {
                 defer { self.stoppingWindows = false; self.openingGame = nil; self.openingApp = nil }
                 do {
-                    _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .forceStop))
+                    for environment in self.knownEnvironments {
+                        _ = try await self.supervisor.send(SupervisorRequest(root: self.paths.root, environmentID: environment.id, command: .forceStop))
+                    }
                     self.currentSession = nil
                     self.notice = "Windows games, apps, and launchers are closed."
                 } catch {
-                    if let session = self.currentSession, let game = self.games.first(where: { $0.sessionAppID == session.appID }) {
+                    if let session = self.currentSession, let game = self.games.first(where: { $0.sessionAppID == session.appID && $0.environmentID == session.environmentID }),
+                       let environment = self.environment(id: session.environmentID) {
                         self.monitor(game: game, environment: environment)
                     }
                     throw error
@@ -727,8 +768,9 @@ import CrossedOverCore
         guard let environment, let runtime else { return }
         perform("Repair environment") { _ = try await self.environmentManager.repair(environment, runtime: runtime); self.notice = "Environment repaired. You can retry setup or launch an app." }
     }
-    func changeProfile(_ profile: GraphicsProfile) {
-        guard let environment, let runtime else { return }
+    func changeProfile(_ profile: GraphicsProfile, for game: GameInstallation? = nil) {
+        guard let environment = game.flatMap({ self.environment(for: $0) }) ?? environment,
+              let runtime = runtimes.first(where: { $0.id == environment.runtimeID }) else { return }
         perform("Change graphics profile") {
             _ = try await self.environmentManager.setProfile(profile, environment: environment, runtime: runtime)
             self.notice = "Graphics profile changed to \(profile.title)."

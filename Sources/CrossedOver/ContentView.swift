@@ -81,7 +81,7 @@ struct ContentView: View {
         .confirmationDialog("Create a full manual backup?", isPresented: $manualBackupConfirmation, titleVisibility: .visible) {
             Button("Create backup") { model.backup() }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("This copies the entire Windows environment, including all games, apps, and local saves, and can take substantial disk space. No backups are created automatically.") }
+        } message: { Text("This copies the default Windows environment and its games, apps, and local saves. Other retained environments stay separate. Backups can take substantial disk space and are never automatic.") }
         .confirmationDialog("Change the Windows runtime?", isPresented: Binding(get: { pendingRuntime != nil || pendingIncludedRuntime }, set: { if !$0 { pendingRuntime = nil; pendingIncludedRuntime = false } }), titleVisibility: .visible) {
             if let runtime = pendingRuntime { Button("Change runtime") { pendingRuntime = nil; model.useRuntime(runtime) } }
             if pendingIncludedRuntime { Button("Use included runtime") { pendingIncludedRuntime = false; model.useIncludedRuntime() } }
@@ -335,7 +335,7 @@ struct ContentView: View {
         }.padding(16)
     }
     private func beginImport(_ app: WindowsApp? = nil) {
-        if let app, let environment = model.environment {
+        if let app, let environment = model.environment(id: app.environmentID) {
             let url = model.paths.prefix(environment).appendingPathComponent(app.executablePath)
             executableDraft = WindowsAppDraft(url: url, category: app.category, app: app)
         } else if let url = model.chooseWindowsExecutable() {
@@ -662,16 +662,16 @@ struct ContentView: View {
                     Text(recommendation.detail)
                         .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                     if game.store == .steam {
-                        Text("Current shared renderer: " + (model.environment?.profile.title ?? "Not configured"))
+                        Text("Current renderer: " + (model.environment(for: game)?.profile.title ?? "Not configured"))
                             .font(.system(size: 12))
-                        if let profile = recommendation.profile, model.runtime?.manifest.supports(profile) != true {
+                        if let profile = recommendation.profile, model.runtime(for: game)?.manifest.supports(profile) != true {
                             Text("The selected runtime does not include this renderer. Import a runtime with the required graphics backend before applying it.")
                                 .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                         }
-                        if let profile = recommendation.profile, model.environment?.profile != profile {
-                            Button("Use \(profile.title)") { model.changeProfile(profile) }.buttonStyle(SecondaryButton())
-                                .disabled(model.busy || model.currentSession != nil || model.runtime?.manifest.supports(profile) != true)
-                            Text("Quit Windows games, apps and launchers first. This changes the shared renderer for Steam and added apps; your other games keep their recommendations.")
+                        if let profile = recommendation.profile, model.environment(for: game)?.profile != profile {
+                            Button("Use \(profile.title)") { model.changeProfile(profile, for: game) }.buttonStyle(SecondaryButton())
+                                .disabled(model.busy || model.currentSession != nil || model.runtime(for: game)?.manifest.supports(profile) != true)
+                            Text("Quit Windows games, apps and launchers first. This changes the renderer for games and apps in this Windows environment; other environments keep their settings.")
                                 .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                         }
                     } else {
@@ -707,7 +707,7 @@ struct ContentView: View {
                     .font(.system(size: 12)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button("Game folder") { moddingGame = nil; model.showGameFiles(game) }.buttonStyle(SecondaryButton())
-                    Button("Windows Documents") { moddingGame = nil; model.showWindowsDocuments() }.buttonStyle(SecondaryButton())
+                    Button("Windows Documents") { moddingGame = nil; model.showWindowsDocuments(for: game) }.buttonStyle(SecondaryButton())
                 }
             }
             if game.store == .steam {
@@ -737,7 +737,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionLabel("WINDOWS ENVIRONMENT")
                 VStack(alignment: .leading, spacing: 0) {
-                settingRow("Graphics renderer", detail: "Used by Steam and added Windows software. Quit all Windows software before changing it.") {
+                settingRow("Graphics renderer", detail: "Used by the default Windows environment. For other games, use their graphics recommendation. Quit its Windows software before changing it.") {
                     Group {
                         if renderingSnapshot { menuLabel(model.environment?.profile.title ?? "Not set up") }
                         else {
@@ -849,7 +849,7 @@ struct ContentView: View {
                 if advancedExpanded || previewAdvanced { Rule(); advanced.padding(22) }
             }.panel()
             VStack(alignment: .leading, spacing: 0) {
-                settingRow("Backups", detail: "Manual only. Full backups include every installed game and app.") {
+                settingRow("Backups", detail: "Manual only. Includes the default Windows environment and its games and apps.") {
                     HStack(spacing: 8) {
                         Button("Create backup…") { manualBackupConfirmation = true }
                             .buttonStyle(SecondaryButton()).disabled(model.environment == nil)
@@ -1195,7 +1195,7 @@ private struct WindowsAppEditor: View {
         _category = State(initialValue: draft.category)
     }
     private var alreadyInWindows: Bool {
-        guard let environment = model.environment else { return false }
+        guard let environment = draft.app.flatMap({ model.environment(id: $0.environmentID) }) ?? model.environment else { return false }
         return url.standardizedFileURL.path.hasPrefix(model.paths.prefix(environment).appendingPathComponent("drive_c").standardizedFileURL.path + "/")
     }
     var body: some View {

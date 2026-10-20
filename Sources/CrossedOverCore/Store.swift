@@ -31,6 +31,22 @@ public final class Store: Sendable {
     public func remove(kind: String, id: String) throws {
         try database.write { db in try db.execute(sql: "DELETE FROM records WHERE kind=? AND id=?", arguments: [kind, id]) }
     }
+    /// Put the preferred environment first without relying on UUID sort order.
+    /// Other retained environments still own their installed games and launchers.
+    public func libraryEnvironments() throws -> [ManagedEnvironment] {
+        let environments = try all(ManagedEnvironment.self, kind: "environment")
+        let preferred = try all(UUID.self, kind: "defaultEnvironment").first
+        return environments.sorted {
+            if ($0.id == preferred) != ($1.id == preferred) { return $0.id == preferred }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+    }
+    public func setDefaultEnvironment(_ id: UUID) throws {
+        guard try all(ManagedEnvironment.self, kind: "environment").contains(where: { $0.id == id }) else {
+            throw CrossedOverError.message("Environment not found.")
+        }
+        try put(id, kind: "defaultEnvironment", id: "selected")
+    }
     /// Game sessions share an ID with their launch operation. Commit both
     /// together so a delivered request is never mistaken for a started game.
     @discardableResult public func putSession(_ session: LaunchSession) throws -> Bool {

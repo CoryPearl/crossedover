@@ -34,7 +34,7 @@ Wine supplies Windows APIs and process loading. Graphics components translate su
 
 The app's Wine build comes from CodeWeavers' published FOSS sources, with the patches in this repository. It does not copy the proprietary CrossOver application. Store clients, credentials, and games are not bundled. Steam, Epic, and Ubisoft retain their own sign-in, entitlement, download, update, and DRM flows. Minecraft uses Microsoft sign-in and the owner’s real content license.
 
-Steam, Epic, Ubisoft, and imported `.exe` cards use **one shared Windows environment**. Minecraft Bedrock uses a separate WineGDK runtime, account helper, prefix, and worlds under `Bedrock/`. Environment UUIDs do not imply that the interface offers arbitrary per-game environments.
+New Windows installs use a **preferred default environment**. Previously installed environments can remain registered in the same library: game/app cards keep their owning environment, and duplicate store games prefer the default installation. Steam opens in the default environment; Epic and Ubisoft open where their launchers are installed. Minecraft Bedrock uses a separate WineGDK runtime, account helper, prefix, and worlds under `Bedrock/`. The interface does not offer arbitrary environment creation or an environment picker.
 
 ## 2. Architecture and source map
 
@@ -155,7 +155,7 @@ GRDB wraps a SQLite `records` table with a composite primary key of `(kind, id)`
 | `windowsApp` | Persistent imported executable card and its category/path |
 | `windowsRun` | Imported executable launch, worker PID, state, timestamps, and exit code |
 
-Refreshing installations transactionally replaces only `game` records belonging to the current environment. It cannot erase imported `windowsApp` cards. Restoring a backup commits its environment metadata and imported cards together in a SQLite transaction.
+Refreshing installations transactionally replaces only `game` records belonging to each scanned environment. A `defaultEnvironment` record selects the preferred environment without relying on UUID sort order; cross-environment discovery deduplicates by store and game ID while preserving the owning environment for launches, management, files, renderer choices and session observation. It cannot erase imported `windowsApp` cards. Restoring a backup commits its environment metadata and imported cards together in a SQLite transaction.
 
 Legacy game records without a `source` decode as Steam. Store-aware session identifiers prevent a Steam App ID from colliding with an Epic or Ubisoft identifier. UI preferences such as library view mode use macOS preferences rather than the Windows registry.
 
@@ -436,7 +436,7 @@ An unsuccessful migration preserves files and blocks normal launches until repai
 
 **Close Windows Steam** requests Steam shutdown. The bottom **Stop & close Windows** action cancels and awaits the native operation, cancels game observation, then requests Force Stop. The bottom bar appears from the initial Play click, persists through requested/running/unknown tracking, and also covers imported executable runs. Its indeterminate spinner does not estimate a completion percentage. A running process does not prove a usable game window.
 
-Force Stop waits up to ten seconds for an in-flight preparation/worker lock, invalidates queued workers, sends `wineserver -k`, and confirms shutdown with `wineserver -w`. Only after confirmation does it mark active sessions and app runs for this environment stopped. If shutdown fails, the UI retains the session and resumes observation so the user can retry. Late observer replies cannot restore cancelled tracking. The client permits a longer, 60-second timeout for this action. It uses the selected runtime and prefix, rather than a global Wine kill; all games, apps, and launchers in this shared environment close, and unsaved work can be lost. Native Mac launchers are outside this action.
+Force Stop waits up to ten seconds for an in-flight preparation/worker lock, invalidates queued workers, sends `wineserver -k`, and confirms shutdown with `wineserver -w`. Only after confirmation does it mark active sessions and app runs for this environment stopped. If shutdown fails, the UI retains the session and resumes observation so the user can retry. Late observer replies cannot restore cancelled tracking. The client permits a longer, 60-second timeout for this action. It uses the selected runtime and prefix, rather than a global Wine kill; the GUI sends this scoped action to every registered Windows environment, closing their games, apps, and launchers; unsaved work can be lost. Native Mac launchers are outside this action.
 
 ## 14. Security, accounts, and diagnostics
 
@@ -554,7 +554,7 @@ CI runs core tests, native builds, thin packaging, and website checks. It does n
 
 The implementation has a local library, not a universal Windows compatibility guarantee. Important boundaries are:
 
-- One shared environment and one tracked store-game session in the GUI.
+- One default environment for new installs, retained installations in a unified library, and one tracked store-game session in the GUI.
 - Contained C:-based store discovery, not arbitrary external Windows drive libraries.
 - Supported x86/x64 `.exe` cards, not general Windows ARM packages or automatic dependency resolution.
 - Experimental Direct3D 9/10/11 coverage; no exposed DirectX 12 profile or validated general Direct3D 12 launch route.

@@ -81,4 +81,43 @@ struct GameLibraryTests {
         let recipe = GameRecipe(appID: "730", name: "Fixture", profile: .performance, executableNames: ["CS2.EXE"], status: "fixture", notes: "")
         #expect(try GameProcessDetection.executableNames(for: game, recipe: recipe) == ["cs2.exe"])
     }
+
+    @Test func preferredEnvironmentKeepsRetainedGamesAndRoutesDuplicateToNewInstallation() throws {
+        let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
+        let paths = AppPaths(root: root); try paths.prepare()
+        let store = try Store(url: root.appendingPathComponent("library.sqlite"))
+        var old = ManagedEnvironment(runtimeID: "old-runtime")
+        old.id = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!; old.state = "ready"
+        var fresh = ManagedEnvironment(runtimeID: "new-runtime")
+        fresh.id = UUID(uuidString: "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")!; fresh.state = "ready"
+        for environment in [old, fresh] { try store.put(environment, kind: "environment", id: environment.id.uuidString) }
+        let oldSteam = paths.prefix(old).appendingPathComponent("drive_c/Program Files (x86)/Steam")
+        let newSteam = paths.prefix(fresh).appendingPathComponent("drive_c/Program Files (x86)/Steam")
+        try manifest("730", name: "Counter-Strike 2", directory: "CS2", library: oldSteam)
+        try manifest("730", name: "Counter-Strike 2", directory: "CS2", library: newSteam)
+        try manifest("11020", name: "TrackMania", directory: "TrackMania", library: oldSteam)
+        let epicFolder = paths.prefix(old).appendingPathComponent("drive_c/Epic Games/Brawlhalla")
+        try FileManager.default.createDirectory(at: epicFolder, withIntermediateDirectories: true)
+        try Data().write(to: epicFolder.appendingPathComponent("Brawlhalla.exe"))
+        let manifests = paths.prefix(old).appendingPathComponent(EpicDiscovery.manifestsPath)
+        try FileManager.default.createDirectory(at: manifests, withIntermediateDirectories: true)
+        // Store-qualified identity must keep an Epic ID that collides with Steam.
+        let item: [String: Any] = ["AppName": "730", "DisplayName": "Brawlhalla", "InstallLocation": #"C:\Epic Games\Brawlhalla"#,
+                                   "LaunchExecutable": "Brawlhalla.exe", "InstallSize": 1]
+        try JSONSerialization.data(withJSONObject: item).write(to: manifests.appendingPathComponent("brawl.item"))
+        try store.setDefaultEnvironment(fresh.id)
+        #expect(try store.libraryEnvironments().map(\.id) == [fresh.id, old.id])
+        var games = GameLibrary.discover(environments: try store.libraryEnvironments(), paths: paths)
+        #expect(games.count == 3)
+        #expect(games.first { $0.store == .steam && $0.appID == "730" }?.environmentID == fresh.id)
+        #expect(games.first { $0.store == .epic && $0.appID == "730" }?.environmentID == old.id)
+        #expect(games.first { $0.appID == "11020" }?.environmentID == old.id)
+        #expect(games.first { $0.appID == "11020" }?.directory.hasPrefix(paths.prefix(old).path) == true)
+        // If the preferred copy is uninstalled, the retained installation remains available.
+        try FileManager.default.removeItem(at: newSteam.appendingPathComponent("steamapps/appmanifest_730.acf"))
+        games = GameLibrary.discover(environments: try store.libraryEnvironments(), paths: paths)
+        #expect(games.first { $0.store == .steam && $0.appID == "730" }?.environmentID == old.id)
+        #expect(try store.libraryEnvironments().first?.id == fresh.id)
+        #expect(throws: CrossedOverError.self) { try store.setDefaultEnvironment(UUID()) }
+    }
 }
