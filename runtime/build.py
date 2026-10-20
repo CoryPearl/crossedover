@@ -193,6 +193,12 @@ def main():
     if applied.returncode != 0:
         run(["git", "apply", "--check", visible_controls_patch], cwd=SOURCE)
         run(["git", "apply", visible_controls_patch], cwd=SOURCE)
+    follow_clip_patch = PROJECT / "runtime/patches/winemac-follow-window-cursor-clipping.patch"
+    applied = subprocess.run(["git", "apply", "--reverse", "--check", follow_clip_patch],
+                             cwd=SOURCE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if applied.returncode != 0:
+        run(["git", "apply", "--check", follow_clip_patch], cwd=SOURCE)
+        run(["git", "apply", follow_clip_patch], cwd=SOURCE)
     dependency_extract = PROJECT / ".cache/community-runtime"
     if not (dependency_extract / "Wine Devel.app").exists():
         extract(dependency_archive, dependency_extract)

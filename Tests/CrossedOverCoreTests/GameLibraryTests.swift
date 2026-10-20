@@ -8,6 +8,7 @@ struct GameLibraryTests {
         #expect(shooter.contains("AppDefaults\\cs2.exe\\Mac Driver"))
         #expect(shooter.contains("\"AllowCursorClipping\"=\"Y\""))
         #expect(shooter.contains("\"CursorClippingLocksWindows\"=\"N\""))
+        #expect(shooter.contains("\"CursorClippingFollowsWindow\"=\"Y\""))
         #expect(shooter.contains("\"FullscreenIgnoreMaxSize\"=\"Y\""))
         #expect(shooter.contains("\"NativeFullscreen\"=\"Y\""))
         #expect(shooter.contains("\"CaptureDisplaysForFullscreen\"=\"N\""))
@@ -16,6 +17,7 @@ struct GameLibraryTests {
         #expect(demo.contains("AppDefaults\\TmForever.exe\\Mac Driver"))
         #expect(demo.contains("\"AllowCursorClipping\"=\"N\""))
         #expect(demo.contains("\"NativeFullscreen\"=\"N\""))
+        #expect(demo.contains("\"CursorClippingFollowsWindow\"=\"N\""))
         #expect(GameWindowingPolicy.registry(for: "99999") == nil)
     }
     private func temporary() throws -> URL {

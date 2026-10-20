@@ -1,0 +1,123 @@
+Subject: winemac: Let selected games follow native window geometry with full-client capture.
+
+Default off. Preserve explicit, released and application-replaced clipping.
+The owned fixture geometry hook requires both a test flag and its receiving title.
+
+--- a/dlls/winemac.drv/macdrv_cocoa.h
++++ b/dlls/winemac.drv/macdrv_cocoa.h
+@@ -144,6 +144,7 @@
+ extern bool native_fullscreen;
+ extern bool force_window_controls;
+ extern bool cursor_clipping_locks_windows;
++extern bool cursor_clipping_follows_window;
+ extern bool use_precise_scrolling;
+ extern int gl_surface_mode;
+ extern CFDictionaryRef localized_strings;
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -60,6 +60,7 @@
+ bool native_fullscreen = false;
+ bool force_window_controls = false;
+ bool cursor_clipping_locks_windows = true;
++bool cursor_clipping_follows_window = false;
+ bool use_precise_scrolling = true;
+ int gl_surface_mode = GL_SURFACE_IN_FRONT_OPAQUE;
+ bool retina_enabled = false;
+@@ -383,6 +384,9 @@
+ 
+     if (!get_config_key(hkey, appkey, "AllowCursorClipping", buffer, sizeof(buffer)))
+         allow_cursor_clipping = IS_OPTION_TRUE(buffer[0]);
++
++    if (!get_config_key(hkey, appkey, "CursorClippingFollowsWindow", buffer, sizeof(buffer)))
++        cursor_clipping_follows_window = IS_OPTION_TRUE(buffer[0]);
+ 
+     if (!get_config_key(hkey, appkey, "CursorClippingLocksWindows", buffer, sizeof(buffer)))
+         cursor_clipping_locks_windows = IS_OPTION_TRUE(buffer[0]);
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -1788,6 +1788,19 @@
+ }
+ 
+ 
++/* Use the same per-monitor coordinate space for the client and ClipCursor.
++ * A previous full-client clip is the only rectangle we may follow. Explicit
++ * subrectangles, point capture, released capture and other windows stay alone. */
++static BOOL get_client_screen_clip(HWND hwnd, RECT *client, RECT *clip)
++{
++    UINT context = NtUserSetThreadDpiAwarenessContext(NTUSER_DPI_PER_MONITOR_AWARE_V2);
++    UINT dpi = NtUserGetWinMonitorDpi(hwnd, MDT_DEFAULT);
++    BOOL valid = NtUserGetClientRect(hwnd, client, dpi) && NtUserGetClipCursor(clip);
++    if (valid) NtUserMapWindowPoints(hwnd, 0, (POINT *)client, 2, dpi);
++    NtUserSetThreadDpiAwarenessContext(context);
++    return valid && !IsRectEmpty(client);
++}
++
+ /***********************************************************************
+  *              macdrv_window_frame_changed
+  *
+@@ -1799,7 +1812,8 @@
+     RECT rect;
+     UINT flags = SWP_NOACTIVATE | SWP_NOZORDER;
+     int width, height;
+-    BOOL being_dragged;
++    BOOL being_dragged, follow_clip = FALSE;
++    RECT old_client, old_clip;
+ 
+     if (!hwnd) return;
+     if (!(data = get_win_data(hwnd))) return;
+@@ -1842,11 +1856,29 @@
+     if (!(flags & SWP_NOSIZE) || !(flags & SWP_NOMOVE))
+     {
+         bool send_sizemove = !event->window_frame_changed.in_resize && !being_dragged && !event->window_frame_changed.skip_size_move_loop;
++        if (cursor_clipping_follows_window && hwnd == NtUserGetForegroundWindow() &&
++            get_client_screen_clip(hwnd, &old_client, &old_clip))
++            follow_clip = EqualRect(&old_client, &old_clip);
++
+         if (send_sizemove)
+             send_message(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+         NtUserSetRawWindowPos(hwnd, rect, flags, FALSE);
+         if (send_sizemove)
+             send_message(hwnd, WM_EXITSIZEMOVE, 0, 0);
++        if (follow_clip)
++        {
++            RECT client, clip;
++            /* WM_SIZE/WM_EXITSIZEMOVE may release or replace capture. Honor it.
++             * Otherwise stale screen coordinates clamp clicks to the old
++             * client after a native move/resize or fullscreen transition. */
++            if (hwnd == NtUserGetForegroundWindow() &&
++                get_client_screen_clip(hwnd, &client, &clip) && EqualRect(&clip, &old_clip))
++            {
++                UINT context = NtUserSetThreadDpiAwarenessContext(NTUSER_DPI_PER_MONITOR_AWARE_V2);
++                NtUserClipCursor(&client);
++                NtUserSetThreadDpiAwarenessContext(context);
++            }
++        }
+     }
+ }
+ 
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -3603,6 +3603,23 @@
+         titleString = [NSString stringWithCharacters:title length:length];
+     else
+         titleString = @"";
++    OnMainThreadAsync(^{
++        /* Geometry changes are restricted to this receiving owned fixture. */
++        if (getenv("CROSSEDOVER_INPUT_BOUNDS_PROBE") &&
++            [titleString hasPrefix:@"Owned crossedover input:"])
++        {
++            NSRect frame = [window frame];
++            NSString *action = [titleString substringFromIndex:[@"Owned crossedover input:" length]];
++            if ([action isEqualToString:@"grow"])
++            { frame.size.width += 180; frame.size.height += 100; }
++            else if ([action isEqualToString:@"move"])
++            { frame.origin.x += 110; frame.origin.y -= 35; }
++            else if ([action isEqualToString:@"shrink"])
++            { frame.size.width -= 100; frame.size.height -= 60; }
++            [window setFrameAndWineFrame:frame];
++            [window windowDidResize:nil];
++        }
++    });
+     /* Only replace generic Steam host titles, preserving sign-in and dialog titles. */
+     if ([[[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString*)kCFBundleNameKey] isEqualToString:@"crossedover Steam"] &&
+         (![titleString length] || [titleString caseInsensitiveCompare:@"wine"] == NSOrderedSame ||

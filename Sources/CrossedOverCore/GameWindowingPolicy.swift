@@ -19,6 +19,7 @@ public enum GameWindowingPolicy {
         "FullscreenIgnoreMaxSize"="Y"
         "NativeFullscreen"="\(appID == "730" ? "Y" : "N")"
         "CursorClippingLocksWindows"="N"
+        "CursorClippingFollowsWindow"="\(appID == "730" ? "Y" : "N")"
         "AllowImmovableWindows"="N"
         "CaptureDisplaysForFullscreen"="N"
         "WindowsFloatWhenInactive"="none"

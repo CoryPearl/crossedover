@@ -606,3 +606,15 @@ window behavior and clean-machine tests remain separate release checks. See [the
 The Games library checks Minecraft’s offline installation status on startup, library refresh (including ⌘R), and after a setup/play session ends. A ready installation adds a Minecraft card or list row with Play and launcher options, and participates in search, counts and the Minecraft filter. Routine refreshes reuse the verified backend rather than hashing the entire runtime again; Play verifies runtime bytes again. Failed downloads do not add an installed card.
 
 The owned window-controls fixture (`python3 scripts/window-controls-integration.py`) checks actual AppKit close/minimize/zoom button presence and enabled state, fullscreen eligibility and title-bar placement for 32/64-bit windows. Its diagnostic runs only for an explicit test environment flag and owned fixture title, on the receiving window; it does not enumerate or inspect the user’s game windows.
+
+CS2 opts into `CursorClippingFollowsWindow` in its own Mac Driver settings.
+The driver saves a foreground window's full-client capture rectangle before a
+native frame change. After the Win32 move/resize messages finish, it follows the
+new client bounds only if capture still equals the old rectangle. Per-monitor
+DPI context keeps client and cursor coordinates comparable. Smaller/point
+captures, released or replaced captures, and changed foreground windows are
+preserved. Other games retain the default-off policy. The owned input-bounds
+fixture triggers native geometry changes only on its receiving window, gated
+by both an explicit test flag and fixture title; it sends no mouse events and
+never enumerates game windows. Real mixed-display behavior requires its own
+interactive check.

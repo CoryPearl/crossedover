@@ -1,5 +1,48 @@
 # Validation record
 
+## CS2 native move/resize input bounds — October 19, 2026
+
+The owner reports CS2 opened and worked well, but after moving the running game
+from the built-in display to a larger monitor, the pointer could move everywhere
+while clicks missed buttons in much of the game. This report establishes the
+trigger; it does not identify a confirmed graphics/DPI root cause.
+
+An owned native move/resize fixture reproduced stale full-client `ClipCursor`
+bounds with the original driver. The new default-off
+`CursorClippingFollowsWindow` option is enabled only for CS2 by crossedover's
+launch policy. It updates a still-unchanged full-client capture after native
+frame handling. It keeps per-monitor coordinate context and preserves explicit
+subrectangles, point capture, released/replaced capture and foreground changes.
+No display resolution, global DPI or user CS2 video settings are reset.
+
+- Baseline owned 64-bit fixture: move/grow/shrink retain the stale old clip.
+- Patched owned 64-bit and 32-bit fixtures: full-client clips follow native
+  move/grow/shrink. All five explicit/released/replaced negative cases pass.
+- Disabled option: all eight cases preserve the original behavior.
+- Native window-controls regression: all eight eligible/negative cases pass.
+- Swift: **84 tests in 15 suites passed**, including CS2-only option scoping.
+  Repeat patch-build regression passed; release compilation passed.
+- The source runtime rebuilt as
+  `wine-11.0-cx26.3.0-dxmt0.80-d9vk-mvk1.4.2-x87-openal1.25.2-8d2b4c4432`.
+  The v1.4.0/build 26 preview packaged and passed strict deep code-signature
+  verification. The stopped-environment guard allowed runtime selection; the
+  existing Metal profile was preserved and no automatic backup was created.
+  The new app is open and CS2 was requested through the normal launch route;
+  its generated per-game policy enables capture following while retaining
+  shooter cursor capture. Actual second-monitor confirmation remains pending.
+- The final driver patch passes reverse checks alongside the earlier window
+  controls patch. This is synthetic move/resize evidence, not a test with two
+  physical monitors. Actual CS2 secondary-display clicks and aiming remain to
+  be confirmed; no public release or push has occurred.
+
+Evidence: `.cache/input-bounds/`,
+`.cache/input-bounds-a829b5f1-c4e8-411b-a6f0-9a6412ae74cb` (baseline),
+`.cache/input-bounds-6aaa8ae4-6cc8-4f7a-9239-b06e05e33ddd` (64-bit),
+`.cache/input-bounds-1c482758-f44c-424c-a330-4b6933b3f2c3` (32-bit),
+`.cache/input-bounds-bf76a43a-7104-4bdb-a40e-99b5b25457c1` (disabled), and
+`.cache/window-controls-e4ec794e-e4c4-438d-a23b-ffc7b057cbef` (controls).
+Each fixture removed only its own generated runtime and prefix copies.
+
 ## Minecraft signed-package installer — October 19, 2026
 
 Development remains **v1.4.0/build 26**, with no public push/release.
