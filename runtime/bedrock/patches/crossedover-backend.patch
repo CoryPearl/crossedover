@@ -30,7 +30,7 @@ index 101fda3..77c6b27 100755
    --without-gstreamer --without-ffmpeg > "$BUILD/configure.log" 2>&1
  make -j"$JOBS" > "$BUILD/build.log" 2>&1
 diff --git a/launcher/setup.py b/launcher/setup.py
-index 3135712..b3ae58d 100644
+index 3135712..6bb0aba 100644
 --- a/launcher/setup.py
 +++ b/launcher/setup.py
 @@ -21,7 +21,7 @@ import signal
@@ -42,28 +42,52 @@ index 3135712..b3ae58d 100644
  
  # The frozen executable also runs the shipped Python scripts. No system Python
  # or developer tools are required on the user's Mac.
-@@ -48,6 +48,7 @@ ACCOUNT_ERRORS = {
+@@ -48,6 +48,11 @@ ACCOUNT_ERRORS = {
      'catalog_lookup': 'Could not find Minecraft in Microsoft’s Windows catalog. Try again shortly.',
      'account_package': 'Microsoft could not provide the game download for this account. Try again shortly.',
      'package_selection': 'Microsoft returned an unexpected set of game packages. The launcher needs an update.',
 +    'package_transport': 'Microsoft supplied no secure download for this package. Installation was stopped; no game files were installed.',
++    'package_signature': 'Minecraft’s package signature could not be verified. Nothing was installed; retry the download.',
++    'package_integrity': 'Minecraft’s download failed its integrity check. Nothing was installed; retry the download.',
++    'package_integrity_format': 'Minecraft’s package uses an unsupported integrity layout. The launcher needs an update.',
++    'package_space': 'There is not enough free space to download and prepare Minecraft.',
      'package_connection': 'Could not connect to Microsoft’s game download. Check your connection and retry.',
      'package_size': 'Microsoft’s download size differs from its catalog. Try again shortly.',
      'package_cache': 'Could not save the download metadata. Check available disk space and retry.',
-@@ -131,6 +132,12 @@ def account_update(line):
-                 event('busy', 'Downloading Minecraft', f'{done * 100 // total}%', 0.35 + 0.5 * done / total)
- 
- 
+@@ -120,15 +125,30 @@ def account_update(line):
+         event('busy', 'Signing you in', 'If macOS asks, “Always Allow” remembers access to your saved sign-in.', 0.2)
+     elif line.startswith(b'Finding the Windows package'):
+         event('busy', 'Checking your Minecraft purchase', '', 0.3)
++    elif line.startswith(b'Package bytes: '):
++        import re
++        match = re.fullmatch(rb'Package bytes: (\d+)/(\d+)\s*', line)
++        if match:
++            done, total = map(int, match.groups())
++            if 0 <= done <= total and 0 < total <= 32 * 1024 ** 3:
++                event('busy', 'Downloading Minecraft', f'{done * 100 // total}%', 0.3 + 0.35 * done / total)
++    elif line.strip() == b'Verifying Minecraft package.':
++        event('busy', 'Verifying Minecraft', 'Checking the complete download before installation.', 0.66)
+     elif line.startswith(b'Downloading Minecraft '):
+-        event('busy', 'Downloading Minecraft', 'Keep this app open. Minecraft will start when it’s ready.', 0.35)
++        event('busy', 'Downloading Minecraft', 'Preparing the verified game files.', 0.7)
+     elif line.startswith(b'Downloaded ') and b' files.' in line:
+         import re
+         match = re.fullmatch(rb'Downloaded (\d+)/(\d+) files\.\s*', line)
+         if match:
+             done, total = map(int, match.groups())
+             if 0 <= done <= total and total > 0:
+-                event('busy', 'Downloading Minecraft', f'{done * 100 // total}%', 0.35 + 0.5 * done / total)
++                event('busy', 'Downloading Minecraft', f'{done * 100 // total}%', 0.7 + 0.15 * done / total)
++
++
 +class ReviewedAccountError(RuntimeError):
 +    def __init__(self, code):
 +        self.code = code if code in ACCOUNT_ERRORS else 'setup_failed'
 +        super().__init__(ACCOUNT_ERRORS.get(self.code, 'Minecraft setup stopped.'))
-+
-+
- class Cancelled(BaseException):
-     """User cancellation unwinds owned processes without reporting a failure."""
  
-@@ -148,7 +155,7 @@ def stop_command(process):
+ 
+ class Cancelled(BaseException):
+@@ -148,7 +168,7 @@ def stop_command(process):
              process.wait()
  
  
@@ -72,7 +96,7 @@ index 3135712..b3ae58d 100644
      log.write(('\n$ ' + ' '.join(map(str, command)) + '\n').encode())
      log.flush()
      helper_error = None
-@@ -164,7 +171,18 @@ def run(command, log, failure, account_progress=False):
+@@ -164,7 +184,18 @@ def run(command, log, failure, account_progress=False):
                  if line.startswith(b'BEDROCK_ERROR:'):
                      helper_error = ACCOUNT_ERRORS.get(line.strip().split(b':', 1)[1].decode('ascii', errors='replace'))
                  account_update(line)
@@ -91,7 +115,7 @@ index 3135712..b3ae58d 100644
      finally:
          stop_command(process)
          if account_progress and process.stdout:
-@@ -174,10 +192,7 @@ def run(command, log, failure, account_progress=False):
+@@ -174,10 +205,7 @@ def run(command, log, failure, account_progress=False):
  
  
  def validate_install():
@@ -103,7 +127,7 @@ index 3135712..b3ae58d 100644
      version = lambda text: tuple(int(part) for part in text.split('.'))
      if platform.machine() != 'arm64' or version(platform.mac_ver()[0] or '0') < version(minimum):
          raise RuntimeError(f'This build requires an Apple Silicon Mac with macOS {minimum} or later.')
-@@ -236,11 +251,11 @@ def main():
+@@ -236,11 +264,11 @@ def main():
                  with runtime.account(ROOT / 'game', download=not (ROOT / 'game').exists(), progress=account_update):
                      if not ready:
                          install(log)
@@ -118,7 +142,7 @@ index 3135712..b3ae58d 100644
              event('ready', 'Ready to play')
  
  
-@@ -256,5 +271,6 @@ if __name__ == '__main__':
+@@ -256,5 +284,6 @@ if __name__ == '__main__':
      except Cancelled:
          event('cancelled', 'Setup paused', 'Continue when you’re ready.')
      except (OSError, RuntimeError) as error:
@@ -127,43 +151,123 @@ index 3135712..b3ae58d 100644
 +        event('error', code)
          sys.exit(1)
 diff --git a/standalone-helper.rs b/standalone-helper.rs
-index 09be15e..b7d1f63 100644
+index 09be15e..c12338e 100644
 --- a/standalone-helper.rs
 +++ b/standalone-helper.rs
-@@ -32,19 +32,25 @@ fn package_url_allowed(url: &reqwest::Url) -> bool {
-     }
-     match url.scheme() {
-         "https" => true,
+@@ -3,8 +3,9 @@
+ use std::{collections::{HashMap, HashSet}, path::{Component, Path, PathBuf}, process::ExitCode, sync::{Arc, atomic::{AtomicUsize, Ordering}}};
+ use std::os::unix::{ffi::OsStrExt, fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt}};
+ use futures_util::{stream, StreamExt, TryStreamExt};
+-use msixvc::{streaming, xvd::{SegmentFile, XvdFile}};
+-use tokio::{fs::{File, OpenOptions}, io::{AsyncReadExt, AsyncSeekExt}};
++use msixvc::xvd::{SegmentFile, XvdFile};
++#[cfg(test)] use msixvc::streaming;
++use tokio::{fs::{File, OpenOptions}, io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt}};
+ use xodus::models::secrets::Token;
+ use xodus::tokens::{TokenManager, store::TokenStoreError};
+ use xodus::tokens::{backend::{KeychainBackend, MemoryBackend}, store::TokenBackend};
+@@ -15,6 +16,8 @@ use std::sync::Mutex;
+ #[path = "../src/package.rs"] mod package;
+ #[path = "../src/license.rs"] mod license;
+ 
++#[path = "package_integrity.rs"] mod package_integrity;
++
+ type Outcome<T> = Result<T, Box<dyn std::error::Error>>;
+ const PRODUCT: &str = "9NBLGGH2JHXJ";
+ 
+@@ -26,24 +29,23 @@ impl std::fmt::Display for SetupFailure {
+ impl std::error::Error for SetupFailure {}
+ fn failure(code: &'static str) -> Box<dyn std::error::Error> { Box::new(SetupFailure(code)) }
+ 
++// Package requests carry no account headers/cookies. HTTP is limited to the
++// catalog's two official asset origins and is admitted only to the complete
++// signature/hash-tree verifier below. TLS verification is never disabled.
+ fn package_url_allowed(url: &reqwest::Url) -> bool {
+-    if !url.username().is_empty() || url.password().is_some() || url.fragment().is_some() {
+-        return false;
+-    }
+-    match url.scheme() {
+-        "https" => true,
 -        // Microsoft's package catalog returns these HTTP origins. They do not
 -        // serve certificates for these names; changing the scheme breaks TLS.
 -        "http" => matches!(url.host_str(), Some("assets1.xboxlive.com" | "assets2.xboxlive.com"))
 -            && url.port_or_known_default() == Some(80),
-+        // The upstream package integrity gap makes HTTP unsafe for installation.
-+        // Accept only authenticated transport, including every redirect.
-+        "http" => false,
-         _ => false,
-     }
- }
- 
-+// The authenticated catalog must supply HTTPS. Rewriting a CDN hostname is
-+// not proof that the mirror serves the licensed package; never fall back to
-+// HTTP while upstream's unencrypted package sections lack authentication.
+-        _ => false,
+-    }
++    if !url.username().is_empty() || url.password().is_some() || url.fragment().is_some() { return false; }
++    url.scheme() == "https" || (url.scheme() == "http"
++        && matches!(url.host_str(), Some("assets1.xboxlive.com" | "assets2.xboxlive.com"))
++        && url.port_or_known_default() == Some(80))
++}
++
 +fn secure_package_url(input: &str) -> Option<reqwest::Url> {
 +    let url = reqwest::Url::parse(input).ok()?;
 +    package_url_allowed(&url).then_some(url)
-+}
-+
+ }
+ 
  fn package_client() -> Outcome<reqwest::Client> {
 -    // This client carries no sign-in headers or cookies. Authentication and
 -    // licensing continue to use the separate HTTPS-only account client.
-+    // No account headers or cookies are carried by this download client.
-     Ok(reqwest::Client::builder().user_agent("bedrock-mac-standalone/0.1")
--        .connect_timeout(std::time::Duration::from_secs(30))
-+        .https_only(true).connect_timeout(std::time::Duration::from_secs(30))
+-    Ok(reqwest::Client::builder().user_agent("bedrock-mac-standalone/0.1")
++    Ok(reqwest::Client::builder().user_agent("crossedover-bedrock/1.4.0")
+         .connect_timeout(std::time::Duration::from_secs(30))
          .redirect(reqwest::redirect::Policy::custom(|attempt| {
              if attempt.previous().len() >= 5 || !package_url_allowed(attempt.url()) {
-                 attempt.error("Unsupported package redirect")
-@@ -68,7 +74,7 @@ impl TokenBackend for AccountKeychain {
+@@ -52,6 +54,53 @@ fn package_client() -> Outcome<reqwest::Client> {
+         })).build()?)
+ }
+ 
++async fn fetch_verified_package(url: reqwest::Url, size: u64, path: &Path, signature_only: bool)
++    -> Outcome<Option<package_integrity::SignedLayout>> {
++    if size < 16384 || size > 32 * 1024 * 1024 * 1024 { return Err(failure("package_size")); }
++    let response = package_client()?.get(url).header(reqwest::header::ACCEPT_ENCODING, "identity").send().await
++        .map_err(|_| failure("package_connection"))?;
++    if !response.status().is_success() || response.status().as_u16() != 200 || response.content_length() != Some(size) {
++        return Err(failure("package_connection"));
++    }
++    let mut response = response;
++    let mut output = OpenOptions::new().write(true).create_new(true).open(path).await?;
++    let mut header = Vec::new();
++    let mut signed = false;
++    let mut downloaded: u64 = 0;
++    let mut reported: u64 = 0;
++    while let Some(chunk) = tokio::time::timeout(std::time::Duration::from_secs(45), response.chunk()).await
++        .map_err(|_| failure("package_connection"))?.map_err(|_| failure("package_connection"))? {
++        downloaded = downloaded.checked_add(chunk.len() as u64).ok_or_else(|| failure("package_size"))?;
++        if downloaded > size { return Err(failure("package_size")); }
++        if header.len() < 12288 { header.extend(&chunk[..chunk.len().min(12288 - header.len())]); }
++        if !signed && header.len() == 12288 {
++            package_integrity::verify_header(&header).ok_or_else(|| failure("package_signature"))?;
++            // Reviewed format-only diagnostics. Never output identifiers, keys, URLs, or header bytes.
++            let field = |n| u32::from_le_bytes(header[n..n + 4].try_into().unwrap());
++            eprintln!("Signed package format: integrity={}, resiliency={}, fixed={}, dynamic={}, embedded={}, mutable={}",
++                field(0x208) & 4 == 0, field(0x208) & 16 != 0, field(0x280) == 0,
++                field(0x280) == 1, field(0x288) != 0, header[0x470] != 0);
++            let valid = package_integrity::signed_layout(&header, size).map_err(failure)?;
++            signed = true;
++            eprintln!("Package signature verified.");
++            if signature_only { return Ok(Some(valid)); }
++            eprintln!("Downloading verified Minecraft package.");
++        }
++        output.write_all(&chunk).await?;
++        if downloaded - reported >= 16 * 1024 * 1024 || downloaded == size {
++            eprintln!("Package bytes: {downloaded}/{size}"); reported = downloaded;
++        }
++    }
++    if downloaded != size || !signed { return Err(failure("package_size")); }
++    output.sync_all().await?; drop(output);
++    eprintln!("Verifying Minecraft package.");
++    let path = path.to_path_buf();
++    let verified = tokio::task::spawn_blocking(move || package_integrity::verify_archive(&path)).await
++        .map_err(|_| failure("package_integrity"))?.map_err(failure)?;
++    eprintln!("Minecraft package integrity verified.");
++    Ok(Some(verified))
++}
++
+ const ACCOUNT_ENTRY: &str = "account-v1";
+ type AccountValues = HashMap<String, Vec<u8>>;
+ 
+@@ -68,7 +117,7 @@ impl TokenBackend for AccountKeychain {
              // the secret again before every update. SecItemAdd/Update writes
              // directly, without that extra authorization-triggering read.
              security_framework::passwords::set_generic_password(
@@ -172,48 +276,130 @@ index 09be15e..b7d1f63 100644
                  .map_err(|error| std::io::Error::other(format!("Keychain write failed ({})", error.code())))?;
              Ok(())
          }
-@@ -250,13 +256,16 @@ async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &P
+@@ -234,14 +283,17 @@ async fn authorize_game(client: &reqwest::Client, tokens: &TokenManager, directo
+     Ok(())
+ }
+ 
+-async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &Path, market: &str, check_only: bool) -> Outcome<()> {
++async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &Path, market: &str, check_only: bool, signature_only: bool) -> Outcome<()> {
+     if directory.symlink_metadata().is_ok() {
+         return Err("The download destination must not exist; existing games are never overwritten.".into());
+     }
+     let parent = directory.parent().ok_or("A destination parent directory is required.")?;
+     std::fs::create_dir_all(parent)?;
+     let staging = tempfile::Builder::new().prefix(".bedrock-download-").tempdir_in(parent)?;
+-    let out = staging.path();
++    let game_staging = staging.path().join("game");
++    std::fs::create_dir(&game_staging)?;
++    let out = game_staging.as_path();
++    let archive = staging.path().join("package.msixvc");
+     eprintln!("Finding the Windows package for the signed-in owner's Minecraft purchase.");
+     let content_id = package::get_content_id(client, PRODUCT.into(), Some(market.into())).await
+         .map_err(|_| failure("catalog_lookup"))?;
+@@ -250,37 +302,27 @@ async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &P
      let packages: Vec<_> = details.package_files.iter().filter(|p| p.file_name.ends_with(".msixvc")).collect();
      if packages.len() != 1 { return Err(failure("package_selection")); }
      let package = packages[0];
 -    let download_client = package_client()?;
-     let mut connected = None;
+-    let mut connected = None;
 -    for cdn in &package.cdn_root_paths {
 -        let url = format!("{}{}", cdn, package.relative_url);
 -        if !reqwest::Url::parse(&url).is_ok_and(|url| package_url_allowed(&url)) { continue; }
-+    let mut secure_candidate = false;
-+    for cdn in package.cdn_root_paths.iter().chain(&package.background_cdn_root_paths) {
-+        let catalog_url = format!("{}{}", cdn, package.relative_url);
-+        let Some(secure_url) = secure_package_url(&catalog_url) else { continue; };
-+        let url = secure_url.to_string();
-+        let download_client = package_client()?;
-+        secure_candidate = true;
-         match streaming::HttpRead::open(download_client.clone(), &url, None::<fn(u64, u64)>).await {
+-        match streaming::HttpRead::open(download_client.clone(), &url, None::<fn(u64, u64)>).await {
 -            Ok(http) => { connected = Some((url, http)); break; },
-+            Ok(http) => { connected = Some((url, http, download_client)); break; },
++    if package.file_size <= 0 { return Err(failure("package_size")); }
++    let size = package.file_size as u64;
++    if fs2::available_space(out)? < size.saturating_mul(3).saturating_add(512 * 1024 * 1024) {
++        return Err(failure("package_space"));
++    }
++    let mut verified_layout = None;
++    for cdn in package.cdn_root_paths.iter().chain(&package.background_cdn_root_paths) {
++        let Some(url) = secure_package_url(&format!("{}{}", cdn, package.relative_url)) else { continue; };
++        match fetch_verified_package(url, size, &archive, signature_only).await {
++            Ok(layout) => { verified_layout = layout; break; },
              Err(error) => {
-                 // Record only transport categories, never signed URLs or responses.
-                 eprintln!("Package transport: {:?}", error.kind());
-@@ -275,7 +284,8 @@ async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &P
-             },
+-                // Record only transport categories, never signed URLs or responses.
+-                eprintln!("Package transport: {:?}", error.kind());
+-                if let Some(http) = error.get_ref().and_then(|e| e.downcast_ref::<reqwest::Error>()) {
+-                    eprintln!("Package transport: status={:?}, connect={}, timeout={}",
+-                        http.status().map(|s| s.as_u16()), http.is_connect(), http.is_timeout());
+-                    let mut source = std::error::Error::source(http);
+-                    while let Some(cause) = source {
+-                        let text = cause.to_string().to_lowercase();
+-                        for category in ["certificate", "dns", "connection refused", "handshake", "network is unreachable"] {
+-                            if text.contains(category) { eprintln!("Package transport category: {category}"); }
+-                        }
+-                        source = cause.source();
+-                    }
+-                }
+-            },
++                // Do not try another mirror after authentication/integrity fails.
++                let transport = error.downcast_ref::<SetupFailure>().is_some_and(|e| e.0 == "package_connection");
++                if !transport { return Err(error); }
++                if archive.exists() { std::fs::remove_file(&archive)?; }
++            }
          }
      }
 -    let (url, http) = connected.ok_or_else(|| failure("package_connection"))?;
-+    if !secure_candidate { return Err(failure("package_transport")); }
-+    let (url, http, download_client) = connected.ok_or_else(|| failure("package_connection"))?;
-     if package.file_size <= 0 || http.len() != package.file_size as u64 {
-         return Err(failure("package_size"));
-     }
-@@ -417,7 +427,7 @@ async fn run() -> Outcome<()> {
+-    if package.file_size <= 0 || http.len() != package.file_size as u64 {
+-        return Err(failure("package_size"));
+-    }
+-    let mut metadata = streaming::PrefixCacheFile::new(http, package.file_size as u64, out.join(".xodus-streaming.msixvc")).await
+-        .map_err(|_| failure("package_cache"))?;
++    let verified_layout = verified_layout.ok_or_else(|| failure("package_connection"))?;
++    if signature_only { eprintln!("Signed Minecraft package layout verified."); return Ok(()); }
++    let mut metadata = File::open(&archive).await.map_err(|_| failure("package_cache"))?;
+     let xvd = XvdFile::parse(&mut metadata).await.map_err(|_| failure("package_format"))?;
+     let mut files: HashMap<String, SegmentFile> = HashMap::new();
+     for (name, segment) in xvd.parse_user_package_files(&mut metadata).await.map_err(|_| failure("package_files"))? {
+@@ -323,16 +365,16 @@ async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &P
+     stream::iter(files.iter()).map(|(name, info)| {
+         let xvd = &xvd;
+         let key = &key;
+-        let url = &url;
+-        let download_client = &download_client;
++        let archive = &archive;
+         let completed = &completed;
+         async move {
+             let relative = safe_relative(name)?;
+             let target = out.join(&relative);
+             std::fs::create_dir_all(target.parent().ok_or("Missing output parent.")?)?;
+             let mut output = OpenOptions::new().write(true).create_new(true).open(&target).await?;
++            let mut verified_input = File::open(archive).await?;
+             tokio::time::timeout(std::time::Duration::from_secs(900),
+-                xvd.download_file_http(download_client, url, &mut output, info, **key, |_, _| {})).await
++                xvd.extract_file(&mut verified_input, &mut output, info, **key, |_, _| {})).await
+                 .map_err(|_| "A game file download timed out; retry setup.")?
+                 .map_err(|_| "A game file download failed; retry setup.")?;
+             output.sync_all().await?;
+@@ -363,6 +405,13 @@ async fn download(client: &reqwest::Client, tokens: &TokenManager, directory: &P
+         }
+     }).buffer_unordered(4).try_collect::<Vec<_>>().await?;
+     drop(metadata);
++    // Keep only the verified metadata prefix needed for repeat license checks,
++    // not a second complete archive beside the extracted game.
++    let mut input = File::open(&archive).await?.take(verified_layout.metadata_end);
++    let mut cache = OpenOptions::new().write(true).create_new(true).open(out.join(".xodus-streaming.msixvc")).await?;
++    let copied = tokio::io::copy(&mut input, &mut cache).await?;
++    if copied != verified_layout.metadata_end { return Err(failure("package_cache")); }
++    cache.sync_all().await?; drop(cache);
+     check_game(out).await?;
+     if directory.symlink_metadata().is_ok() { return Err("The destination appeared during download; refusing to replace it.".into()); }
+     promote_installation(out, directory)?;
+@@ -417,10 +466,10 @@ async fn run() -> Outcome<()> {
      let mut args = std::env::args().skip(1);
      let mode = args.next().ok_or("Use --download GAME_DIR or --serve GAME_DIR [--market CA].")?;
      if mode == "--help" {
 -        println!("standalone_helper --download GAME_DIR [--market CA] [--serve-after]\nstandalone_helper --check-download GAME_DIR [--market CA]\nstandalone_helper --serve GAME_DIR [--market CA]\nstandalone_helper --sign-out GAME_DIR\nCredentials: macOS Keychain, Minecraft Bedrock Standalone. Stop any existing Xbox helper first.");
-+        println!("standalone_helper --download GAME_DIR [--market CA] [--serve-after]\nstandalone_helper --check-download GAME_DIR [--market CA]\nstandalone_helper --serve GAME_DIR [--market CA]\nstandalone_helper --sign-out GAME_DIR\nCredentials: macOS Keychain, crossedover Minecraft. Stop any existing Xbox helper first.");
++        println!("standalone_helper --download GAME_DIR [--market CA] [--serve-after]\nstandalone_helper --check-download GAME_DIR [--market CA]\nstandalone_helper --check-signature GAME_DIR [--market CA]\nstandalone_helper --serve GAME_DIR [--market CA]\nstandalone_helper --sign-out GAME_DIR\nCredentials: macOS Keychain, crossedover Minecraft. Stop any existing Xbox helper first.");
          return Ok(());
      }
-     if mode != "--download" && mode != "--check-download" && mode != "--serve" && mode != "--sign-out" { return Err("Unknown helper mode.".into()); }
-@@ -438,7 +448,7 @@ async fn run() -> Outcome<()> {
+-    if mode != "--download" && mode != "--check-download" && mode != "--serve" && mode != "--sign-out" { return Err("Unknown helper mode.".into()); }
++    if mode != "--check-signature" && mode != "--download" && mode != "--check-download" && mode != "--serve" && mode != "--sign-out" { return Err("Unknown helper mode.".into()); }
+     let directory = PathBuf::from(args.next().ok_or("Game directory required.")?);
+     let directory = if directory.is_absolute() { directory } else { std::env::current_dir()?.join(directory) };
+     let mut market = String::from("CA");
+@@ -438,7 +487,7 @@ async fn run() -> Outcome<()> {
      else if mode != "--sign-out" && directory.symlink_metadata().is_ok() { return Err("Download destination already exists; choose a new directory.".into()); }
      // A download does not create the IPC socket yet, so also serialize account access.
      let support = PathBuf::from(std::env::var_os("HOME").ok_or("Home directory is unavailable.")?)
@@ -222,7 +408,7 @@ index 09be15e..b7d1f63 100644
      if support.is_symlink() { return Err("The standalone helper state directory must not be a symbolic link.".into()); }
      std::fs::create_dir_all(&support)?;
      std::fs::set_permissions(&support, std::fs::Permissions::from_mode(0o700))?;
-@@ -446,7 +456,7 @@ async fn run() -> Outcome<()> {
+@@ -446,7 +495,7 @@ async fn run() -> Outcome<()> {
      if lock_path.is_symlink() { return Err("The account lock must not be a symbolic link.".into()); }
      let account_lock = std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false).mode(0o600).open(lock_path)?;
      fs2::FileExt::try_lock_exclusive(&account_lock).map_err(|_| "Another standalone account helper is already running.")?;
@@ -231,7 +417,21 @@ index 09be15e..b7d1f63 100644
          .map_err(|_| "Could not initialize macOS Keychain.")?;
      let account = Arc::new(AccountBackend::new(AccountKeychain));
      if mode == "--sign-out" {
-@@ -534,7 +544,7 @@ mod tests {
+@@ -464,11 +513,11 @@ async fn run() -> Outcome<()> {
+         if login::run(&client, &tokens).await != ExitCode::SUCCESS { return Err(failure("signin_failed")); }
+     }
+     if login_needed(&tokens, chrono::Utc::now())? { return Err(failure("signin_cancelled")); }
+-    if mode == "--download" || mode == "--check-download" {
++    if mode == "--download" || mode == "--check-download" || mode == "--check-signature" {
+         // Dropping the download future on cancellation also removes its private
+         // temporary directory. Never leave gigabytes of abandoned staging data.
+         tokio::select! {
+-            result = download(&client, &tokens, &directory, &market, mode == "--check-download") => {
++            result = download(&client, &tokens, &directory, &market, mode == "--check-download", mode == "--check-signature") => {
+                 result.map_err(|error| if error.is::<SetupFailure>() { error } else { failure("download_failed") })?;
+             },
+             _ = tokio::signal::ctrl_c() => return Ok(()),
+@@ -534,7 +583,7 @@ mod tests {
          impl Drop for Cleanup {
              fn drop(&mut self) {
                  let _ = security_framework::passwords::delete_generic_password(
@@ -240,7 +440,7 @@ index 09be15e..b7d1f63 100644
              }
          }
          let _cleanup = Cleanup(key.clone());
-@@ -542,29 +552,41 @@ mod tests {
+@@ -542,13 +591,13 @@ mod tests {
              AccountKeychain.set(&key, value).unwrap();
          }
          let value = security_framework::passwords::get_generic_password(
@@ -252,23 +452,17 @@ index 09be15e..b7d1f63 100644
      #[test]
      fn package_transport_accepts_catalog_origins_without_rewriting_them() {
 -        for url in ["http://assets1.xboxlive.com/game.msixvc", "http://assets2.xboxlive.com/game.msixvc", "https://example.com/game.msixvc"] {
-+        for url in ["https://example.com/game.msixvc"] {
++        for url in ["https://example.com/game.msixvc", "http://assets1.xboxlive.com/game.msixvc", "http://assets2.xboxlive.com/game.msixvc"] {
              let parsed = reqwest::Url::parse(url).unwrap();
              assert!(package_url_allowed(&parsed));
              assert_eq!(parsed.as_str(), url);
-         }
--        for url in ["http://example.com/game", "http://assets1.xboxlive.com.evil.test/game",
-+        for url in ["http://assets1.xboxlive.com/game.msixvc", "http://assets2.xboxlive.com/game.msixvc", "http://example.com/game", "http://assets1.xboxlive.com.evil.test/game",
-             "http://assets1.xboxlive.com:8080/game", "http://user:secret@assets1.xboxlive.com/game",
-             "http://127.0.0.1/game", "file:///tmp/game", "https://example.com/game#fragment"] {
-             assert!(!package_url_allowed(&reqwest::Url::parse(url).unwrap()), "{url}");
+@@ -560,11 +609,22 @@ mod tests {
          }
      }
  
 +    #[test]
-+    fn catalog_downloads_require_secure_origins_without_host_rewrites() {
-+        for bad in ["http://assets1.xboxlive.com/game", "http://assets2.xboxlive.com/game",
-+                    "http://d1.xboxlive.com/game", "http://example.com/game",
++    fn catalog_downloads_limit_http_to_official_origins_without_host_rewrites() {
++        for bad in ["http://d1.xboxlive.com/game", "http://example.com/game",
 +                    "https://user:secret@example.com/game", "https://example.com/game#fragment",
 +                    "file:///tmp/game"] {
 +            assert!(secure_package_url(bad).is_none());
@@ -300,7 +494,7 @@ index bf8861a..d0ff9cc 100755
                     cwd=ROOT, env=env, check=True)
      print("Built standalone account helper: " + str(HELPER))
 diff --git a/tests/test_onboarding.py b/tests/test_onboarding.py
-index 38506d3..249a8f4 100644
+index 38506d3..0131199 100644
 --- a/tests/test_onboarding.py
 +++ b/tests/test_onboarding.py
 @@ -118,6 +118,20 @@ class OnboardingTests(unittest.TestCase):
@@ -324,3 +518,24 @@ index 38506d3..249a8f4 100644
      def test_bundle_setup_preserves_worlds_and_relinks_after_app_move(self):
          with tempfile.TemporaryDirectory() as folder:
              folder = Path(folder)
+@@ -184,13 +198,19 @@ class OnboardingTests(unittest.TestCase):
+ 
+     def test_download_progress_advances_and_rejects_invalid_counts(self):
+         with contextlib.redirect_stdout(io.StringIO()) as output:
++            worker.account_update(b'Package bytes: 500/1000\n')
++            worker.account_update(b'Package bytes: 1000/1000\n')
++            worker.account_update(b'Package bytes: 5/0\n')
++            worker.account_update(b'Package bytes: 10/1\n')
++            worker.account_update(b'Package bytes: private-sentinel\n')
++            worker.account_update(b'Verifying Minecraft package.\n')
+             worker.account_update(b'Downloading Minecraft 1.26 (1000 files).\n')
+             worker.account_update(b'Downloaded 500/1000 files.\n')
+             worker.account_update(b'Downloaded 1000/1000 files.\n')
+             worker.account_update(b'Downloaded 1/0 files.\n')
+             worker.account_update(b'Downloaded 2/1 files.\n')
+         statuses = [json.loads(line) for line in output.getvalue().splitlines()]
+-        self.assertEqual(len(statuses), 3)
++        self.assertEqual(len(statuses), 6)
+         self.assertEqual([status['progress'] for status in statuses], sorted(status['progress'] for status in statuses))
+         self.assertTrue(all(0 <= event['progress'] <= 1 for event in statuses))
+ 

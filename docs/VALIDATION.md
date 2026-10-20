@@ -1,5 +1,48 @@
 # Validation record
 
+## Minecraft signed-package installer — October 19, 2026
+
+Development remains **v1.4.0/build 26**, with no public push/release.
+
+- Added a macOS-native RSA-PSS/SHA-256 verifier with two pinned Microsoft public
+  verification keys. Provenance/fingerprints are recorded under
+  `runtime/bedrock/verification/`; no private keys or GDK executables are bundled.
+- The real owner's catalog package header passed signature verification with a
+  4 KiB signed-header envelope. Its fixed layout has a skipped mutable section;
+  pinned msixvc source confirms those bytes are not consumed by its parser.
+- Complete package verification anchors every parent/leaf hash-tree page to
+  the signed root, then checks all metadata/game data pages before parsing or
+  extraction. Tests cover encrypted/plaintext entries, multiple levels, mutable
+  padding, corrupted headers/tree/metadata/first and last data pages, unexpected
+  size and unsupported layouts. The owned fixture key is rejected in production.
+- Helper: **18 tests passed**, 2 explicit live/Keychain fixtures ignored.
+  Python onboarding: **16 tests passed**, including reviewed byte progress.
+  Swift: **84 tests in 15 suites passed**; the subsequent Bedrock-only run
+  passed **8 tests**, adding rejection of the obsolete backend policy.
+- Release build, fresh v1.4.0 preview packaging, exact backend inventory and
+  strict deep code-signature verification passed. The pipeline and app require
+  the matching `signed-xvd-v1` policy. The obsolete staging copy was removed.
+- The owner approved the packaged helper's Keychain prompt. A live installation
+  through the normal Core service downloaded the 2,069,975,040-byte Microsoft
+  package. Complete signature/tree/data verification and the Microsoft content
+  license succeeded, followed by extraction of all **12,177 files**, prefix
+  preparation and observed `playing` status.
+- The owner confirmed **Minecraft's menu**, then **playable local-world controls
+  and sound, save and normal quit**. The worker exited cleanly with `ready`;
+  an independent offline check reports the installed game. There are no leftover
+  complete temporary archives. Retained metadata is **14,614,528 bytes**; the
+  installed game is approximately **2.13 GiB**. No automatic backup was created.
+- The new native v1.4.0 app was opened only after the session/helper ended.
+  Card-based repeat launch, saved-world reopen and native window behavior are
+  being checked. Only allowlisted private-log status categories were inspected.
+
+Evidence: `.cache/v1.4/verified-download-build.log`,
+`.cache/v1.4/signed-download-swift-tests.log`,
+`.cache/v1.4/signed-download-policy-tests.log`,
+`.cache/v1.4/signed-download-release-build.log`,
+`.cache/v1.4/signed-download-package.log`, and
+`.cache/v1.4/verified-install-status.log` (reviewed Core status only).
+
 ## Brawlhalla native window controls — October 19, 2026
 
 The owner confirms Brawlhalla opens reliably, but still has no traffic-light

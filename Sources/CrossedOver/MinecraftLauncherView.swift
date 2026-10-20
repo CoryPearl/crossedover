@@ -88,6 +88,7 @@ struct MinecraftLauncherView: View {
     }
     private var detail: String {
         if model.bedrockActive { return model.bedrockStatus?.detail ?? "Verifying the separate runtime before starting." }
+        if model.bedrockError != nil { return "Minecraft has not started. Review the setup message below." }
         if !model.bedrockAvailable { return "This build does not include the separate Bedrock runtime yet. Its setup button becomes available after that runtime is built and verified." }
         if model.bedrockInstalled { return "Open your installed Windows edition with your Microsoft account. Your worlds stay in Minecraft’s separate environment." }
         return "Sign in with your own Microsoft account. Minecraft is downloaded from Microsoft when a secure package is available."

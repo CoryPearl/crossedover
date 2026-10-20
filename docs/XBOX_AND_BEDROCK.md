@@ -8,7 +8,22 @@ The requested v1.4.0 feature is local **Minecraft for Windows (Bedrock)** suppor
 
 The Minecraft panel is available from **Game Launchers → Minecraft Bedrock…** and Settings. An absent or invalid backend leaves Install & Play disabled with an explanation. With a verified backend, the native app runs its worker, renders bounded reviewed status messages, and allows cancelling setup or stopping the dedicated Minecraft session. The worker retains one account helper through download, prefix preparation and gameplay. A process check precedes Running status; a successful command exit alone is insufficient.
 
-The backend is built from the pinned source below plus crossedover's tracked integration patch. Game transport is **HTTPS only**, including redirects; foreground and background catalog candidates are checked without changing their hosts. Microsoft sign-in succeeded in the local test and its saved account was reused. The licensed package download failed: the catalog's HTTP origins did not yield a usable verified HTTPS route, and attempted Microsoft HTTPS mirror routes returned 404/503. Those mirror experiments were removed. Minecraft has **not** installed or launched in crossedover. The missing secure download path remains a release blocker.
+The backend is built from the pinned source below plus crossedover's tracked
+integration patch. Account/catalog/license traffic remains verified HTTPS.
+Game packages now use the `signed-xvd-v1` verification policy: Microsoft public
+keys authenticate the package header, its root authenticates the complete hash
+tree, and every data page is checked before parsing or extraction. HTTP is
+limited to the two official catalog asset origins; no account headers/cookies,
+host rewrites or certificate exceptions are used. The complete archive is
+temporary and removed after extraction, failure or cancellation.
+
+Microsoft sign-in succeeded and the saved account was reused. A real Minecraft
+package header passed signature verification. Owned signed archive fixtures pass
+full verification and reject corrupted headers, tree pages and data, including
+plaintext metadata. The complete live package passed verification and extracted successfully using
+Microsoft's real content license. The owner confirmed the menu, playable local
+world with controls/sound, save and normal quit. The installed status is ready;
+card-based repeat launch and saved-world reopen are being checked.
 
 The Keychain service is **crossedover Minecraft**; the data root is `CrossedOver/Bedrock`, including its game and separate Wine prefix/worlds. Steam/Epic do not share this server, account, renderer or Stop action. App uninstall checks the Bedrock session lock, and the app stays alive when its window closes during a session. See [build instructions, file paths and outstanding release checks](../runtime/bedrock/README.md). No game or Microsoft account is included in the source or backend.
 

@@ -579,13 +579,29 @@ is required for Running.
 
 ## Minecraft backend in v1.4.0 development
 
-`BedrockService.swift` implements an independent backend boundary, outside the Steam/Epic supervisor. `BedrockBackend.load` validates a pinned schema/revision, HTTPS-only policy, required components, every file digest and the exact file/symlink inventory. Verification runs off the UI actor. The worker receives a minimal environment with `BEDROCK_HOME=<CrossedOver root>/Bedrock` and `BEDROCK_BUNDLE=<verified backend>`, without inherited Wine/DYLD/Python overrides. A bounded JSON stream maps only known states and progress to reviewed UI text; arbitrary account strings never become status or activity entries. Unknown states, oversized lines, malformed progress, or a worker exit without a terminal state fail the session.
+`BedrockService.swift` implements an independent backend boundary, outside the Steam/Epic supervisor. `BedrockBackend.load` validates a pinned schema/revision, `signed-xvd-v1` package verification policy, required components, every file digest and the exact file/symlink inventory. Verification runs off the UI actor. The worker receives a minimal environment with `BEDROCK_HOME=<CrossedOver root>/Bedrock` and `BEDROCK_BUNDLE=<verified backend>`, without inherited Wine/DYLD/Python overrides. A bounded JSON stream maps only known states and progress to reviewed UI text; arbitrary account strings never become status or activity entries. Unknown states, oversized lines, malformed progress, or a worker exit without a terminal state fail the session.
 
 `MinecraftLauncherView` is opened from the shared Game Launchers menu or Settings. Play owns one worker through account checks, download, preparation and observed gameplay. Stop terminates that worker; the worker unwinds its own subprocess groups/helper/prefix, and the native app waits for its exit before clearing the active state. Steam/Epic sessions are independent. The app stays alive after its window closes during Minecraft and prevents quit/uninstall while its own session is active; uninstall also checks the backend onboarding lock. Microsoft sign-out preserves worlds.
 
 `runtime/bedrock/prepare.py` builds from pinned Bedrock for Mac/WineGDK/Xodus sources, applies the tracked compatibility patch, tests the helper, freezes Python, and stages only allowed components. `scripts/package.py --bedrock-backend` verifies the staged inventory, signs nested code, and records the signed hashes. `--output` creates a separate local preview app. No account, game or Microsoft DLL enters the backend. Account data uses the `crossedover Minecraft` Keychain service. The local preview requires macOS 26, Apple silicon, Rosetta and an owned Windows Bedrock edition.
 
-The upstream HTTP package fallback is removed. Foreground and background catalog origins are accepted only over certificate-verified HTTPS, without hostname rewrites. Live sign-in succeeded, but the licensed package download did not. Attempted HTTPS mirror routes returned 404/503 and were removed; no HTTP request or certificate exception is used. Some upstream package sections lack complete integrity authentication; without a secure HTTPS origin, setup must stop instead of installing those bytes. This restriction can prevent installation and is not presented as verified Bedrock support. Full download/gameplay, saves, controls, window behavior and clean-machine tests remain separate release checks. See [the backend guide](runtime/bedrock/README.md) and [current assessment](docs/XBOX_AND_BEDROCK.md).
+The package downloader uses a separate client with no account headers/cookies.
+Account and license traffic remains certificate-verified HTTPS. Catalog package
+candidates may use HTTPS or the two official HTTP asset origins on port 80;
+redirects keep that restriction and hosts are never rewritten. Every candidate
+must pass Microsoft's RSA-PSS/SHA-256 header signature, its signed root hash,
+every parent/child hash-tree page and all data-page hashes before the XVD or
+filesystem parsers consume it. The complete archive stays in private temporary
+storage through verification/extraction, then is removed. Only the required
+verified metadata prefix is retained with the game for later ownership checks.
+Unsupported layouts and any failed verification stop installation. Public keys,
+source provenance and owned tamper-test fixtures live under
+`runtime/bedrock/verification/`; test signing keys are never trusted by production.
+The full live package passed signature/tree/data verification, extracted using
+the owner's real license, and launched. The owner confirmed local-world play,
+controls/sound, saving and normal quit. Card-based repeat launch, world reopen,
+window behavior and clean-machine tests remain separate release checks. See [the backend guide](runtime/bedrock/README.md) and
+[current assessment](docs/XBOX_AND_BEDROCK.md).
 
 The Games library checks Minecraft’s offline installation status on startup, library refresh (including ⌘R), and after a setup/play session ends. A ready installation adds a Minecraft card or list row with Play and launcher options, and participates in search, counts and the Minecraft filter. Routine refreshes reuse the verified backend rather than hashing the entire runtime again; Play verifies runtime bytes again. Failed downloads do not add an installed card.
 

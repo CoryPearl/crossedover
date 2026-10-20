@@ -15,11 +15,14 @@
   The owned 32/64-bit tests pass, and the owner confirmed the real game's
   red/yellow/green buttons, minimize and fullscreen work.
 
-Microsoft sign-in is confirmed. Minecraft's package download remains blocked;
-installation, gameplay, audio/input, saves, fullscreen and repeat launches are
-not verified. Failed setup does not create an installed-game card. The current
-preview requires Apple silicon, Rosetta, macOS 26+ and an owned Windows edition.
-This does not add the Windows Xbox app or general Game Pass compatibility.
+Microsoft sign-in, verified package download/install and local gameplay are
+confirmed. The owner tested controls/sound, saved a world and quit normally.
+The installer authenticates the signed hash tree and every metadata/game-data
+page before extraction, then removes the complete temporary archive. Card-based
+repeat launch, saved-world reopen and remaining release checks are in progress.
+Failed setup does not create an installed-game card. The current preview requires
+Apple silicon, Rosetta, macOS 26+ and an owned Windows edition. This does not add
+the Windows Xbox app or general Game Pass compatibility.
 
 Existing public download URLs still point to the previous v1.3.1 artifact.
 Publishing v1.4.0 waits for the Minecraft flow and remaining release checks.

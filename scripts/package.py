@@ -33,10 +33,10 @@ def verify_runtime(root):
 
 def verify_bedrock(root):
     manifest = json.loads((root / "backend.json").read_text())
-    if not (manifest["schemaVersion"] == 1 and manifest["downloadPolicy"] == "https-only"
+    if not (manifest["schemaVersion"] == 1 and manifest["downloadPolicy"] == "signed-xvd-v1"
             and manifest["sourceRevision"] == "99fc9aa7d79b34aaee25a447b964e5d8235a2cec"
             and manifest["previewOnly"] is True):
-        raise RuntimeError("Select a matching HTTPS-only Bedrock preview backend")
+        raise RuntimeError("Select a matching signature-verifying Bedrock preview backend")
     actual = {}
     for p in root.rglob("*"):
         if p.is_file() and not p.is_symlink() and str(p.relative_to(root)) != "backend.json":

@@ -10,25 +10,38 @@ with pinned WineGDK, DXMT, and Xodus components. Our tracked integration patch:
 
 - honors `BEDROCK_HOME` inside crossedover's data directory;
 - uses the separate **crossedover Minecraft** Keychain service;
-- requires certificate-verified HTTPS for game bytes and every redirect;
+- keeps account/catalog/license traffic on certificate-verified HTTPS;
+- verifies the package signature and complete hash tree before parsing or extracting any game data;
 - reports game startup only after observing the Minecraft process;
 - forwards reviewed status codes instead of arbitrary exception text;
 - selects installed developer toolchains without changing global tools.
 
-The upstream HTTP download is deliberately unavailable here: upstream records
-an integrity gap for some package sections. The helper requires an HTTPS URL
-from Microsoft's authenticated package catalog and checks foreground and
-background CDN candidates without rewriting their hostnames. Normal TLS
-validation remains enabled on every request and redirect.
+The `signed-xvd-v1` download policy uses a separate client without account
+headers or cookies. It accepts HTTPS catalog candidates and limits HTTP to
+Microsoft's `assets1.xboxlive.com` / `assets2.xboxlive.com` origins on port 80.
+Redirects obey the same policy. It never rewrites hostnames or disables TLS.
+All candidates go through the same complete package verifier: the Microsoft
+RSA-PSS signature authenticates the header/root hash, the root authenticates
+all lower hash-tree pages, and leaf hashes authenticate every data page,
+including plaintext package metadata. Unsupported layouts fail closed.
 
-The owner successfully signed in during the local test. The current catalog's
-HTTP asset roots did not provide a usable certificate-verified game download.
-Trying the same path on Microsoft's HTTPS asset endpoint returned HTTP 404;
-retaining the original virtual host returned HTTP 503. Those failed mirror
-experiments were removed. **Minecraft has not installed or launched in
-crossedover.** Setup now stops with a specific secure-download message instead
-of blaming sign-in. Completing authenticated package integrity verification or
-finding a supported secure package source remains necessary before release.
+The complete archive is staged privately and checked before the XVD/filesystem
+parsers or extraction run. The installer still obtains the owning account's
+real Microsoft content license. Only required metadata and extracted game files
+are retained; cancellation, failure and successful extraction remove the
+temporary complete archive. No automatic full-package backup is created.
+See [verification design, public-key provenance and fixtures](verification/README.md).
+
+The owner successfully signed in during the local test, and a real package
+header passed signature verification. Owned signed fixture archives pass full
+verification; changed headers, tree pages, metadata and game data are rejected.
+The full approximately 2 GB live package passed signature/tree/data verification,
+Microsoft granted the content license, and all 12,177 files extracted. The
+owner confirmed the game menu, playable local-world controls/sound, save and
+normal quit. The installation check reports ready. The complete temporary
+archive is gone; only 14,614,528 bytes of metadata remain with the game.
+Card-based repeat launch and saved-world reopen are being checked.
+No v1.4.0 binary has been published.
 
 ## Build locally
 

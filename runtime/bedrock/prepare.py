@@ -139,7 +139,10 @@ def stage():
         for name in ('LICENSE', 'THIRD_PARTY.md'):
             shutil.copy2(SOURCE / name, candidate / name)
         shutil.copy2(PATCH, candidate / 'crossedover-backend.patch')
-        metadata = dict(schemaVersion=1, sourceRevision=REVISION, downloadPolicy='https-only',
+        (candidate / 'verification').mkdir()
+        for name in ('README.md', 'package_integrity.rs', 'GreenGamesPublicKey.public.bin', 'GreenXvdPublicKey.public.bin'):
+            shutil.copy2(ROOT / 'runtime/bedrock/verification' / name, candidate / 'verification' / name)
+        metadata = dict(schemaVersion=1, sourceRevision=REVISION, downloadPolicy='signed-xvd-v1',
                         minimumMacOS=26, previewOnly=True,
                         toolchain=subprocess.check_output(['rustc', '--version'], text=True).strip())
         # All symlinks must remain portable inside the staged backend.
@@ -166,6 +169,11 @@ def main():
         run(SOURCE / 'build-standalone-wine.sh', env=env, cwd=SOURCE)
         run(SOURCE / 'build-standalone-graphics.sh', '--wine-runtime', SOURCE / 'runtime/standalone/wine', env=env, cwd=SOURCE)
     if args.helper:
+        examples = SOURCE / 'sources/xodus/crates/xodus-cli/examples'
+        examples.mkdir(parents=True, exist_ok=True)
+        for name in ('package_integrity.rs', 'GreenGamesPublicKey.public.bin', 'GreenXvdPublicKey.public.bin'):
+            shutil.copy2(ROOT / 'runtime/bedrock/verification' / name, examples / name)
+        shutil.copytree(ROOT / 'runtime/bedrock/verification/fixtures', examples / 'fixtures', dirs_exist_ok=True)
         run(sys.executable, SOURCE / 'standalone-setup.py', '--build-helper', '--jobs', '2', env=env, cwd=SOURCE)
         run('cargo', '+' + env['CROSSEDOVER_RUST_TOOLCHAIN'], 'test', '--release', '--locked', '-j', '2',
             '-p', 'xodus-cli', '--example', 'standalone_helper', env=env, cwd=SOURCE / 'sources/xodus')
@@ -174,7 +182,7 @@ def main():
         stage()
     if args.check:
         print(json.dumps({'sourcePrepared': SOURCE.is_dir(), 'backendStaged': (OUTPUT / 'backend.json').is_file(),
-                          'sourceRevision': REVISION, 'downloadPolicy': 'https-only', 'gameDownloaded': False}, indent=2))
+                          'sourceRevision': REVISION, 'downloadPolicy': 'signed-xvd-v1', 'gameDownloaded': False}, indent=2))
 
 
 if __name__ == '__main__':

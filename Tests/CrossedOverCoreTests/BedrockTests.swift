@@ -19,7 +19,7 @@ struct BedrockTests {
             hashes[name] = try FileSafety.sha256(path)
         }
         let manifest: [String: Any] = ["schemaVersion": 1, "sourceRevision": BedrockBackend.sourceRevision,
-                                     "downloadPolicy": "https-only", "minimumMacOS": 26, "previewOnly": true,
+                                     "downloadPolicy": "signed-xvd-v1", "minimumMacOS": 26, "previewOnly": true,
                                      "fileHashes": hashes, "symlinks": [String: String]()]
         try JSONSerialization.data(withJSONObject: manifest).write(to: backend.appendingPathComponent("backend.json"))
         try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
@@ -29,6 +29,13 @@ struct BedrockTests {
     @Test func backendRequiresVerifiedBytesAndExactInventory() throws {
         let (root, _, backend) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }
+        let manifestURL = backend.directory.appendingPathComponent("backend.json")
+        let originalManifest = try Data(contentsOf: manifestURL)
+        var legacy = try JSONSerialization.jsonObject(with: originalManifest) as! [String: Any]
+        legacy["downloadPolicy"] = "https-only"
+        try JSONSerialization.data(withJSONObject: legacy).write(to: manifestURL)
+        #expect(throws: (any Error).self) { try BedrockBackend.load(at: backend.directory) }
+        try originalManifest.write(to: manifestURL)
         let unexpected = backend.directory.appendingPathComponent("unreviewed.py")
         try Data().write(to: unexpected)
         #expect(throws: (any Error).self) { try BedrockBackend.load(at: backend.directory) }
@@ -67,8 +74,16 @@ struct BedrockTests {
         #expect(event.title == "Preparing Minecraft…")
         #expect(!event.detail.contains("private-sentinel"))
         #expect(event.progress == 0.4)
+        let verifying = try BedrockEvent.decode(Data(#"{"state":"busy","title":"Verifying Minecraft","progress":0.66}"#.utf8))
+        #expect(verifying.title == "Verifying Minecraft")
+        for code in ["package_signature", "package_integrity", "package_integrity_format", "package_space"] {
+            let message = try BedrockEvent.decode(Data("{\"state\":\"error\",\"title\":\"\(code)\"}".utf8))
+            #expect(message.phase == .error)
+            #expect(!message.detail.contains("permission prompts"))
+        }
         let failure = try BedrockEvent.decode(Data(#"{"state":"error","title":"package_transport"}"#.utf8))
-        #expect(failure.detail.contains("no secure download"))
+        #expect(failure.detail.contains("downloader update"))
+        #expect(failure.detail.contains("sign-in is saved"))
         let connection = try BedrockEvent.decode(Data(#"{"state":"error","title":"package_connection"}"#.utf8))
         #expect(connection.detail.contains("sign-in is saved"))
         let license = try BedrockEvent.decode(Data(#"{"state":"error","title":"content_license"}"#.utf8))

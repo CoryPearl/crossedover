@@ -1,6 +1,6 @@
 # crossedover v1.4.0 quickstart
 
-**v1.4.0 is the Minecraft release in development.** The existing v1.3.1 download below does not include its Bedrock backend. Build the [Minecraft preview](runtime/bedrock/README.md) for local testing; download and gameplay validation remain incomplete.
+**v1.4.0 is the Minecraft release in development.** The existing v1.3.1 download below does not include its Bedrock backend. Build the [Minecraft preview](runtime/bedrock/README.md) for local testing; owned-account installation and local gameplay have passed initial testing; release checks remain open.
 
 ## Before you start
 
@@ -139,18 +139,18 @@ The launcher uses DXMT / Metal for DirectX 10–11, with DXVK / Metal for Direct
 
 **Settings → Other platforms → Open Xbox Cloud** opens Microsoft's official site in your default browser. It streams only supported cloud titles; account, subscription, region, network, and controller requirements vary. This does not download games into crossedover or imply Minecraft Bedrock is available in the cloud.
 
-Experimental [Bedrock for Mac](https://github.com/1JRobertson/bedrock-mac) work uses a separate WineGDK/DXMT runtime and Microsoft account helper. It establishes a possible future Bedrock-specific route, not support in crossedover or the Windows Xbox app. See [the technical assessment](docs/XBOX_AND_BEDROCK.md). Minecraft Java already has a separate native Mac version. No Microsoft credentials or games are included or collected by crossedover.
+The v1.4.0 development backend builds on [Bedrock for Mac](https://github.com/1JRobertson/bedrock-mac), using a separate WineGDK/DXMT runtime and Microsoft account helper. Local installation and gameplay have been tested on the current Mac; this does not run the Windows Xbox app. See [the technical assessment](docs/XBOX_AND_BEDROCK.md). Minecraft Java already has a separate native Mac version. No Microsoft credentials or games are included or collected by crossedover.
 
 In **v1.4.0 development previews**, **Game Launchers → Minecraft Bedrock…** opens
 a dedicated launcher. A separately built and verified backend is required;
 without it the install button explains what is missing. With it, choose
 **Install & Play**, complete Microsoft sign-in/Keychain prompts, and keep the
-setup session open. The backend downloads only over verified HTTPS and may
-stop if a secure package is unavailable. **Stop Minecraft** affects this
+setup session open. The backend checks Microsoft’s package signature and all
+metadata/game-data hashes before extraction; a failed check stops installation. **Stop Minecraft** affects this
 separate session. Once installation completes, Minecraft appears as a card in **Games**, in grid or list mode. Search for Minecraft or use its library filter; **⌘R** refreshes installation status without signing in. The launcher’s options allow account sign-out and uninstall
 that keeps worlds. [Local preview build and file paths](runtime/bedrock/README.md).
-This flow is not part of the public v1.3.1 package and is awaiting live gameplay
-validation; it does not add the Windows Xbox app or general Game Pass support.
+This flow is not part of the public v1.3.1 package. Broader compatibility and
+release validation remain open; it does not add the Windows Xbox app or general Game Pass support.
 
 
 ## Hardware guidelines

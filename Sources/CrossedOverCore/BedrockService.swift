@@ -33,7 +33,7 @@ public struct BedrockBackend: Sendable {
         }
         let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: file))
         guard manifest.schemaVersion == 1, manifest.sourceRevision == sourceRevision,
-              manifest.downloadPolicy == "https-only", manifest.minimumMacOS == 26, manifest.previewOnly,
+              manifest.downloadPolicy == "signed-xvd-v1", manifest.minimumMacOS == 26, manifest.previewOnly,
               !manifest.fileHashes.isEmpty, manifest.fileHashes.count <= 100_000 else {
             throw CrossedOverError.message("This Minecraft backend is incompatible. Use a matching crossedover preview build.")
         }
@@ -133,7 +133,11 @@ public struct BedrockEvent: Sendable, Equatable {
         case .error:
             title = "Minecraft needs attention"
             let errors = [
-                "package_transport": "Microsoft supplied no secure download for this package. Installation stopped before downloading the game.",
+                "package_transport": "crossedover cannot verify this Minecraft download yet. Your Microsoft sign-in is saved. Installation needs a downloader update; signing in again will not fix this.",
+                "package_signature": "Minecraft’s package signature could not be verified. Nothing was installed; retry the download.",
+                "package_integrity": "Minecraft’s download failed its integrity check. Nothing was installed; retry the download.",
+                "package_integrity_format": "Minecraft’s package uses an unsupported integrity layout. crossedover needs an update.",
+                "package_space": "There is not enough free space to download and prepare Minecraft.",
                 "package_connection": "Minecraft’s download server could not provide the game package. Your sign-in is saved; you can retry.",
                 "content_license": "Microsoft could not verify a Minecraft for Windows license for this account. Check that you signed in with the account that owns it.",
                 "keychain_access": "Allow access to your saved Microsoft sign-in in the macOS Keychain prompt, then retry.",
@@ -144,7 +148,7 @@ public struct BedrockEvent: Sendable, Equatable {
             ]
             detail = errors[wire.title] ?? "Setup or the game stopped. You can retry; existing worlds are kept. Microsoft sign-in and macOS permission prompts must be completed in their own windows."
         case .busy:
-            let known = ["Signing you in", "Sign in to Microsoft", "Checking your Minecraft purchase", "Downloading Minecraft", "Preparing Minecraft", "Finishing setup", "Signing out"]
+            let known = ["Signing you in", "Sign in to Microsoft", "Checking your Minecraft purchase", "Downloading Minecraft", "Verifying Minecraft", "Preparing Minecraft", "Finishing setup", "Signing out"]
             title = known.contains(wire.title) ? wire.title : "Preparing Minecraft…"
             detail = wire.title == "Sign in to Microsoft" || wire.title == "Signing you in"
                 ? "Complete Microsoft sign-in or Keychain access in its own window." : "You can cancel this session below."
