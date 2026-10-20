@@ -28,13 +28,13 @@ v1.4.0 is the Minecraft development release. Describing a launch path or runtime
 
 ## 1. What the app does
 
-crossedover is a native macOS library and compatibility manager for Windows software. It provides **Games** and **Apps** views, manages a Wine runtime and its Windows environment, installs official Windows launchers, discovers installed games, and requests launches through the appropriate client.
+crossedover is a native macOS library and compatibility manager for Windows software. It provides **Games** and **Apps** views, manages a Wine runtime and its Windows environment, installs official Windows launchers, discovers installed games, and requests launches through the appropriate client. It supports Steam, Epic (including Ubisoft partner handoffs), local `.exe` cards, and a separate Minecraft Bedrock backend in v1.4.0 development.
 
 Wine supplies Windows APIs and process loading. Graphics components translate supported Direct3D calls to APIs available on macOS. Rosetta supplies Intel translation on Apple silicon. crossedover coordinates these components and their configuration; it does not install a Windows virtual machine.
 
-The app's Wine build comes from CodeWeavers' published FOSS sources, with the patches in this repository. It does not copy the proprietary CrossOver application. Store clients, credentials, and games are not bundled. Steam, Epic, and Ubisoft retain their own sign-in, entitlement, download, update, and DRM flows.
+The app's Wine build comes from CodeWeavers' published FOSS sources, with the patches in this repository. It does not copy the proprietary CrossOver application. Store clients, credentials, and games are not bundled. Steam, Epic, and Ubisoft retain their own sign-in, entitlement, download, update, and DRM flows. Minecraft uses Microsoft sign-in and the owner’s real content license.
 
-The current application manages **one shared Windows environment**. The UUIDs in the data model identify that environment and its records; they do not imply that the interface already offers separate per-game environments.
+Steam, Epic, Ubisoft, and imported `.exe` cards use **one shared Windows environment**. Minecraft Bedrock uses a separate WineGDK runtime, account helper, prefix, and worlds under `Bedrock/`. Environment UUIDs do not imply that the interface offers arbitrary per-game environments.
 
 ## 2. Architecture and source map
 
@@ -619,3 +619,8 @@ by both an explicit test flag and fixture title; it sends no mouse events and
 never enumerates game windows. Real mixed-display behavior requires its own
 interactive check. The owner confirmed CS2 menu clicks align across the larger
 monitor after moving the running game with this runtime.
+
+Minecraft’s grid card and list row load the official grass-block logo from the
+owner’s installed game (`LargeLogo.png`, with smaller-logo fallbacks). Path
+resolution and image decoding run away from UI layout, using the same bounded
+artwork cache as the other games. No Minecraft asset is bundled with the app.

@@ -176,7 +176,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(model.selectedPage == "settings" ? "Settings" : model.selectedPage == "activity" ? "Activity" : appsPage ? "Apps" : "Games")
                         .font(.system(size: 25, weight: .medium)).tracking(-0.6).accessibilityAddTraits(.isHeader)
-                    Text(model.selectedPage == "settings" ? "Windows, launchers, and app preferences." : model.selectedPage == "activity" ? "Recent actions and sessions." : appsPage ? "Your Windows apps, on Mac." : "Steam, Epic, and Windows games, together.")
+                    Text(model.selectedPage == "settings" ? "Windows, launchers, and app preferences." : model.selectedPage == "activity" ? "Recent actions and sessions." : appsPage ? "Your Windows apps, on Mac." : "Your games, together on Mac.")
                         .font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
                 Spacer()
@@ -291,10 +291,24 @@ struct ContentView: View {
                 .accessibilityLabel("Play Minecraft Bedrock")
         }
     }
+    private func minecraftArtwork(compact: Bool = false) -> some View {
+        let path = model.minecraftArtworkPath
+        return LibraryArtwork(path: path, preview: renderingSnapshot ? path.flatMap { model.previewArtwork[$0] } : nil) { image in
+            ZStack {
+                Palette.sidebar
+                if let image {
+                    Image(decorative: image, scale: 1).resizable().interpolation(.none).scaledToFit()
+                        .padding(compact ? 6 : 16).accessibilityLabel("Minecraft artwork")
+                } else {
+                    Image(systemName: "cube").font(.system(size: compact ? 22 : 34, weight: .ultraLight))
+                        .foregroundStyle(Palette.muted).accessibilityHidden(true)
+                }
+            }
+        }
+    }
     private var minecraftCard: some View {
         VStack(spacing: 0) {
-            Image(systemName: "cube").font(.system(size: 34, weight: .ultraLight)).foregroundStyle(Palette.muted)
-                .frame(height: 112).frame(maxWidth: .infinity).background(Palette.sidebar)
+            minecraftArtwork().frame(height: 112).frame(maxWidth: .infinity)
             Rule()
             VStack(alignment: .leading, spacing: 10) {
                 Text("MINECRAFT · WINDOWS").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(Palette.muted)
@@ -307,8 +321,7 @@ struct ContentView: View {
     }
     private var minecraftRow: some View {
         HStack(spacing: 16) {
-            Image(systemName: "cube").font(.system(size: 22, weight: .ultraLight)).foregroundStyle(Palette.muted)
-                .frame(width: 88, height: 56).background(Palette.sidebar).clipShape(RoundedRectangle(cornerRadius: 4))
+            minecraftArtwork(compact: true).frame(width: 88, height: 56).clipShape(RoundedRectangle(cornerRadius: 4))
             VStack(alignment: .leading, spacing: 6) {
                 Text("Minecraft Bedrock").font(.system(size: 13, weight: .medium))
                 Text("Minecraft · " + minecraftState).font(.system(size: 10)).foregroundStyle(Palette.muted)

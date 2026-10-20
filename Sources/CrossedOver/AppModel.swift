@@ -37,6 +37,7 @@ import CrossedOverCore
     var bedrockAvailable = false
     var bedrockChecked = false
     var bedrockInstalled = false
+    var minecraftArtworkPath: String?
     var bedrockActive = false
     var bedrockStopping = false
     var bedrockError: String?
@@ -101,8 +102,20 @@ import CrossedOverCore
         if game == nil || (game?.store == .steam && game?.appID == "11020") { return logoPath ?? game?.artworkPath }
         return game?.artworkPath
     }
+    private func refreshMinecraftArtwork() async {
+        guard minecraftArtworkPath == nil else { return }
+        let root = paths.root
+        minecraftArtworkPath = await Task.detached(priority: .utility) {
+            for name in ["LargeLogo.png", "Logo.png", "StoreLogo.png"] {
+                if let file = try? FileSafety.containedURL("Bedrock/game/" + name, in: root),
+                   FileManager.default.fileExists(atPath: file.path) { return file.path }
+            }
+            return nil as String?
+        }.value
+    }
     func preparePreviewArtwork() async {
-        for path in Set(games.compactMap { artworkPath(for: $0) } + [logoPath].compactMap { $0 }) {
+        await refreshMinecraftArtwork()
+        for path in Set(games.compactMap { artworkPath(for: $0) } + [logoPath, minecraftArtworkPath].compactMap { $0 }) {
             previewArtwork[path] = await LibraryArtworkCache.shared.image(at: path)
         }
     }
@@ -238,6 +251,7 @@ import CrossedOverCore
             let status = try await backend.status(dataRoot: paths.root)
             verifiedBedrockBackend = backend
             bedrockStatus = status; bedrockInstalled = status.phase == .ready; bedrockAvailable = true
+            if bedrockInstalled { await refreshMinecraftArtwork() }
         } catch { bedrockError = "Minecraft's preview backend could not be verified. Rebuild or reinstall the matching backend." }
         bedrockChecked = true
     }
@@ -249,6 +263,8 @@ import CrossedOverCore
         // ordinary library refreshes do not hash its entire runtime again.
         guard let status = try? await backend.status(dataRoot: paths.root), !bedrockActive else { return }
         bedrockInstalled = status.phase == .ready
+        if bedrockInstalled { await refreshMinecraftArtwork() }
+        else { minecraftArtworkPath = nil }
     }
 
     func startMinecraft(signOut: Bool = false) {
@@ -264,7 +280,10 @@ import CrossedOverCore
                 let events = try await bedrockService.events(backend: backend, dataRoot: paths.root, signOut: signOut)
                 for try await event in events {
                     bedrockStatus = event
-                    if event.phase == .ready || event.phase == .playing { bedrockInstalled = true }
+                    if event.phase == .ready || event.phase == .playing {
+                        bedrockInstalled = true
+                        await refreshMinecraftArtwork()
+                    }
                     if event.phase == .new { bedrockInstalled = false }
                     if event.phase == .error { bedrockError = event.detail }
                 }
@@ -319,7 +338,7 @@ import CrossedOverCore
                 let game = try FileSafety.containedURL("game", in: home)
                 try FileManager.default.trashItem(at: game, resultingItemURL: nil)
             }.value
-            self.bedrockInstalled = false; self.bedrockStatus = nil
+            self.bedrockInstalled = false; self.bedrockStatus = nil; self.minecraftArtworkPath = nil
             self.bedrockChecked = false; await self.checkMinecraft()
             self.notice = "Minecraft moved to Trash. Your worlds were kept in its separate Windows environment."
         }

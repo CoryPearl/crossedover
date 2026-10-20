@@ -14,8 +14,8 @@ GitHub Pages serves the website publicly. The app repository remains private, so
 
 Images are app-owned interface previews with no account details. They are not gameplay benchmarks. The branch mark is original vector artwork.
 
-The Games preview shows the user’s installed library without account details. Apps previews use example cards; no games or apps are included. Interface previews are not gameplay benchmarks.
+The Games preview shows the installed library, including Minecraft, without account details. Minecraft’s card reads its artwork from the owner’s installed package; screenshots identify the game, and no game asset is bundled with the app. Apps previews use example cards; no games or apps are included. Interface previews are not gameplay benchmarks.
 
 The download count is the sum of uploaded `.dmg` asset `download_count` values on published GitHub releases (including published prereleases). Repeat downloads count; it is not unique users or installs. The Pages build reads the private API through its read-only Actions token, emits only aggregate values, and renders static HTML plus `downloads.json`. No browser API token, analytics script, cookie, or visitor tracking is used. It refreshes on publication and roughly every six hours; scheduling can be delayed. An API failure displays “Download count unavailable” instead of a false zero. Local builds stay offline unless you explicitly run `python3 website/download_stats.py --output PATH` and pass that file to `website/build.py --download-stats PATH`.
 
-The current development version is **v1.4.0**, the Minecraft release. Pages keeps the previous v1.3.1 download URLs until the new artifact is actually published. Existing interface images retain their original version labels.
+The current development version is **v1.4.0**, the Minecraft release. Pages keeps the previous v1.3.1 download URLs until the new artifact is actually published. The library/list previews show the current v1.4.0 interface, including Minecraft’s installed-game artwork. The Apps and launch-state examples retain their own labels.

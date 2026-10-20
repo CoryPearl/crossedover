@@ -48,7 +48,8 @@ for path, page in pages.items():
 for name in ("library.png", "list.png", "apps.png"):
     data = (site / "assets" / name).read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n", f"Invalid PNG: {name}"
-    assert struct.unpack(">II", data[16:24]) == (2200, 1520), f"Unexpected image size: {name}"
+    expected = (2200, 1800) if name == "library.png" else (2200, 1520)
+    assert struct.unpack(">II", data[16:24]) == expected, f"Unexpected image size: {name}"
 
 for name in ("README.md", "QUICKSTART.md", "docs/QUICKSTART.html"):
     assert VERSION in (ROOT / name).read_text(), f"Missing version: {name}"

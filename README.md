@@ -23,42 +23,39 @@
 <br>
 
 <p align="center">
-  <img src="website/assets/library.png" width="1100" alt="crossedover’s monochrome game library with search, game cards, and a Game Launchers menu">
+  <img src="website/assets/library.png" width="1100" alt="crossedover’s monochrome game library with search, Steam, Epic, and Minecraft cards, and a Game Launchers menu">
   <br>
-  <sub>A little less launcher. A little more library. Interface preview · v1.3.1.</sub>
+  <sub>A little less launcher. A little more library. Interface preview · v1.4.0.</sub>
 </p>
 
-Run Windows software on your Mac through Wine. **Games** for what you play. **Apps** for everything else. Steam games are our focus, with Epic Games and Ubisoft Connect handoffs alongside them. More launcher and platform support is coming soon.
+crossedover is a **macOS home for Windows apps and games**. Install games through Steam or Epic, play Minecraft Bedrock, or add a local Windows `.exe`. Keep what you play in **Games** and everything else in **Apps**, with search, grid/list views, and launch controls in one place.
 
-| Your games, together | Bring an .exe | Stay in control |
+| Steam & Epic | Minecraft Bedrock | Your Windows apps |
 | --- | --- | --- |
-| Steam and Epic installs in one searchable library. Open your clients from **Game Launchers**. | Add Windows games, tools, installers, and mod managers as cards. Steam is optional. | See launch status, stop Windows windows, browse files, and manage your installations. |
+| Install through the official Windows clients. Completed games appear automatically; Epic can hand off to Ubisoft Connect. | Sign in with the Microsoft account that owns Minecraft for Windows. Install locally, then launch from its Games card. | Add games, utilities, installers, and mod managers as cards. Choose **Play** or **Run**. No store launcher is required. |
+
+**Version 1.4.0 is in development.** Minecraft sign-in, verified installation, and local gameplay with controls, sound, and saving have been tested on the current Mac. The available **[v1.3.1 download](https://github.com/CoryPearl/crossedover/releases/tag/v1.3.1)** includes Steam, Epic, and `.exe` cards; it does not include the new Minecraft backend. [v1.4.0 notes](docs/RELEASE_NOTES_1.4.0.md) · [Validation](docs/VALIDATION.md).
 
 ## Get started
 
 1. Open the DMG and drag **crossedover** into **Applications**.
-2. Open **Game Launchers** in the sidebar and choose **Set up Steam** or **Set up Epic Games**, sign in inside that launcher, and install a Windows game. Completed installs appear in **Games** automatically.
-3. For other software, choose **Add .exe**, pick **Games** or **Apps**, and add the card. Press **Play** or **Run** whenever you need it. Both launchers are optional for imported apps.
+2. Choose a store from **Game Launchers**, or use **Add .exe** for local Windows software. Sign in through each launcher's own window.
+3. Installed games appear in **Games**. Added executables go in **Games** or **Apps**. Use the card's **Play / Run** button and **⋯** menu for files and management.
 
-**Required:** Apple silicon (M1 or newer), macOS 15 or 26, working Rosetta, and **8 GiB free plus app/game storage**. **Recommended:** M4-class performance, **16 GB+ unified memory** (24–32 GB+ for heavier games), and an SSD with room for updates. These are guidelines, not a 60 FPS guarantee. [Hardware guidelines](docs/HARDWARE.md) · [Quickstart](QUICKSTART.md). This release is not notarized.
+For Minecraft in a v1.4.0 build with its backend, choose **Game Launchers → Minecraft Bedrock… → Install & Play**. After installation, its card appears in Games. Requires an owned Windows edition, Apple silicon, **macOS 26+**, and Rosetta. [Minecraft setup](QUICKSTART.md#xbox-and-minecraft-bedrock).
 
-Use **Game Launchers** to open Steam, Epic Games, or an installed Ubisoft Connect client, filter Games by store, search either library, and switch between grid and list views. Include an app’s containing folder when it needs nearby files. After running an installer, use the card’s **⋯ → Edit app / choose executable** to select the installed program. Files stay local; nothing is uploaded. Only add software you trust: Windows apps run with your Mac user permissions.
+**Steam, Epic, and imported apps:** Apple silicon, macOS 15 or 26, Rosetta, and **8 GiB free plus app/game storage**. **Recommended:** M4-class performance, **16 GB+ unified memory**, and SSD space for updates. Heavier games may benefit from 24–32 GB+. These are guidelines, not a 60 FPS guarantee. The current build is not notarized. [Hardware](docs/HARDWARE.md) · [Quickstart](QUICKSTART.md).
 
-Compatibility varies. TrackMania Nations Forever is our first tested game; CS2 is experimental. Importing an executable does not guarantee it will work. Drivers, anti-cheat, extra frameworks, and some apps need functionality this runtime does not provide.
+## Your software, your library
 
-The bottom launch bar shows opening and running status. **Stop & close Windows** cancels the launch and closes all managed Windows windows; unsaved progress may be lost.
+- **One place to launch.** Open clients from Game Launchers; launch installed games and added executables from their cards. Minecraft uses its own environment alongside the shared Steam/Epic/app environment.
+- **Files and mods stay accessible.** Open installation folders in Finder. Use Steam Workshop where supported, or add Windows mod managers as Apps. Steam, Epic, and Ubisoft keep their own verification/uninstall flows.
+- **Keep control.** The bottom status bar tracks opening and running software. Stop closes the managed Windows session; Minecraft's Stop action affects only Minecraft. Unsaved progress can be lost.
+- **No automatic full backups.** Create or clear backups in Settings. Use the in-app uninstaller for complete app/data removal; dragging only the Mac app to Trash leaves its separate data folder behind. Minecraft's game uninstaller keeps worlds.
 
-Use **⋯** to manage cards and browse files. Steam keeps its uninstall and verification controls. Epic cards open **Epic Library → ⋯ → Manage** for verification and uninstall; confirm there. Both stores have file access, launch tracking, and mod folders. Imported cards can be renamed, moved between libraries, or removed. Removing an imported card keeps its files. [Mods and file access](QUICKSTART.md#mods) use normal Windows locations.
+Compatibility varies by app and game. TrackMania, Brawlhalla, CS2, and Minecraft have local test evidence; that does not guarantee every title, a minimum frame rate, or all hardware. Drivers, anti-cheat, DRM, and extra frameworks can prevent software from working. The Windows Xbox app and general PC Game Pass catalog are not implemented.
 
-Full environment backups are **manual only**. **Settings → Uninstall crossedover** removes the app, managed Windows apps, games, saves, and data after Windows software is closed. Empty Trash afterward. Dragging only the Mac app to Trash leaves its separate data folder behind.
-
-**Settings → Graphics renderer** offers DirectX 9–11, DirectX 10–11, DirectX 9, and an OpenGL fallback, with guidance for each. The combined mode appears when both backends are installed. Epic’s launcher manages DXMT for DirectX 10–11 and DXVK for DirectX 9 when available. Steam and imported apps keep their selected graphics profile. See the [Epic quickstart](QUICKSTART.md#epic-games) for setup and management.
-
-If an existing Epic installation opens its client but no game, quit Windows games and launchers, then use **Settings → Windows Epic Games → Repair launch support** to install missing Epic components.
-
-The Windows Xbox app and Minecraft Bedrock are **not supported by the included runtime**. Settings can open Xbox Cloud Gaming for supported streaming titles; this does not install Xbox games. [Xbox and Bedrock status](QUICKSTART.md#xbox-and-minecraft-bedrock).
-
-**v1.4.0 — Minecraft release (in development):** a dedicated Minecraft Bedrock launcher and separate WineGDK backend are being tested locally. They are not part of the published v1.3.1 download. Once installation completes, Minecraft appears as a card in Games, with grid/list views, search, Play, and launcher options. Microsoft sign-in, verified download/install, and local gameplay with controls and sound have been confirmed; repeat launch and remaining release checks are in progress. See [the local preview build](runtime/bedrock/README.md) and [v1.4.0 notes](docs/RELEASE_NOTES_1.4.0.md).
+Games and accounts are not included. Software runs locally through Wine with your Mac user permissions. Use your own accounts and executables you trust. More launchers, platforms, and compatibility improvements are coming soon.
 
 ## Build
 

@@ -39,13 +39,13 @@ The app bundle and its Windows data are separate. Games, launchers, and saves li
 
 Full backups are manual only and can need space for the entire Windows environment. They are not included in the setup allowance. Use **Settings → Backups** to create or clear them.
 
-Windows CPU, GPU, and VRAM specifications do not translate into a guaranteed Mac equivalent. More powerful hardware cannot supply unsupported Windows features, DRM, or anti-cheat. Local Xbox app games and Minecraft Bedrock remain unsupported by the included runtime. [Quickstart](https://corypearl.github.io/crossedover/quickstart.html#hardware)
-# Minecraft Bedrock development preview
+Windows CPU, GPU, and VRAM specifications do not translate into a guaranteed Mac equivalent. More powerful hardware cannot supply unsupported Windows features, DRM, or anti-cheat. The Windows Xbox app and general Game Pass catalog are unsupported. Minecraft Bedrock uses the separate v1.4.0 backend described below. [Quickstart](https://corypearl.github.io/crossedover/quickstart.html#hardware)
+## Minecraft Bedrock development preview
 
 The separate v1.4.0 Bedrock preview currently requires **Apple silicon, macOS 26
 or later, Rosetta, a Minecraft for Windows license, an internet connection and
 at least 8 GiB free for setup**. This is separate from the included Steam/Epic
-runtime requirements. The local build has reached sign-in on an M4/16 GiB Mac;
-download, gameplay performance, input/audio and lower-end Mac checks remain
-unverified. No Bedrock frame-rate target is advertised yet. See
+runtime requirements. The local build has passed sign-in, verified download/install, local play with
+controls/sound, saving and normal quit on an M4/16 GiB Mac. Frame-rate benchmarks,
+lower-end Macs, multiplayer and broader compatibility remain unverified. No Bedrock frame-rate target is advertised yet. See
 [the backend guide](../runtime/bedrock/README.md).

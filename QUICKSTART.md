@@ -4,7 +4,7 @@
 
 ## Before you start
 
-You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, an internet connection for setup. Steam and Epic accounts are needed only for games from those stores. Allow **8 GiB free for setup, plus space for apps and games**. Recommended: **16 GB+ unified memory**, or **24–32 GB+** for heavier games. [Hardware guidelines](#hardware-guidelines).
+You need an **Apple silicon Mac**, **macOS 15 or 26**, **Rosetta 2**, and an internet connection for setup. Use a Steam or Epic account only for that store, or your owning Microsoft account for Minecraft. Minecraft’s separate backend requires macOS 26+. Allow **8 GiB free for setup, plus space for apps and games**. Recommended: **16 GB+ unified memory**, or **24–32 GB+** for heavier games. [Hardware guidelines](#hardware-guidelines).
 
 Compatibility is experimental. TrackMania Nations Forever is the first tested demo, CS2 is experimental, and compatibility with other games and apps varies. A version number does not certify every game or sustained performance.
 
@@ -22,7 +22,7 @@ If macOS offers to install Rosetta 2, follow Apple's prompt.
 
 ## Games and Apps
 
-**Games** contains completed Windows Steam and Epic installs and Windows game cards you add yourself. **Apps** contains tools, mod managers, installers, and other Windows software. Both libraries support search (⌘F), refresh (⌘R), and grid/list views.
+**Games** contains completed Steam/Epic installs, Minecraft Bedrock after setup in v1.4.0, and Windows game cards you add yourself. **Apps** contains tools, mod managers, installers, and other Windows software. Both libraries support search (⌘F), refresh (⌘R), and grid/list views.
 
 ## Add a Windows .exe
 
@@ -135,7 +135,7 @@ The launcher uses DXMT / Metal for DirectX 10–11, with DXVK / Metal for Direct
 
 ## Xbox and Minecraft Bedrock
 
-**The Windows Xbox app, local PC Game Pass downloads, and Minecraft Bedrock are not supported by the included runtime.** Adding a launcher button cannot supply Windows Gaming Services, account/licensing integration, and game-specific GDK support. This release does not promise the whole Xbox library.
+**Minecraft Bedrock runs locally in the v1.4.0 development build with its separate backend.** The owning Microsoft account downloads and licenses the Windows edition. Installation, local play with controls/sound, saving, and normal quit have been tested on the current Mac. The previous v1.3.1 download has no Minecraft backend. The Windows Xbox app and general PC Game Pass catalog are not implemented.
 
 **Settings → Other platforms → Open Xbox Cloud** opens Microsoft's official site in your default browser. It streams only supported cloud titles; account, subscription, region, network, and controller requirements vary. This does not download games into crossedover or imply Minecraft Bedrock is available in the cloud.
 

@@ -1,5 +1,35 @@
 # Validation record
 
+## Minecraft artwork and product scope — October 19, 2026
+
+Minecraft's card and list row now read its official grass-block artwork from the
+owner's installed `LargeLogo.png`, with smaller-logo fallbacks. Asset path
+resolution and bounded thumbnail decoding run off UI layout. Installation and
+playing status load the artwork; uninstall clears its path. No Minecraft art
+asset is copied into the source or app bundle.
+
+- Release compilation, fresh v1.4.0 preview packaging and strict deep signature
+  verification passed. The updated app was opened after game/helper processes
+  ended, preserving their data and the selected Windows runtime/profile.
+- App-owned SwiftUI renders were visually reviewed in grid and list modes.
+  Minecraft's full-color artwork, title and Play/options controls are visible.
+  The website's new library image is 2200×1800 so all four cards fit; list view
+  remains 2200×1520. No protected game windows were inspected.
+- README, Markdown/HTML quickstarts, technical and hardware guides, and Pages
+  copy describe Windows apps/games, Steam, Epic, Ubisoft handoffs and Minecraft.
+  They distinguish local v1.4.0 Bedrock testing from the available v1.3.1 binary.
+  The offline DMG guide keeps inline styles and no external image dependency.
+- Pages built successfully; release checks passed versions, local links,
+  fragments and image dimensions. All **3 existing website tests** passed.
+  Local index, quickstart and updated images returned HTTP 200.
+- Browser preview could not bootstrap because its installed runtime referenced
+  a missing browser-service module; one reset/retry reproduced the failure.
+  Website rendered-layout QA was not completed. No browser fallback or tool
+  configuration change was attempted. The owned preview server was stopped.
+
+Evidence: `.cache/artwork-scope/` and refreshed `website/assets/library.png` /
+`list.png`. Changes remain local; the GitHub Pages deployment was not triggered.
+
 ## CS2 native move/resize input bounds — October 19, 2026
 
 The owner reports CS2 opened and worked well, but after moving the running game
