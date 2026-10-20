@@ -15,7 +15,8 @@
 - CS2 gains a one-time low-detail performance preset targeting 60 FPS in
   matches: MSAA and ambient occlusion off, lower scene detail, with dynamic
   shadows, audio and the confirmed window/input policy retained. Later user
-  graphics choices remain intact. Sustained match FPS still needs validation.
+  graphics choices remain intact. The owner reports that local play looks
+  good at 60 FPS with this preset; a universal minimum is not established.
 - Every installed store game has a renderer recommendation in card/list views
   and its graphics details. Known recipes and bounded executable API hints
   take precedence; unknown titles get a labeled starting point. Minecraft
@@ -39,8 +40,9 @@ Existing public download URLs still point to the previous v1.3.1 artifact.
 Publishing v1.4.0 waits for the Minecraft flow and remaining release checks.
 The latest CS2 online test encounters a VAC file-signature error from both
 crossedover and Windows Steam's own Play button, including after Steam's file
-verification jobs finished with No Error. A fresh-client retest is pending.
-Secure matchmaking is blocked in the reported run, and sustained match FPS is
-not validated in this build.
+verification jobs finished with No Error and after a fresh Windows Steam
+session. Local play is owner-confirmed around 60 FPS in the tested run;
+secure matchmaking remains blocked. The saved Steam launch options are the
+next configuration check. Rendering recommendations do not certify online play.
 See [backend build instructions](../runtime/bedrock/README.md) and the
 [validation record](VALIDATION.md).

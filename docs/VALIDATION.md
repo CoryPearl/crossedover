@@ -56,10 +56,16 @@ caching run outside the UI actor; no game code runs during API inspection.
   query reports Steam Client Service running (state 4), with both service and
   Win32 exit codes zero. This does not establish VAC compatibility. The owner
   then closed both apps normally; process observation found only Windows system
-  services before a fresh Steam client was requested. The fresh-session online
-  retry and offline Practice performance checks remain pending.
-  **Sustained match FPS, frametime improvement and this run's click alignment
-  remain unconfirmed; VAC-secured matchmaking is blocked in the reported run.**
+  services before a fresh Steam client was requested. Following that test, the
+  owner reports **“60fps looks great”**, while the VAC warning remains. This
+  confirms a good subjective result at the reported frame rate in that local
+  run, not a measured minimum across monitors, maps or session lengths. No
+  automated frame-time capture or numeric before/after baseline was obtained.
+  The working preset, runtime, audio and window/input policy are retained.
+  A final check of the game's user-saved Steam Launch Options is pending;
+  crossedover's own recipe contains only window sizing and the frame cap.
+  **Local performance is owner-confirmed around 60 FPS in the tested run;
+  VAC-secured matchmaking remains blocked after a fresh Steam session.**
   No game UI capture, input automation, driver replacement,
   remote push or public release was performed.
 
