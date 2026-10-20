@@ -48,7 +48,16 @@ caching run outside the UI actor; no game code runs during API inspection.
   was requested through its normal flow. Its installation log recorded verifying
   activity from 21:37:10 to 21:39:14 local time, then returned to Fully Installed
   with no pending update. A fresh normal Steam launch was requested and CS2's
-  process observed again. The UI repair count and retry outcome remain pending.
+  process observed again. The owner supplied a second screenshot confirming the
+  same warning, then confirmed it also occurs using Windows Steam's own Play
+  button. This rules out the crossedover handoff alone as a sufficient cause.
+  Allowlisted installation-job result parsing finds `No Error` for the two
+  jobs ending at 21:39:13/21:39:14; no UI repair count is available. A read-only
+  query reports Steam Client Service running (state 4), with both service and
+  Win32 exit codes zero. This does not establish VAC compatibility. The owner
+  then closed both apps normally; process observation found only Windows system
+  services before a fresh Steam client was requested. The fresh-session online
+  retry and offline Practice performance checks remain pending.
   **Sustained match FPS, frametime improvement and this run's click alignment
   remain unconfirmed; VAC-secured matchmaking is blocked in the reported run.**
   No game UI capture, input automation, driver replacement,

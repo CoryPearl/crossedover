@@ -37,9 +37,10 @@ the Windows Xbox app or general Game Pass compatibility.
 
 Existing public download URLs still point to the previous v1.3.1 artifact.
 Publishing v1.4.0 waits for the Minecraft flow and remaining release checks.
-The latest CS2 online test encountered a VAC file-signature error. Steam ran a
-verification cycle and the game was relaunched; its repair report and retry
-outcome are pending. Secure matchmaking and sustained match FPS are not validated
-in this build.
+The latest CS2 online test encounters a VAC file-signature error from both
+crossedover and Windows Steam's own Play button, including after Steam's file
+verification jobs finished with No Error. A fresh-client retest is pending.
+Secure matchmaking is blocked in the reported run, and sustained match FPS is
+not validated in this build.
 See [backend build instructions](../runtime/bedrock/README.md) and the
 [validation record](VALIDATION.md).
