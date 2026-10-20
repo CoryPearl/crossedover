@@ -45,7 +45,10 @@ caching run outside the UI actor; no game code runs during API inspection.
   or third-party-injection options. No local `d3d11.dll`/`dxgi.dll` replacements
   were found in the two game executable folders. These checks don't establish
   the signature error's cause. After the owner quit CS2, Steam file verification
-  was requested through its normal flow; completion/repair results are pending.
+  was requested through its normal flow. Its installation log recorded verifying
+  activity from 21:37:10 to 21:39:14 local time, then returned to Fully Installed
+  with no pending update. A fresh normal Steam launch was requested and CS2's
+  process observed again. The UI repair count and retry outcome remain pending.
   **Sustained match FPS, frametime improvement and this run's click alignment
   remain unconfirmed; VAC-secured matchmaking is blocked in the reported run.**
   No game UI capture, input automation, driver replacement,
