@@ -10,7 +10,8 @@
 - Minecraft uses a separate WineGDK runtime and data directory. Its Stop action
   leaves Steam and Epic sessions independent; uninstall preserves Minecraft worlds.
 - CS2 has an opt-in input-bounds fix for native window moves/resizes. Owned
-  32/64-bit fixtures pass; the larger-monitor case is awaiting confirmation.
+  32/64-bit fixtures pass, and the owner confirmed clicks align across the
+  larger monitor after moving the running game.
 - Epic partner launches use the repaired prerequisites and queued client handoff.
   Brawlhalla opens from crossedover. A new scoped runtime patch adds native
   controls to shaped/layered main windows and keeps desktop title bars onscreen.

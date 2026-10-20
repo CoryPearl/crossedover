@@ -617,4 +617,5 @@ preserved. Other games retain the default-off policy. The owned input-bounds
 fixture triggers native geometry changes only on its receiving window, gated
 by both an explicit test flag and fixture title; it sends no mouse events and
 never enumerates game windows. Real mixed-display behavior requires its own
-interactive check.
+interactive check. The owner confirmed CS2 menu clicks align across the larger
+monitor after moving the running game with this runtime.

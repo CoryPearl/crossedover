@@ -29,11 +29,14 @@ No display resolution, global DPI or user CS2 video settings are reset.
   existing Metal profile was preserved and no automatic backup was created.
   The new app is open and CS2 was requested through the normal launch route;
   its generated per-game policy enables capture following while retaining
-  shooter cursor capture. Actual second-monitor confirmation remains pending.
+  shooter cursor capture. The CS2 game process was observed. The owner repeated
+  the move from the built-in display to the larger monitor and confirmed
+  **“Clicks line up across the whole window.”**
 - The final driver patch passes reverse checks alongside the earlier window
   controls patch. This is synthetic move/resize evidence, not a test with two
-  physical monitors. Actual CS2 secondary-display clicks and aiming remain to
-  be confirmed; no public release or push has occurred.
+  physical monitors. The subsequent owner confirmation above establishes actual
+  CS2 secondary-display menu clicking. Aiming, all display/DPI arrangements and
+  other games were not separately revalidated; no public release or push occurred.
 
 Evidence: `.cache/input-bounds/`,
 `.cache/input-bounds-a829b5f1-c4e8-411b-a6f0-9a6412ae74cb` (baseline),
