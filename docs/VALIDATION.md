@@ -62,12 +62,28 @@ caching run outside the UI actor; no game code runs during API inspection.
   run, not a measured minimum across monitors, maps or session lengths. No
   automated frame-time capture or numeric before/after baseline was obtained.
   The working preset, runtime, audio and window/input policy are retained.
-  A final check of the game's user-saved Steam Launch Options is pending;
-  crossedover's own recipe contains only window sizing and the frame cap.
+  The owner subsequently confirmed Steam's saved Launch Options field is blank;
+  crossedover's own recipe contains only window sizing and the frame cap. Saved
+  flags therefore do not explain this run's warning. The observed failures are
+  consistent with a runtime/VAC compatibility issue, but the exact rejected
+  component has not been identified. Similar Windows-build failures under
+  Proton are reported in [Valve's tracker](https://github.com/ValveSoftware/csgo-osx-linux/issues/4125);
+  that Linux evidence does not establish this Mac's root cause. No verified
+  correction for this runtime has been identified. CS2's source renderer-details note
+  now distinguishes the confirmed local rendering result from blocked secure
+  matchmaking. No launch flags, game binaries or runtime components were changed.
   **Local performance is owner-confirmed around 60 FPS in the tested run;
   VAC-secured matchmaking remains blocked after a fresh Steam session.**
   No game UI capture, input automation, driver replacement,
   remote push or public release was performed.
+
+The follow-up changed only compatibility/help text. Release compilation copied
+the updated recipe resource successfully; the CLI still recommends DirectX 10–11
+and includes the matchmaking limitation. Pages build, release/link/offline-guide
+checks and all three website tests passed. No additional preview bundle was
+created or active app replaced for this text update; the note will be included
+in the next packaged build. The prior 90-test core result remains applicable to
+the unchanged implementation.
 
 Evidence: `.cache/cs2-performance/`. Current preview:
 `.cache/previews/crossedover-1.4.0-cs2-performance-verified.app`.

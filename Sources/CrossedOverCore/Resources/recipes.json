@@ -19,7 +19,7 @@
     "profile": "metal",
     "executableNames": ["cs2.exe"],
     "status": "experimental",
-    "notes": "DXMT translates CS2's DirectX 11 graphics to Metal. Use the game's DirectX 11 mode for this recommendation. The combined DirectX 9–11 profile also includes this backend; neither profile adds DirectX 12 support.",
+    "notes": "Use DXMT for CS2's DirectX 11 graphics. The combined DirectX 9–11 profile also includes this backend. Local play is reported around 60 FPS with the tuned preset on M4. Current tests encounter a signature error on VAC-secured servers, including through Steam's own Play button after verification and a fresh client session with blank launch options. This recommendation covers rendering; secure matchmaking remains blocked in the tested setup.",
     "compatibleProfiles": ["metal", "combined"],
     "launchArguments": ["-windowed", "-w", "1280", "-h", "720", "+fps_max", "60"]
   }

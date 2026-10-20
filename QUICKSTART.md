@@ -92,6 +92,8 @@ CS2 launches at 1280×720 with a 60 FPS cap. Its next launch applies a one-time 
 
 If CS2 reports missing or invalid signatures, quit the game and use **⋯ → Verify game files…**, then check Steam's progress. Secure matchmaking is unconfirmed in the current local build; a successful offline Practice match does not validate VAC-secured play. See [Steam's verification instructions](https://help.steampowered.com/en/faqs/view/0C48-FCBD-DA71-93EB/).
 
+Current v1.4.0 testing reports local CS2 play around 60 FPS on the M4 Mac. VAC-secured matchmaking remains blocked in that setup, including after verification, a fresh Windows Steam session, launching from Steam's own Play button and confirming blank saved launch options. The exact cause is unconfirmed and there is no verified correction for this runtime yet. Keep the working graphics preset for local play; the renderer recommendation does not establish online compatibility.
+
 ## Mods
 
 Games keep their normal Windows files, so manual mods can be installed in the locations specified by each mod's instructions. Quit the game before changing files.

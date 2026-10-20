@@ -42,7 +42,9 @@ The latest CS2 online test encounters a VAC file-signature error from both
 crossedover and Windows Steam's own Play button, including after Steam's file
 verification jobs finished with No Error and after a fresh Windows Steam
 session. Local play is owner-confirmed around 60 FPS in the tested run;
-secure matchmaking remains blocked. The saved Steam launch options are the
-next configuration check. Rendering recommendations do not certify online play.
+secure matchmaking remains blocked even with blank saved Steam launch options.
+The renderer details explain this current limitation. The exact VAC failure
+cause is unconfirmed; no verified runtime correction has been identified.
+Rendering recommendations do not certify online play.
 See [backend build instructions](../runtime/bedrock/README.md) and the
 [validation record](VALIDATION.md).
