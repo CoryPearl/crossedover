@@ -18,7 +18,7 @@
   <a href="TECHNICAL_README.md">Technical README</a>
 </p>
 
-<p align="center"><sub>v1.4.0 · In development &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
+<p align="center"><sub>v1.4.0 · Minecraft release &nbsp;·&nbsp; macOS &nbsp;·&nbsp; Apple silicon &nbsp;·&nbsp; Open source</sub></p>
 
 <br>
 
@@ -34,7 +34,7 @@ crossedover is a **macOS home for Windows apps and games**. Install games throug
 | --- | --- | --- |
 | Install through the official Windows clients. Completed games appear automatically; Epic can hand off to Ubisoft Connect. | Sign in with the Microsoft account that owns Minecraft for Windows. Install locally, then launch from its Games card. | Add games, utilities, installers, and mod managers as cards. Choose **Play** or **Run**. No store launcher is required. |
 
-**Version 1.4.0 is in development.** Minecraft sign-in, verified installation, and local gameplay with controls, sound, and saving have been tested on the current Mac. The available **[v1.3.1 download](https://github.com/CoryPearl/crossedover/releases/tag/v1.3.1)** includes Steam, Epic, and `.exe` cards; it does not include the new Minecraft backend. [v1.4.0 notes](docs/RELEASE_NOTES_1.4.0.md) · [Validation](docs/VALIDATION.md).
+**[Download v1.4.0](https://github.com/CoryPearl/crossedover/releases/tag/v1.4.0)** — includes the Windows runtime and separate Minecraft backend. Minecraft sign-in, verified installation, and local gameplay with controls, sound, and saving have been tested on the current Mac. Downloads require repository access while this GitHub repository is private. [v1.4.0 notes](docs/RELEASE_NOTES_1.4.0.md) · [Validation](docs/VALIDATION.md).
 
 ## Get started
 
@@ -42,7 +42,7 @@ crossedover is a **macOS home for Windows apps and games**. Install games throug
 2. Choose a store from **Game Launchers**, or use **Add .exe** for local Windows software. Sign in through each launcher's own window.
 3. Installed games appear in **Games**. Added executables go in **Games** or **Apps**. Use the card's **Play / Run** button and **⋯** menu for files and management.
 
-For Minecraft in a v1.4.0 build with its backend, choose **Game Launchers → Minecraft Bedrock… → Install & Play**. After installation, its card appears in Games. Requires an owned Windows edition, Apple silicon, **macOS 26+**, and Rosetta. [Minecraft setup](QUICKSTART.md#xbox-and-minecraft-bedrock).
+For Minecraft, choose **Game Launchers → Minecraft Bedrock… → Install & Play**. After installation, its card appears in Games. Requires an owned Windows edition, Apple silicon, **macOS 26+**, and Rosetta. [Minecraft setup](QUICKSTART.md#xbox-and-minecraft-bedrock).
 
 **Steam, Epic, and imported apps:** Apple silicon, macOS 15 or 26, Rosetta, and **8 GiB free plus app/game storage**. **Recommended:** M4-class performance, **16 GB+ unified memory**, and SSD space for updates. Heavier games may benefit from 24–32 GB+. These are guidelines, not a 60 FPS guarantee. The current build is not notarized. [Hardware](docs/HARDWARE.md) · [Quickstart](QUICKSTART.md).
 

@@ -1,6 +1,10 @@
 # crossedover v1.4.0 — Minecraft
 
-**In development. Not published.** Local builds use version **1.4.0**, build **26**.
+Version **1.4.0**, build **26**. The DMG includes the Windows runtime and separate Minecraft backend.
+
+[Download](https://github.com/CoryPearl/crossedover/releases/download/v1.4.0/crossedover-1.4.0.dmg) · [Quickstart](../QUICKSTART.md) · [Website](https://corypearl.github.io/crossedover/)
+
+Locally signed, **not notarized by Apple**. Downloads require repository access while the GitHub repository is private. No games or accounts are bundled.
 
 - Minecraft Bedrock has a dedicated entry in Game Launchers and Settings, with
   Microsoft sign-in, setup progress, cancellation, sign-out and files/worlds access.
@@ -39,8 +43,9 @@ Failed setup does not create an installed-game card. The current preview require
 Apple silicon, Rosetta, macOS 26+ and an owned Windows edition. This does not add
 the Windows Xbox app or general Game Pass compatibility.
 
-Existing public download URLs still point to the previous v1.3.1 artifact.
-Publishing v1.4.0 waits for the Minecraft flow and remaining release checks.
+v1.4.0 is published at the owner’s request with the local test results below.
+Broader hardware coverage, saved-world repeat testing, clean-Mac setup and the
+remaining [release checklist](RELEASE.md) are not certified by this release.
 CS2 retains the working native window/input policy and normal Steam overlay
 handling. Its policy removes crossedover’s earlier forced overlay-disable
 entries. After the sharper 1600×900 and presentation-timing update, the owner

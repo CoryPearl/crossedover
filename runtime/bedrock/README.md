@@ -1,4 +1,4 @@
-# Minecraft Bedrock backend · v1.4.0 development
+# Minecraft Bedrock backend · v1.4.0
 
 This is the **local Windows Bedrock** backend, separate from crossedover's
 Steam/Epic runtime. The Game Launchers menu opens a Minecraft panel; its install
@@ -41,7 +41,7 @@ owner confirmed the game menu, playable local-world controls/sound, save and
 normal quit. The installation check reports ready. The complete temporary
 archive is gone; only 14,614,528 bytes of metadata remain with the game.
 Card-based repeat launch and saved-world reopen are being checked.
-No v1.4.0 binary has been published.
+The v1.4.0 DMG includes this backend; broader compatibility is still being checked.
 
 ## Build locally
 
@@ -117,13 +117,15 @@ crossedover requires finishing or stopping that session first.
 ## Release boundary
 
 Core tests, source builds, a valid package, and a real game session are separate
-checks. Do not publish v1.4.0 as playable Bedrock support until owned-account
-download, gameplay, controls/audio, world save/reopen, normal quit, cancellation,
-window/fullscreen behavior and a repeat launch have been checked. The development app is v1.4.0/build 26. Existing public download links still
-point to the previous artifact while this work is in progress.
+checks. The owner requested publishing v1.4.0/build 26 after confirming
+owned-account download, gameplay, controls/audio, saving and normal quit.
+Saved-world reopen, cancellation, window/fullscreen behavior, repeat launch and
+broader hardware remain validation work; their completion is not implied by
+publishing this version.
 
 The upstream portable-library notice/source inventory and clean-Mac validation
-also remain binary-release work. This backend is for local preview testing.
+also remain work for broader public distribution. The backend retains its
+preview status and is included in the owner-requested private-repository release.
 Preserve the upstream GPLv3, Wine LGPL, DXMT and dependency notices. The source
 revision plus `patches/crossedover-backend.patch` are the durable build inputs;
 generated source changes alone are not an integration patch.

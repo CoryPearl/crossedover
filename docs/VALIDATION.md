@@ -1,5 +1,29 @@
 # Validation record
 
+## v1.4.0 release preparation — October 19, 2026
+
+Following the confirmed CS2 online test, the owner requested publishing v1.4.0
+to GitHub. The release uses version 1.4.0/build 26 and the tested Windows runtime
+plus the separate signature-verifying Minecraft backend. It contains no game
+installation, account, world or saved credentials. Repository visibility remains
+private, with the public GitHub Pages site explaining download access.
+
+The complete DMG was built, its checksum verified, and its mounted contents
+checked for both runtime manifests, the matching app version/build, the offline
+quickstart, notices and Applications link. Both bundled component inventories
+and the app's strict deep ad-hoc signature verification passed. Release/website
+consistency checks and all three website tests passed. The preceding core
+validation remains 92 tests in 16 suites plus four focused CS2 regression checks.
+
+DMG SHA-256:
+`4aafa8e9276c4091daef23954cb0c0d19f84c5bd902ecd121e9806feb5e340fc`.
+The release includes checksums, guides, notices and a component inventory. The
+inventory is not a complete SBOM or independent source rebuild. Existing
+clean-Mac, broader hardware, Minecraft repeat/saved-world and notarization work
+is still recorded in [the release checklist](RELEASE.md). Publishing this build
+does not claim those checks passed. The running game and its working environment
+were not interrupted or replaced during release packaging.
+
 ## CS2 sharper resolution and presentation timing confirmed — October 19, 2026
 
 The owner later reports recurring frame drops **throughout matches**, despite
